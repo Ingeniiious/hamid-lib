@@ -25,18 +25,10 @@ export default function DashboardLoading() {
         </div>
       </div>
 
-      {/* Skeleton course grid */}
+      {/* Skeleton major cards */}
       <div className="mx-auto max-w-5xl px-6 pb-12 pt-4">
-        {/* Skeleton major divider */}
-        <div className="flex items-center gap-4 py-2">
-          <Skeleton className="h-px flex-1 bg-gray-900/5 dark:bg-white/5" />
-          <Skeleton className="h-5 w-40 bg-gray-900/10 dark:bg-white/10" />
-          <Skeleton className="h-px flex-1 bg-gray-900/5 dark:bg-white/5" />
-        </div>
-
-        {/* Skeleton cards */}
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
+          {Array.from({ length: 3 }).map((_, i) => (
             <Card
               key={i}
               className="border-gray-900/10 bg-white/50 backdrop-blur-sm dark:border-white/10 dark:bg-white/5"
@@ -44,8 +36,7 @@ export default function DashboardLoading() {
               <CardHeader className="pb-3">
                 <Skeleton className="h-5 w-3/4 bg-gray-900/10 dark:bg-white/10" />
               </CardHeader>
-              <CardContent className="space-y-2">
-                <Skeleton className="h-4 w-1/2 bg-gray-900/10 dark:bg-white/10" />
+              <CardContent>
                 <Skeleton className="h-4 w-1/3 bg-gray-900/10 dark:bg-white/10" />
               </CardContent>
             </Card>

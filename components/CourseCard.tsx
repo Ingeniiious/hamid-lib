@@ -15,10 +15,11 @@ interface CourseCardProps {
     semester: string | null;
   };
   index: number;
+  href?: string;
 }
 
-export function CourseCard({ course, index }: CourseCardProps) {
-  const href = `/course/${course.slug || course.id}`;
+export function CourseCard({ course, index, href }: CourseCardProps) {
+  const link = href ?? `/course/${course.slug || course.id}`;
 
   return (
     <motion.div
@@ -27,7 +28,7 @@ export function CourseCard({ course, index }: CourseCardProps) {
       transition={{ duration: 0.4, ease, delay: index * 0.06 }}
       whileHover={{ scale: 1.02 }}
     >
-      <Link href={href}>
+      <Link href={link}>
         <Card className="cursor-pointer border-border/50 bg-card/80 backdrop-blur-sm transition-shadow duration-300 hover:shadow-lg">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium">

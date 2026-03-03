@@ -1,8 +1,8 @@
 "use server";
 
 import { randomInt, randomBytes } from "crypto";
-import { scrypt } from "@noble/hashes/scrypt";
-import { bytesToHex } from "@noble/hashes/utils";
+import { scrypt } from "@noble/hashes/scrypt.js";
+import { bytesToHex } from "@noble/hashes/utils.js";
 import { db } from "@/lib/db";
 import { emailVerification } from "@/database/schema";
 import { eq, and, gt, sql } from "drizzle-orm";
