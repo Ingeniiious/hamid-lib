@@ -1,10 +1,43 @@
 import type { Metadata } from "next";
+import { Geist } from "next/font/google";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
+const geist = Geist({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-geist",
+  display: "swap",
+});
+
+const siteUrl = "https://library.hamidproject.xyz";
+
 export const metadata: Metadata = {
-  title: "Hamid Library",
+  title: {
+    default: "Hamid Library",
+    template: "%s | Hamid Library",
+  },
   description:
-    "A personal open-source university course library — courses, presentations, resources, and more.",
+    "Your University Course Library — courses, presentations, resources, and more.",
+  metadataBase: new URL(siteUrl),
+  openGraph: {
+    title: "Hamid Library",
+    description:
+      "Your University Course Library — courses, presentations, resources, and more.",
+    url: siteUrl,
+    siteName: "Hamid Library",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Hamid Library",
+    description:
+      "Your University Course Library — courses, presentations, resources, and more.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
@@ -13,20 +46,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="font-sans antialiased">{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${geist.variable} font-sans antialiased`}>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   );
 }
