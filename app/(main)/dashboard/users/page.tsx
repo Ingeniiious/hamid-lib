@@ -22,7 +22,6 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { DashboardTopBar } from "@/components/DashboardTopBar";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -315,31 +314,22 @@ export default function AccountPage() {
 
   if (!sessionLoaded) {
     return (
-      <>
-        <div className="sticky top-0 z-20 flex items-center justify-between px-6 py-5 sm:px-8">
-          <div className="h-9 w-9 animate-pulse rounded-full bg-gray-900/10 dark:bg-white/10" />
-          <div className="h-9 w-9 animate-pulse rounded-full bg-gray-900/10 dark:bg-white/10" />
+      <div className="mx-auto max-w-3xl px-6 pb-12 pt-4">
+        <div className="mb-8 flex justify-center">
+          <div className="h-7 w-48 animate-pulse rounded-lg bg-gray-900/10 dark:bg-white/10" />
         </div>
-        <div className="mx-auto max-w-3xl px-6 pb-12 pt-4">
-          <div className="mb-8 flex justify-center">
-            <div className="h-7 w-48 animate-pulse rounded-lg bg-gray-900/10 dark:bg-white/10" />
-          </div>
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <div className="h-72 animate-pulse rounded-2xl bg-gray-900/5 dark:bg-white/5" />
-            <div className="h-72 animate-pulse rounded-2xl bg-gray-900/5 dark:bg-white/5" />
-            <div className="h-48 animate-pulse rounded-2xl bg-gray-900/5 md:col-span-2 dark:bg-white/5" />
-            <div className="h-36 animate-pulse rounded-2xl bg-red-500/5 md:col-span-2" />
-          </div>
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <div className="h-72 animate-pulse rounded-2xl bg-gray-900/5 dark:bg-white/5" />
+          <div className="h-72 animate-pulse rounded-2xl bg-gray-900/5 dark:bg-white/5" />
+          <div className="h-48 animate-pulse rounded-2xl bg-gray-900/5 md:col-span-2 dark:bg-white/5" />
+          <div className="h-36 animate-pulse rounded-2xl bg-red-500/5 md:col-span-2" />
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      <DashboardTopBar userName={userName} />
-
-      <motion.div
+    <motion.div
         variants={stagger}
         initial="hidden"
         animate="show"
@@ -729,6 +719,5 @@ export default function AccountPage() {
           </motion.div>
         </div>
       </motion.div>
-    </>
   );
 }

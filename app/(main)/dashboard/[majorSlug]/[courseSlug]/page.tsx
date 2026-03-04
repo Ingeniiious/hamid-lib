@@ -1,15 +1,11 @@
-import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { course } from "@/database/schema";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { DashboardTopBar } from "@/components/DashboardTopBar";
 import { BackButton } from "@/components/BackButton";
 import { CourseDetail } from "@/components/CourseDetail";
 import { unslugify } from "@/lib/slugify";
 import type { Metadata } from "next";
-
-export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ majorSlug: string; courseSlug: string }>;
@@ -40,8 +36,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CoursePage({ params }: Props) {
   const { majorSlug, courseSlug } = await params;
-  const { data: session } = await auth.getSession();
-  if (!session) redirect("/auth");
 
   const courses = await db
     .select()
@@ -52,20 +46,15 @@ export default async function CoursePage({ params }: Props) {
   if (!c) notFound();
 
   const majorName = unslugify(majorSlug);
-  const userName = session.user?.name || "Student";
 
   return (
-    <>
-      <DashboardTopBar userName={userName} />
+    <div className="mx-auto max-w-5xl px-6 pb-12 pt-4">
+      <BackButton
+        href={`/dashboard/${majorSlug}`}
+        label={majorName}
+      />
 
-      <div className="mx-auto max-w-5xl px-6 pb-12 pt-4">
-        <BackButton
-          href={`/dashboard/${majorSlug}`}
-          label={majorName}
-        />
-
-        <CourseDetail course={c} />
-      </div>
-    </>
+      <CourseDetail course={c} />
+    </div>
   );
 }

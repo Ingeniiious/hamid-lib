@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -29,25 +28,21 @@ export function CourseCard({ course, index, href }: CourseCardProps) {
       whileHover={{ scale: 1.02 }}
     >
       <Link href={link}>
-        <Card className="cursor-pointer border-border/50 bg-card/80 backdrop-blur-sm transition-shadow duration-300 hover:shadow-lg">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium">
-              {course.title}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1">
-            {course.professor && (
-              <p className="text-sm text-muted-foreground">
-                {course.professor}
-              </p>
-            )}
-            {course.semester && (
-              <p className="text-xs text-muted-foreground/70">
-                {course.semester}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="cursor-pointer rounded-2xl border border-gray-900/10 bg-white/50 p-6 text-center backdrop-blur-xl transition-shadow duration-300 hover:shadow-lg dark:border-white/15 dark:bg-white/5">
+          <h3 className="font-display text-base font-light text-gray-900 dark:text-white">
+            {course.title}
+          </h3>
+          {course.professor && (
+            <p className="mt-2 text-sm text-gray-900/50 dark:text-white/50">
+              {course.professor}
+            </p>
+          )}
+          {course.semester && (
+            <p className="mt-1 text-xs text-gray-900/40 dark:text-white/40">
+              {course.semester}
+            </p>
+          )}
+        </div>
       </Link>
     </motion.div>
   );

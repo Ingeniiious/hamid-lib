@@ -1,15 +1,10 @@
-import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { course } from "@/database/schema";
-import { redirect, notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
-import { DashboardTopBar } from "@/components/DashboardTopBar";
+import { notFound } from "next/navigation";
 import { CourseGrid } from "@/components/CourseGrid";
 import { BackButton } from "@/components/BackButton";
 import { unslugify } from "@/lib/slugify";
 import type { Metadata } from "next";
-
-export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ majorSlug: string }>;
@@ -32,9 +27,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function MajorCoursesPage({ params }: Props) {
   const { majorSlug } = await params;
-  const { data: session } = await auth.getSession();
-  if (!session) redirect("/auth");
-
   const majorName = unslugify(majorSlug);
 
   // Find courses whose major matches (case-insensitive)
@@ -49,28 +41,22 @@ export default async function MajorCoursesPage({ params }: Props) {
 
   if (majorCourses.length === 0) notFound();
 
-  const userName = session.user?.name || "Student";
-
   return (
-    <>
-      <DashboardTopBar userName={userName} />
+    <div className="mx-auto max-w-5xl px-6 pb-12 pt-4">
+      <BackButton href="/dashboard" label="All Majors" />
 
-      <div className="mx-auto max-w-5xl px-6 pb-12 pt-4">
-        <BackButton href="/dashboard" label="All Majors" />
+      <h1 className="mt-4 text-center font-display text-2xl font-light text-gray-900 dark:text-white">
+        {majorName}
+      </h1>
+      <p className="mt-1 text-center text-sm text-gray-900/50 dark:text-white/50">
+        {majorCourses.length}{" "}
+        {majorCourses.length === 1 ? "Course" : "Courses"}
+      </p>
 
-        <h1 className="mt-4 text-center text-2xl font-medium text-foreground">
-          {majorName}
-        </h1>
-        <p className="mt-1 text-center text-sm text-muted-foreground">
-          {majorCourses.length}{" "}
-          {majorCourses.length === 1 ? "Course" : "Courses"}
-        </p>
-
-        <CourseGrid
-          courses={majorCourses}
-          hrefPrefix={`/dashboard/${majorSlug}`}
-        />
-      </div>
-    </>
+      <CourseGrid
+        courses={majorCourses}
+        hrefPrefix={`/dashboard/${majorSlug}`}
+      />
+    </div>
   );
 }

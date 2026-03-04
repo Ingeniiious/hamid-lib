@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -22,16 +21,14 @@ export function MajorCard({ name, slug, courseCount, index }: MajorCardProps) {
       whileHover={{ scale: 1.02 }}
     >
       <Link href={`/dashboard/${slug}`}>
-        <Card className="cursor-pointer border-border/50 bg-card/80 backdrop-blur-sm transition-shadow duration-300 hover:shadow-lg">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium">{name}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              {courseCount} {courseCount === 1 ? "Course" : "Courses"}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="cursor-pointer rounded-2xl border border-gray-900/10 bg-white/50 p-6 text-center backdrop-blur-xl transition-shadow duration-300 hover:shadow-lg dark:border-white/15 dark:bg-white/5">
+          <h2 className="font-display text-lg font-light text-gray-900 dark:text-white">
+            {name}
+          </h2>
+          <p className="mt-1 text-sm text-gray-900/50 dark:text-white/50">
+            {courseCount} {courseCount === 1 ? "Course" : "Courses"}
+          </p>
+        </div>
       </Link>
     </motion.div>
   );
