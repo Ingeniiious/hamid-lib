@@ -24,8 +24,8 @@ export async function sendOTP(email: string, type: OTPType = "signup") {
       )
     );
 
-  // Store new OTP (expires in 5 minutes)
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+  // Store new OTP (expires in 90 seconds)
+  const expiresAt = new Date(Date.now() + 90 * 1000);
   await db.insert(emailVerification).values({
     email,
     otpCode: otp,

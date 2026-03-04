@@ -23,9 +23,14 @@ export function PresentationsList() {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const result = await getMyPresentations();
-    setPresentations(result.presentations);
-    setLoading(false);
+    try {
+      const result = await getMyPresentations();
+      setPresentations(result.presentations);
+    } catch {
+      setPresentations([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {

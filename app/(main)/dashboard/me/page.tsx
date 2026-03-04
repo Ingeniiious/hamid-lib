@@ -13,7 +13,7 @@ const R2_BASE = "https://lib.thevibecodedcompany.com";
 export default function MyStudiesPage() {
   return (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 px-6">
+      <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
         <BackButton href="/dashboard" label="Dashboard" />
         <PageHeader title="My Studies" />
       </div>
@@ -24,14 +24,14 @@ export default function MyStudiesPage() {
             title="Presentations"
             description="Upload and share files"
             href="/dashboard/me/presentations"
-            image={`${R2_BASE}/images/presentations.webp`}
+            image={`${R2_BASE}/images/presentation.webp`}
             index={0}
           />
           <DashboardCard
             title="Exam Scores"
             description="View your results"
             href="/dashboard/me/scores"
-            image={`${R2_BASE}/images/exam-scores.webp`}
+            image={`${R2_BASE}/images/exam.webp`}
             index={1}
           />
         </div>

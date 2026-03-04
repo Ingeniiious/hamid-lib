@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import Link from "next/link";
 import { PortalCodeInput } from "@/components/portal/PortalCodeInput";
 import { FileViewer } from "@/components/portal/FileViewer";
@@ -101,160 +101,8 @@ export default function PortalPage() {
   };
 
   return (
-    <div className="flex w-full flex-col items-center justify-center">
-      <AnimatePresence mode="wait">
-        {state.step === "viewing" ? (
-          <motion.div
-            key="viewer"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5, ease }}
-            className="w-full px-4"
-          >
-            <FileViewer
-              fileName={state.fileName}
-              fileUrl={state.fileUrl}
-              fileType={state.fileType}
-              fileSize={state.fileSize}
-            />
-          </motion.div>
-        ) : (
-          <motion.div
-            key="card"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5, ease }}
-            className="w-full max-w-sm px-6"
-          >
-            <div className="rounded-3xl border border-white/20 bg-white/10 p-8 shadow-2xl backdrop-blur-xl">
-              <h2 className="mb-2 text-center font-display text-2xl font-light text-white">
-                Portal
-              </h2>
-
-              <AnimatePresence mode="wait">
-                {state.step === "input" && (
-                  <motion.div
-                    key="input"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3, ease }}
-                  >
-                    <p className="mb-5 text-center text-sm text-white/50">
-                      Enter Your 8-Character Code
-                    </p>
-                    <PortalCodeInput
-                      value={code}
-                      onChange={setCode}
-                      onComplete={handleSubmit}
-                    />
-                    <AnimatePresence>
-                      {error && (
-                        <motion.p
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.3, ease }}
-                          className="mt-4 text-center text-xs text-red-400"
-                        >
-                          {error}
-                        </motion.p>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                )}
-
-                {state.step === "loading" && (
-                  <motion.div
-                    key="loading"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3, ease }}
-                    className="py-8 text-center"
-                  >
-                    <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
-                    <p className="mt-3 text-sm text-white/50">Verifying...</p>
-                  </motion.div>
-                )}
-
-                {state.step === "waiting" && (
-                  <motion.div
-                    key="waiting"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3, ease }}
-                    className="py-4 text-center"
-                  >
-                    <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-amber-400/30 border-t-amber-400" />
-                    <p className="mt-3 text-sm font-medium text-amber-400">
-                      Waiting For Approval
-                    </p>
-                    <p className="mt-1 text-xs text-white/40">
-                      The presenter needs to approve your request.
-                    </p>
-                    <p className="mt-2 truncate text-xs text-white/30">
-                      {state.fileName}
-                    </p>
-                  </motion.div>
-                )}
-
-                {state.step === "rejected" && (
-                  <motion.div
-                    key="rejected"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3, ease }}
-                    className="py-4 text-center"
-                  >
-                    <p className="text-sm font-medium text-red-400">
-                      Access Denied
-                    </p>
-                    <p className="mt-1 text-xs text-white/40">
-                      The presenter rejected your request.
-                    </p>
-                    <button
-                      onClick={handleReset}
-                      className="mt-4 text-xs text-white/50 transition-colors hover:text-white/80"
-                    >
-                      Try Another Code
-                    </button>
-                  </motion.div>
-                )}
-
-                {state.step === "expired" && (
-                  <motion.div
-                    key="expired"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3, ease }}
-                    className="py-4 text-center"
-                  >
-                    <p className="text-sm font-medium text-white/60">
-                      Code Expired
-                    </p>
-                    <p className="mt-1 text-xs text-white/40">
-                      Ask the presenter for a new code.
-                    </p>
-                    <button
-                      onClick={handleReset}
-                      className="mt-4 text-xs text-white/50 transition-colors hover:text-white/80"
-                    >
-                      Try Again
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+    <div className="relative flex h-full w-full flex-col items-center justify-center">
+      {/* Back To Home — same pattern as auth page */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -268,6 +116,182 @@ export default function PortalPage() {
           Back To Home
         </Link>
       </motion.div>
+
+      {/* Main Content */}
+      <AnimatePresence mode="wait">
+        {state.step === "viewing" ? (
+          <motion.div
+            key="viewer"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5, ease }}
+            className="w-full max-w-4xl px-6"
+          >
+            <FileViewer
+              fileName={state.fileName}
+              fileUrl={state.fileUrl}
+              fileType={state.fileType}
+              fileSize={state.fileSize}
+              onBack={handleReset}
+            />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="card"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5, ease }}
+            className="w-full max-w-xl px-3 sm:px-6"
+          >
+            <LayoutGroup>
+              <motion.div
+                layout
+                className="overflow-hidden rounded-3xl border border-white/20 bg-white/10 px-4 py-6 shadow-2xl backdrop-blur-xl sm:px-8 sm:py-8"
+                style={{ borderRadius: "1.5rem" }}
+                transition={{ layout: { duration: 0.35, ease } }}
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  {state.step === "input" && (
+                    <motion.div
+                      key="input"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <motion.h2
+                        layout
+                        className="mb-2 text-center font-display text-2xl font-light text-white"
+                        transition={{ layout: { duration: 0.3, ease } }}
+                      >
+                        Portal
+                      </motion.h2>
+                      <motion.p
+                        layout
+                        className="mb-6 text-center text-sm text-white/50"
+                        transition={{ layout: { duration: 0.3, ease } }}
+                      >
+                        Enter your 8-character access code
+                      </motion.p>
+
+                      <PortalCodeInput
+                        value={code}
+                        onChange={setCode}
+                        onComplete={handleSubmit}
+                      />
+                      <AnimatePresence>
+                        {error && (
+                          <motion.p
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.3, ease }}
+                            className="mt-5 text-center text-xs text-red-400"
+                          >
+                            {error}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  )}
+
+                  {state.step === "loading" && (
+                    <motion.div
+                      key="loading"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex flex-col items-center py-6"
+                    >
+                      <div className="h-7 w-7 animate-spin rounded-full border-2 border-white/20 border-t-white/70" />
+                      <p className="mt-4 text-sm text-white/50">Verifying...</p>
+                    </motion.div>
+                  )}
+
+                  {state.step === "waiting" && (
+                    <motion.div
+                      key="waiting"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex flex-col items-center py-4"
+                    >
+                      <div className="h-7 w-7 animate-spin rounded-full border-2 border-amber-400/30 border-t-amber-400/80" />
+                      <p className="mt-4 text-sm font-medium text-amber-400/90">
+                        Waiting For Approval
+                      </p>
+                      <p className="mt-1.5 text-center text-xs leading-relaxed text-white/40">
+                        The presenter needs to approve your access request.
+                      </p>
+                      <p className="mt-3 max-w-full truncate text-xs text-white/30">
+                        {state.fileName}
+                      </p>
+                    </motion.div>
+                  )}
+
+                  {state.step === "rejected" && (
+                    <motion.div
+                      key="rejected"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex flex-col items-center py-4"
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10">
+                        <div className="h-3 w-3 rounded-full bg-red-400" />
+                      </div>
+                      <p className="mt-4 text-sm font-medium text-red-400">
+                        Access Denied
+                      </p>
+                      <p className="mt-1.5 text-center text-xs text-white/40">
+                        The presenter rejected your request.
+                      </p>
+                      <button
+                        onClick={handleReset}
+                        className="mt-5 rounded-full bg-white/10 px-5 py-2 text-xs font-medium text-white/70 transition-all duration-300 hover:bg-white/15 hover:text-white/90"
+                      >
+                        Try Another Code
+                      </button>
+                    </motion.div>
+                  )}
+
+                  {state.step === "expired" && (
+                    <motion.div
+                      key="expired"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex flex-col items-center py-4"
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5">
+                        <div className="h-3 w-3 rounded-full bg-white/30" />
+                      </div>
+                      <p className="mt-4 text-sm font-medium text-white/60">
+                        Code Expired
+                      </p>
+                      <p className="mt-1.5 text-center text-xs text-white/40">
+                        Ask the presenter for a new code.
+                      </p>
+                      <button
+                        onClick={handleReset}
+                        className="mt-5 rounded-full bg-white/10 px-5 py-2 text-xs font-medium text-white/70 transition-all duration-300 hover:bg-white/15 hover:text-white/90"
+                      >
+                        Try Again
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            </LayoutGroup>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

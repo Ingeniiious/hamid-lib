@@ -98,7 +98,8 @@ export async function POST(request: NextRequest) {
   const result = await uploadToR2(buffer, objectKey, file.type);
 
   if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: 500 });
+    console.error("R2 upload failed:", result.error);
+    return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
   }
 
   const [row] = await db

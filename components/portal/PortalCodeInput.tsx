@@ -27,7 +27,7 @@ export function PortalCodeInput({
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.5, ease }}
+      transition={{ duration: 0.5, ease, delay: 0.15 }}
       className="flex justify-center"
     >
       <InputOTP
@@ -38,23 +38,24 @@ export function PortalCodeInput({
         disabled={disabled}
         inputMode="text"
         pattern="[A-Za-z0-9]*"
+        autoFocus
       >
-        <InputOTPGroup>
+        <InputOTPGroup className="gap-1 sm:gap-1.5">
           {[0, 1, 2, 3].map((i) => (
             <InputOTPSlot
               key={i}
               index={i}
-              className="h-12 w-10 border-white/20 bg-white/10 text-base font-mono font-bold text-white sm:h-14 sm:w-12 sm:text-lg"
+              className="h-12 w-10 rounded-lg border border-white/20 bg-white/10 font-mono text-base font-semibold text-white shadow-none placeholder:text-white/20 data-[active=true]:border-white/40 data-[active=true]:ring-[2px] data-[active=true]:ring-white/20 sm:h-14 sm:w-11 sm:text-lg"
             />
           ))}
         </InputOTPGroup>
-        <InputOTPSeparator className="text-white/30" />
-        <InputOTPGroup>
+        <InputOTPSeparator className="mx-1 text-white/20 sm:mx-2" />
+        <InputOTPGroup className="gap-1 sm:gap-1.5">
           {[4, 5, 6, 7].map((i) => (
             <InputOTPSlot
               key={i}
               index={i}
-              className="h-12 w-10 border-white/20 bg-white/10 text-base font-mono font-bold text-white sm:h-14 sm:w-12 sm:text-lg"
+              className="h-12 w-10 rounded-lg border border-white/20 bg-white/10 font-mono text-base font-semibold text-white shadow-none placeholder:text-white/20 data-[active=true]:border-white/40 data-[active=true]:ring-[2px] data-[active=true]:ring-white/20 sm:h-14 sm:w-11 sm:text-lg"
             />
           ))}
         </InputOTPGroup>

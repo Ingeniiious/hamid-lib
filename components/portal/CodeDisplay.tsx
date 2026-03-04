@@ -40,7 +40,7 @@ export function CodeDisplay({ code, expiresAt, onExpired }: CodeDisplayProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const portalUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/portal`;
+  const portalUrl = "https://libraryyy.com/portal";
 
   return (
     <motion.div

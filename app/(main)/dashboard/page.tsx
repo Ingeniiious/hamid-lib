@@ -16,7 +16,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 px-6">
+      <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
         <PageHeader title={`Hey, ${firstName}`} />
       </div>
 

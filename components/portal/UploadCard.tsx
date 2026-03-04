@@ -5,6 +5,21 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
+const ALLOWED_TYPES = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+]);
+
 interface UploadCardProps {
   onUploaded: () => void;
 }
@@ -19,6 +34,12 @@ export function UploadCard({ onUploaded }: UploadCardProps) {
   const upload = useCallback(
     async (file: File) => {
       setError(null);
+
+      if (!ALLOWED_TYPES.has(file.type)) {
+        setError("File type not allowed. Use PDF, images, presentations, or documents.");
+        return;
+      }
+
       setUploading(true);
       setProgress(10);
 
