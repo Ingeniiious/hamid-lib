@@ -47,7 +47,6 @@ export function UploadCard({ onUploaded }: UploadCardProps) {
       formData.append("file", file);
 
       try {
-        // Simulate progress
         const progressInterval = setInterval(() => {
           setProgress((p) => Math.min(p + 15, 85));
         }, 200);
@@ -65,11 +64,11 @@ export function UploadCard({ onUploaded }: UploadCardProps) {
         }
 
         setProgress(100);
+        onUploaded();
         setTimeout(() => {
           setUploading(false);
           setProgress(0);
-          onUploaded();
-        }, 500);
+        }, 400);
       } catch (e) {
         setError((e as Error).message);
         setUploading(false);
@@ -102,6 +101,7 @@ export function UploadCard({ onUploaded }: UploadCardProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5, ease }}
+      whileHover={{ scale: 1.01 }}
     >
       <div
         onDragOver={(e) => {
@@ -111,10 +111,10 @@ export function UploadCard({ onUploaded }: UploadCardProps) {
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
         onClick={() => !uploading && inputRef.current?.click()}
-        className={`cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-300 ${
+        className={`cursor-pointer rounded-2xl border-2 border-dashed p-6 text-center transition-all duration-300 sm:rounded-3xl sm:p-8 ${
           dragging
             ? "border-blue-500/50 bg-blue-500/5 dark:border-blue-400/50 dark:bg-blue-400/5"
-            : "border-gray-900/10 bg-white/50 hover:border-gray-900/20 dark:border-white/15 dark:bg-white/5 dark:hover:border-white/25"
+            : "border-gray-900/10 bg-white/30 hover:border-gray-900/20 dark:border-white/15 dark:bg-white/[0.02] dark:hover:border-white/25"
         }`}
       >
         <input
@@ -154,12 +154,12 @@ export function UploadCard({ onUploaded }: UploadCardProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3, ease }}
-              className="space-y-2"
+              className="space-y-1.5"
             >
-              <p className="text-sm font-medium text-gray-900/80 dark:text-white/80">
+              <p className="text-sm font-medium text-gray-900/70 dark:text-white/70">
                 Drop A File Here Or Click To Upload
               </p>
-              <p className="text-xs text-gray-900/40 dark:text-white/40">
+              <p className="text-xs text-gray-900/35 dark:text-white/35">
                 PDF, Images, Presentations, Documents — Max 50MB
               </p>
             </motion.div>

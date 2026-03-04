@@ -29,10 +29,10 @@ export function DashboardTopBar({ userName }: { userName: string }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.6, ease }}
-      className="sticky top-0 z-20 flex items-center justify-between px-6 py-5 sm:px-8"
+      className="pointer-events-none flex items-center justify-between px-6 py-5 sm:px-8"
     >
       {/* Left — avatar dropdown + greeting */}
-      <div className="flex items-center gap-3">
+      <div className="pointer-events-auto flex items-center gap-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="focus-visible:outline-none">
@@ -74,7 +74,7 @@ export function DashboardTopBar({ userName }: { userName: string }) {
       </div>
 
       {/* Right — theme toggle */}
-      <div className="flex items-center">
+      <div className="pointer-events-auto flex items-center">
         <ThemeToggle />
       </div>
     </motion.div>

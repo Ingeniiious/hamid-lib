@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { QRCodeSVG } from "qrcode.react";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -40,15 +39,12 @@ export function CodeDisplay({ code, expiresAt, onExpired }: CodeDisplayProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const portalUrl = "https://libraryyy.com/portal";
-
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.4, ease }}
-      className="mt-4 rounded-xl bg-gray-900/5 p-4 dark:bg-white/5"
     >
       {/* Code */}
       <div className="flex items-center justify-center gap-1">
@@ -74,7 +70,7 @@ export function CodeDisplay({ code, expiresAt, onExpired }: CodeDisplayProps) {
           {copied ? "Copied!" : "Copy Code"}
         </button>
         <span
-          className={`text-xs font-mono ${
+          className={`font-mono text-xs ${
             secondsLeft <= 15
               ? "text-red-500"
               : "text-gray-900/50 dark:text-white/50"
@@ -83,16 +79,6 @@ export function CodeDisplay({ code, expiresAt, onExpired }: CodeDisplayProps) {
           {secondsLeft}s
         </span>
       </div>
-
-      {/* QR Code */}
-      <div className="mt-3 flex justify-center">
-        <div className="rounded-lg bg-white p-2">
-          <QRCodeSVG value={portalUrl} size={80} />
-        </div>
-      </div>
-      <p className="mt-1 text-center text-[10px] text-gray-900/30 dark:text-white/30">
-        Scan To Open Portal
-      </p>
     </motion.div>
   );
 }

@@ -27,7 +27,8 @@ function generateCode(): string {
 }
 
 export async function getMyPresentations() {
-  const session = await getSession();
+  const { data: session } = await auth.getSession();
+  if (!session?.user) return { presentations: [] };
 
   try {
     const rows = await db
@@ -37,7 +38,8 @@ export async function getMyPresentations() {
       .orderBy(desc(portalPresentation.createdAt));
 
     return { presentations: rows };
-  } catch {
+  } catch (e) {
+    console.error("[getMyPresentations] error:", e);
     return { presentations: [] };
   }
 }

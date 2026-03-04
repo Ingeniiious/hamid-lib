@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { BackButton } from "@/components/BackButton";
 import { DashboardCard } from "@/components/DashboardCard";
 import { PageHeader } from "@/components/PageHeader";
 import type { Metadata } from "next";
@@ -17,6 +18,7 @@ export default async function DashboardPage() {
   return (
     <div className="flex h-full flex-col">
       <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
+        <BackButton href="/dashboard" label="" invisible />
         <PageHeader title={`Hey, ${firstName}`} />
       </div>
 

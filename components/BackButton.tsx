@@ -10,20 +10,24 @@ const BACK_IMG = "https://lib.thevibecodedcompany.com/images/back.webp";
 interface BackButtonProps {
   href: string;
   label: string;
+  invisible?: boolean;
 }
 
-export function BackButton({ href, label }: BackButtonProps) {
+export function BackButton({ href, label, invisible }: BackButtonProps) {
   const [imgFailed, setImgFailed] = useState(false);
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      animate={{ opacity: invisible ? 0 : 1 }}
       transition={{ duration: 0.5, ease }}
+      className={invisible ? "pointer-events-none" : undefined}
     >
       <Link
         href={href}
         className="inline-flex items-center gap-2 transition-opacity hover:opacity-80"
+        tabIndex={invisible ? -1 : undefined}
+        aria-hidden={invisible || undefined}
       >
         {!imgFailed ? (
           <img
