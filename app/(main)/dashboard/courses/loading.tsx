@@ -1,18 +1,10 @@
-"use client";
-
-import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
-
-const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
 export default function CoursesLoading() {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.4, ease }}
-      className="mx-auto max-w-5xl px-6 pb-12"
+    <div
+      className="mx-auto max-w-5xl px-6 pb-12 opacity-0"
+      style={{ animation: "skeleton-delay 0.4s ease 5s forwards" }}
     >
       {/* Back button skeleton */}
       <div className="pb-2 pt-4">
@@ -40,6 +32,6 @@ export default function CoursesLoading() {
           </div>
         ))}
       </div>
-    </motion.div>
+    </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import Link from "next/link";
-import { Eye, EyeSlash, CaretLeft, CaretUpDown, Check } from "@phosphor-icons/react";
+import { Eye, EyeSlash, CaretUpDown, Check } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import {
   sendOTP,
@@ -25,7 +25,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { UNIVERSITY_DATA, type CountryGroup, type CityGroup } from "@/lib/universities";
+import { UniversityPicker } from "@/components/UniversityPicker";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -100,11 +100,6 @@ export default function AuthPage() {
   const [university, setUniversity] = useState("");
   const [customUniversity, setCustomUniversity] = useState("");
   const [gender, setGender] = useState("");
-  const [uniOpen, setUniOpen] = useState(false);
-  const [uniStep, setUniStep] = useState<"country" | "city" | "university">("country");
-  const [selectedCountry, setSelectedCountry] = useState<CountryGroup | null>(null);
-  const [selectedCity, setSelectedCity] = useState<CityGroup | null>(null);
-  const [uniSearch, setUniSearch] = useState("");
   const [genderOpen, setGenderOpen] = useState(false);
 
   const redirectByRole = (user: Record<string, unknown> | undefined) => {
@@ -711,231 +706,13 @@ export default function AuthPage() {
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.25, ease }}
                       >
-                        <Popover
-                          open={uniOpen}
-                          onOpenChange={(open) => {
-                            setUniOpen(open);
-                            if (!open) {
-                              setUniStep("country");
-                              setSelectedCountry(null);
-                              setSelectedCity(null);
-                              setUniSearch("");
-                            }
-                          }}
-                        >
-                          <PopoverTrigger asChild>
-                            <button
-                              type="button"
-                              role="combobox"
-                              aria-expanded={uniOpen}
-                              className="relative flex h-10 w-full items-center justify-center rounded-full border border-white/20 bg-white/10 px-5 text-center text-sm text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-                            >
-                              <span className={university ? "text-white" : "text-white/50"}>
-                                {university === "__other__"
-                                  ? "Other"
-                                  : university || "University"}
-                              </span>
-                              <CaretUpDown size={16} weight="duotone" className="absolute right-5 text-white/40" />
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent
-                            className="!w-[--radix-popover-trigger-width] rounded-2xl border-gray-900/15 bg-white/70 p-1 backdrop-blur-xl dark:border-white/20 dark:bg-white/10"
-                            sideOffset={4}
-                          >
-                            {(() => {
-                              const itemClass = "flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm text-gray-900/80 transition-colors hover:bg-gray-900/5 hover:text-gray-900 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white";
-                              const mutedItemClass = "flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm text-gray-900/40 transition-colors hover:bg-gray-900/5 hover:text-gray-900/60 dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white/60";
-                              const backClass = "flex w-full items-center justify-center gap-1 shrink-0 pb-1 pt-2 text-xs font-medium text-gray-900/40 transition-colors hover:text-gray-900/60 dark:text-white/40 dark:hover:text-white/60";
-                              const headingClass = "shrink-0 pb-1.5 pt-2 text-center text-xs font-medium text-gray-900/40 dark:text-white/40";
-
-                              const filtered = selectedCity
-                                ? selectedCity.universities.filter((uni) =>
-                                    uni.name.toLowerCase().includes(uniSearch.toLowerCase())
-                                  )
-                                : [];
-
-                              return (
-                                <div className="flex h-[260px] flex-col">
-                                  <AnimatePresence mode="wait" initial={false}>
-                                    {uniStep === "country" && (
-                                      <motion.div
-                                        key="country"
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.15 }}
-                                        className="flex h-full flex-col"
-                                      >
-                                        <p className={headingClass}>Country</p>
-                                        <div className="min-h-0 flex-1 overflow-y-auto">
-                                          {UNIVERSITY_DATA.map((country) => (
-                                            <button
-                                              key={country.country}
-                                              type="button"
-                                              onClick={() => {
-                                                setSelectedCountry(country);
-                                                setUniStep(country.cities.length === 1 ? "university" : "city");
-                                                if (country.cities.length === 1) setSelectedCity(country.cities[0]);
-                                              }}
-                                              className={itemClass}
-                                            >
-                                              {country.country}
-                                            </button>
-                                          ))}
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setUniversity("__other__");
-                                              setUniOpen(false);
-                                            }}
-                                            className={mutedItemClass}
-                                          >
-                                            Other
-                                          </button>
-                                        </div>
-                                      </motion.div>
-                                    )}
-
-                                    {uniStep === "city" && selectedCountry && (
-                                      <motion.div
-                                        key="city"
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.15 }}
-                                        className="flex h-full flex-col"
-                                      >
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setUniStep("country");
-                                            setSelectedCountry(null);
-                                          }}
-                                          className={backClass}
-                                        >
-                                          <CaretLeft size={12} weight="bold" />
-                                          {selectedCountry.country}
-                                        </button>
-                                        <div className="min-h-0 flex-1 overflow-y-auto">
-                                          {selectedCountry.cities.map((city) => (
-                                            <button
-                                              key={city.city}
-                                              type="button"
-                                              onClick={() => {
-                                                setSelectedCity(city);
-                                                setUniStep("university");
-                                              }}
-                                              className={itemClass}
-                                            >
-                                              {city.city}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </motion.div>
-                                    )}
-
-                                    {uniStep === "university" && selectedCity && (
-                                      <motion.div
-                                        key="university"
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.15 }}
-                                        className="flex h-full flex-col"
-                                      >
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setUniSearch("");
-                                            if (selectedCountry && selectedCountry.cities.length > 1) {
-                                              setUniStep("city");
-                                              setSelectedCity(null);
-                                            } else {
-                                              setUniStep("country");
-                                              setSelectedCountry(null);
-                                              setSelectedCity(null);
-                                            }
-                                          }}
-                                          className={backClass}
-                                        >
-                                          <CaretLeft size={12} weight="bold" />
-                                          {selectedCity.city}
-                                        </button>
-                                        <div className="shrink-0 px-1 pb-1.5">
-                                          <input
-                                            type="text"
-                                            value={uniSearch}
-                                            onChange={(e) => setUniSearch(e.target.value)}
-                                            placeholder="Search..."
-                                            className="w-full rounded-lg border border-gray-900/10 bg-gray-900/5 px-3 py-1.5 text-center text-sm text-gray-900 placeholder:text-gray-900/30 focus:outline-none dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-white/30"
-                                            autoFocus
-                                          />
-                                        </div>
-                                        <div className="min-h-0 flex-1 overflow-y-auto">
-                                          {filtered.map((uni) => (
-                                            <button
-                                              key={uni.name}
-                                              type="button"
-                                              onClick={() => {
-                                                setUniversity(uni.name);
-                                                setCustomUniversity("");
-                                                setUniSearch("");
-                                                setUniOpen(false);
-                                              }}
-                                              className={itemClass}
-                                            >
-                                              {university === uni.name && (
-                                                <Check size={14} className="absolute left-3 text-gray-900 dark:text-white" />
-                                              )}
-                                              {uni.name}
-                                            </button>
-                                          ))}
-                                          {filtered.length === 0 && (
-                                            <p className="py-3 text-center text-sm text-gray-900/40 dark:text-white/40">
-                                              No match found.
-                                            </p>
-                                          )}
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setUniversity("__other__");
-                                              setUniSearch("");
-                                              setUniOpen(false);
-                                            }}
-                                            className={mutedItemClass}
-                                          >
-                                            Other — Type Your University
-                                          </button>
-                                        </div>
-                                      </motion.div>
-                                    )}
-                                  </AnimatePresence>
-                                </div>
-                              );
-                            })()}
-                          </PopoverContent>
-                        </Popover>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Custom university input — when "Other" is selected */}
-                  <AnimatePresence mode="popLayout">
-                    {isSignUp && university === "__other__" && (
-                      <motion.div
-                        key="custom-university-field"
-                        layout
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.25, ease }}
-                      >
-                        <Input
-                          type="text"
-                          placeholder="Your University Name"
-                          value={customUniversity}
-                          onChange={(e) => setCustomUniversity(e.target.value)}
-                          className={inputClass}
+                        <UniversityPicker
+                          value={university}
+                          onChange={setUniversity}
+                          customValue={customUniversity}
+                          onCustomChange={setCustomUniversity}
+                          variant="auth"
+                          inputClass={inputClass}
                         />
                       </motion.div>
                     )}

@@ -4,8 +4,6 @@ export default function DashboardLoading() {
   return (
     <div className="flex h-full flex-col">
       <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
-        {/* Spacer matching BackButton height */}
-        <div className="h-12 sm:h-14" />
         {/* PageHeader skeleton */}
         <div className="pb-4 pt-6 text-center sm:pb-20 sm:pt-10">
           <Skeleton className="mx-auto h-9 w-48 bg-gray-900/10 sm:h-12 dark:bg-white/10" />

@@ -11,10 +11,44 @@ interface BackButtonProps {
   href: string;
   label: string;
   invisible?: boolean;
+  floating?: boolean;
 }
 
-export function BackButton({ href, label, invisible }: BackButtonProps) {
+export function BackButton({ href, label, invisible, floating }: BackButtonProps) {
   const [imgFailed, setImgFailed] = useState(false);
+
+  if (floating) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, ease, delay: 0.3 }}
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-start pb-6 pl-6 sm:justify-center sm:pl-0"
+      >
+        <Link
+          href={href}
+          className="pointer-events-auto inline-flex items-center gap-2 transition-opacity hover:opacity-80 sm:-translate-x-[37vw]"
+        >
+          {!imgFailed ? (
+            <img
+              src={BACK_IMG}
+              alt="Back"
+              width={200}
+              height={107}
+              loading="eager"
+              decoding="async"
+              onError={() => setImgFailed(true)}
+              className="h-12 w-auto object-contain sm:h-14"
+            />
+          ) : (
+            <span className="rounded-full border border-gray-900/10 bg-white/70 px-5 py-2 text-sm text-gray-900/60 backdrop-blur-xl dark:border-white/15 dark:bg-white/10 dark:text-white/60">
+              ← {label}
+            </span>
+          )}
+        </Link>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div

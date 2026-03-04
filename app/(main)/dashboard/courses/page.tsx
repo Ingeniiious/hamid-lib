@@ -34,10 +34,9 @@ export default async function CoursesPage() {
     return (
       <div className="flex h-full flex-col">
         <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
-          <BackButton href="/dashboard" label="Dashboard" />
           <PageHeader title="Courses" subtitle="Browse by faculty" />
         </div>
-        <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+        <div className="flex flex-1 flex-col items-center justify-center px-6 pb-24 text-center">
           <h2 className="font-display text-xl font-light text-gray-900 dark:text-white">
             Set Your University
           </h2>
@@ -51,6 +50,7 @@ export default async function CoursesPage() {
             Go To Settings
           </Link>
         </div>
+        <BackButton href="/dashboard" label="Dashboard" floating />
       </div>
     );
   }
@@ -74,13 +74,12 @@ export default async function CoursesPage() {
     <div className="flex h-full flex-col">
       {/* Fixed header */}
       <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
-        <BackButton href="/dashboard" label="Dashboard" />
         <PageHeader title={`Courses Of ${university}`} subtitle="Browse by faculty" />
       </div>
 
       {/* Scrollable content */}
       <div
-        className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto px-6 pb-12"
+        className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto px-6 pb-24"
         style={{
           maskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
           WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
@@ -110,6 +109,7 @@ export default async function CoursesPage() {
           </div>
         )}
       </div>
+      <BackButton href="/dashboard" label="Dashboard" floating />
     </div>
   );
 }

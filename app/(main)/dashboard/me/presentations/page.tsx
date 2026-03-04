@@ -13,7 +13,6 @@ export default function PresentationsPage() {
     <div className="flex h-full flex-col">
       {/* Fixed header — stays pinned */}
       <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
-        <BackButton href="/dashboard/me" label="My Studies" />
         <PageHeader
           title="Presentations"
           subtitle="Upload files and share them instantly via Portal."
@@ -22,7 +21,7 @@ export default function PresentationsPage() {
 
       {/* Scrollable content */}
       <div
-        className="min-h-0 flex-1 overflow-y-auto px-6 pb-12"
+        className="min-h-0 flex-1 overflow-y-auto px-6 pb-24"
         style={{
           maskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
           WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
@@ -32,6 +31,7 @@ export default function PresentationsPage() {
           <PresentationsList />
         </div>
       </div>
+      <BackButton href="/dashboard/me" label="My Studies" floating />
     </div>
   );
 }

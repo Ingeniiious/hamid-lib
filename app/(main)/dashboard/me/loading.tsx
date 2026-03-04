@@ -4,10 +4,6 @@ export default function MyStudiesLoading() {
   return (
     <div className="flex h-full flex-col">
       <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
-        {/* BackButton skeleton */}
-        <div className="pt-6 sm:pt-8">
-          <Skeleton className="h-5 w-24 bg-gray-900/10 dark:bg-white/10" />
-        </div>
         {/* PageHeader skeleton */}
         <div className="pb-2 pt-4">
           <Skeleton className="h-9 w-36 bg-gray-900/10 dark:bg-white/10" />

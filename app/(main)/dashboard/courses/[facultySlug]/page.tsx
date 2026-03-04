@@ -54,7 +54,6 @@ export default async function FacultyCoursesPage({ params }: Props) {
     <div className="flex h-full flex-col">
       {/* Fixed header */}
       <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
-        <BackButton href="/dashboard/courses" label="All Faculties" />
         <PageHeader
           title={fac.name}
           subtitle={`${courses.length} ${courses.length === 1 ? "Course" : "Courses"}`}
@@ -63,7 +62,7 @@ export default async function FacultyCoursesPage({ params }: Props) {
 
       {/* Scrollable content */}
       <div
-        className="min-h-0 flex-1 overflow-y-auto px-6 pb-12"
+        className="min-h-0 flex-1 overflow-y-auto px-6 pb-24"
         style={{
           maskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
           WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
@@ -87,6 +86,7 @@ export default async function FacultyCoursesPage({ params }: Props) {
           )}
         </div>
       </div>
+      <BackButton href="/dashboard/courses" label="All Faculties" floating />
     </div>
   );
 }

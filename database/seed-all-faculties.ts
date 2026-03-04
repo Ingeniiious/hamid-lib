@@ -41,7 +41,6 @@ const FACULTY_NAME_MAP: Record<string, string> = {
   "Havacılık ve Uzay Bilimleri Fakültesi": "Faculty of Aeronautics and Astronautics",
   "İnsan ve Toplum Bilimleri Fakültesi": "Faculty of Humanities and Social Sciences",
   "Sanat ve Tasarım Fakültesi": "Faculty of Art and Design",
-  "Sağlık Bilimleri Fakültesi": "Faculty of Health Sciences",
   "Uygulamalı Bilimler Fakültesi": "Faculty of Applied Sciences",
   "Açık ve Uzaktan Eğitim Fakültesi": "Faculty of Open and Distance Education",
 };

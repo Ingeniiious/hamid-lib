@@ -15,13 +15,12 @@ export default function MyStudiesPage() {
     <div className="flex h-full flex-col">
       {/* Fixed header — stays pinned */}
       <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
-        <BackButton href="/dashboard" label="Dashboard" />
         <PageHeader title="My Studies" />
       </div>
 
       {/* Scrollable content */}
       <div
-        className="min-h-0 flex-1 overflow-y-auto px-6 pb-8 sm:flex sm:items-center sm:justify-center sm:pb-6"
+        className="min-h-0 flex-1 overflow-y-auto px-6 pb-24 sm:flex sm:items-center sm:justify-center"
         style={{
           maskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
           WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
@@ -44,6 +43,7 @@ export default function MyStudiesPage() {
           />
         </div>
       </div>
+      <BackButton href="/dashboard" label="Dashboard" floating />
     </div>
   );
 }
