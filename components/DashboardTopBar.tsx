@@ -26,9 +26,9 @@ export function DashboardTopBar({ userName }: { userName: string }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.6, ease }}
       className="sticky top-0 z-20 flex items-center justify-between px-6 py-5 sm:px-8"
     >
       {/* Left — avatar dropdown + greeting */}

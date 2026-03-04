@@ -20,13 +20,17 @@ export default async function DashboardLayout({
       {/* Gradient overlay — Grainient visible at top, smoothly fading to background */}
       <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-transparent from-0% via-[var(--background)]/60 via-[20%] to-[var(--background)] to-[45%]" />
 
-      {/* Scrollable content */}
-      <div className="relative z-10 h-full overflow-y-auto">
+      {/* Content */}
+      <div className="relative z-10 flex h-full flex-col">
         {/* Persistent top bar — stays across all dashboard routes */}
-        <DashboardTopBar userName={userName} />
+        <div className="shrink-0">
+          <DashboardTopBar userName={userName} />
+        </div>
 
         {/* Page content — cross-fades between dashboard routes */}
-        <DashboardShell>{children}</DashboardShell>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <DashboardShell>{children}</DashboardShell>
+        </div>
       </div>
     </div>
   );

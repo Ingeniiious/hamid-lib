@@ -15,12 +15,12 @@ interface MajorCardProps {
 export function MajorCard({ name, slug, courseCount, index }: MajorCardProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease, delay: index * 0.08 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.6, ease, delay: index * 0.1 }}
       whileHover={{ scale: 1.02 }}
     >
-      <Link href={`/dashboard/${slug}`}>
+      <Link href={`/dashboard/courses/${slug}`}>
         <div className="cursor-pointer rounded-2xl border border-gray-900/10 bg-white/50 p-6 text-center backdrop-blur-xl transition-shadow duration-300 hover:shadow-lg dark:border-white/15 dark:bg-white/5">
           <h2 className="font-display text-lg font-light text-gray-900 dark:text-white">
             {name}

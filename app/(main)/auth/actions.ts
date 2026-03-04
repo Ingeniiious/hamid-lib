@@ -4,7 +4,7 @@ import { randomInt, randomBytes } from "crypto";
 import { scrypt } from "@noble/hashes/scrypt.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { db } from "@/lib/db";
-import { emailVerification } from "@/database/schema";
+import { emailVerification, userProfile } from "@/database/schema";
 import { eq, and, gt, sql } from "drizzle-orm";
 import { sendEmail } from "@/lib/email";
 import { getEmailTemplate } from "@/lib/email-templates";
@@ -135,6 +135,23 @@ function hashPasswordScrypt(password: string): string {
   const salt = randomBytes(16);
   const derived = scrypt(password, salt, { N: 16384, r: 16, p: 1, dkLen: 64 });
   return `${bytesToHex(salt)}:${bytesToHex(derived)}`;
+}
+
+export async function saveUserProfile(
+  userId: string,
+  university: string,
+  gender: string
+) {
+  try {
+    await db.insert(userProfile).values({
+      userId,
+      university,
+      gender,
+    });
+    return { success: true };
+  } catch {
+    return { error: "Failed to save profile." };
+  }
 }
 
 export async function resetPasswordWithOTP(

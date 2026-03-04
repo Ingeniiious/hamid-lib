@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
 import Link from "next/link";
-import { QrCode } from "@phosphor-icons/react";
+import { QrCode, Door } from "@phosphor-icons/react";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -30,7 +30,7 @@ export default function Home() {
                 transition={{ duration: 0.8, ease }}
                 className="font-display text-5xl font-light tracking-tight text-white sm:text-7xl md:text-8xl"
               >
-                Hamid Library
+                Libraryyy
               </motion.h1>
 
               <motion.div
@@ -58,7 +58,7 @@ export default function Home() {
             >
               <div className="rounded-2xl border border-white/20 bg-white/10 p-5 shadow-2xl backdrop-blur-xl sm:p-6">
                 <QRCodeSVG
-                  value="https://library.hamidproject.xyz"
+                  value="https://libraryyy.com"
                   size={200}
                   level="M"
                   bgColor="transparent"
@@ -71,18 +71,29 @@ export default function Home() {
         </AnimatePresence>
       </div>
 
-      {/* QR Toggle Button */}
+      {/* Bottom Action Buttons */}
       {!showQR && (
-        <motion.button
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, ease, delay: 0.6 }}
-          onClick={() => setShowQR(true)}
-          aria-label="Show QR Code"
-          className="absolute bottom-8 z-10 rounded-full bg-white/10 p-3 text-white/70 backdrop-blur-sm transition-all duration-300 hover:bg-white/20 hover:text-white sm:bottom-10"
+          className="absolute bottom-8 z-10 flex items-center gap-3 sm:bottom-10"
         >
-          <QrCode size={20} weight="duotone" />
-        </motion.button>
+          <button
+            onClick={() => setShowQR(true)}
+            aria-label="Show QR Code"
+            className="rounded-full bg-white/10 p-3 text-white/70 backdrop-blur-sm transition-all duration-300 hover:bg-white/20 hover:text-white"
+          >
+            <QrCode size={20} weight="duotone" />
+          </button>
+          <Link
+            href="/portal"
+            aria-label="Portal"
+            className="rounded-full bg-white/10 p-3 text-white/70 backdrop-blur-sm transition-all duration-300 hover:bg-white/20 hover:text-white"
+          >
+            <Door size={20} weight="duotone" />
+          </Link>
+        </motion.div>
       )}
     </div>
   );

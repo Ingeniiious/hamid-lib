@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Hamid Library",
-    short_name: "Hamid Library",
+    name: "Libraryyy",
+    short_name: "Libraryyy",
     description:
       "Your University Course Library — courses, presentations, resources, and more.",
     start_url: "/",

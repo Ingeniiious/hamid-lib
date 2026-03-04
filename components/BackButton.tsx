@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
+const BACK_IMG = "https://lib.thevibecodedcompany.com/images/back.webp";
 
 interface BackButtonProps {
   href: string;
@@ -11,17 +13,34 @@ interface BackButtonProps {
 }
 
 export function BackButton({ href, label }: BackButtonProps) {
+  const [imgFailed, setImgFailed] = useState(false);
+
   return (
     <motion.div
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.3, ease }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5, ease }}
     >
       <Link
         href={href}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-flex items-center gap-2 transition-opacity hover:opacity-80"
       >
-        <span aria-hidden>←</span> {label}
+        {!imgFailed ? (
+          <img
+            src={BACK_IMG}
+            alt="Back"
+            width={200}
+            height={107}
+            loading="eager"
+            decoding="async"
+            onError={() => setImgFailed(true)}
+            className="h-12 w-auto object-contain sm:h-14"
+          />
+        ) : (
+          <span className="text-sm text-gray-900/60 dark:text-white/60">
+            ← Back
+          </span>
+        )}
       </Link>
     </motion.div>
   );

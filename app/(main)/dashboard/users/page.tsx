@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, EyeSlash } from "@phosphor-icons/react";
+import { Eye, EyeSlash, CaretUpDown, Check } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import {
   updateName,
@@ -13,15 +13,33 @@ import {
   revokeOtherSessions,
   sendDeleteOTP,
   confirmDeleteAccount,
+  getUserProfile,
+  updateUserProfile,
 } from "./actions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/BackButton";
+import { PageHeader } from "@/components/PageHeader";
 import { Separator } from "@/components/ui/separator";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { UNIVERSITIES } from "@/lib/universities";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -165,6 +183,17 @@ export default function AccountPage() {
     text: string;
   } | null>(null);
 
+  // University & Gender
+  const [university, setUniversity] = useState("");
+  const [customUniversity, setCustomUniversity] = useState("");
+  const [gender, setGender] = useState("");
+  const [uniOpen, setUniOpen] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileMsg, setProfileMsg] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
   // Language
   const [language, setLanguage] = useState("en");
 
@@ -173,7 +202,7 @@ export default function AccountPage() {
     const saved = localStorage.getItem("hamid-lib-lang");
     if (saved && ["en", "fa", "tr"].includes(saved)) setLanguage(saved);
 
-    authClient.getSession().then(({ data }) => {
+    authClient.getSession().then(async ({ data }) => {
       if (!data?.user) {
         router.replace("/auth");
         return;
@@ -182,6 +211,19 @@ export default function AccountPage() {
       setUserEmail(data.user.email || "");
       setName(data.user.name || "");
       setSessionLoaded(true);
+
+      // Load profile
+      const { profile } = await getUserProfile(data.user.id);
+      if (profile) {
+        const isKnown = UNIVERSITIES.includes(profile.university as typeof UNIVERSITIES[number]);
+        if (profile.university && !isKnown) {
+          setUniversity("__other__");
+          setCustomUniversity(profile.university);
+        } else {
+          setUniversity(profile.university || "");
+        }
+        setGender(profile.gender || "");
+      }
     });
   }, [router]);
 
@@ -207,13 +249,30 @@ export default function AccountPage() {
     e.preventDefault();
     if (!name.trim()) return;
     setNameMsg(null);
+    setProfileMsg(null);
     setNameLoading(true);
-    const result = await updateName(name);
+
+    const [nameResult, profileResult] = await Promise.all([
+      updateName(name),
+      (async () => {
+        const { data: session } = await authClient.getSession();
+        if (!session?.user) return { error: "Not authenticated." };
+        const finalUniversity = university === "__other__" ? customUniversity : university;
+        return updateUserProfile(session.user.id, {
+          university: finalUniversity,
+          gender,
+        });
+      })(),
+    ]);
+
     setNameLoading(false);
-    if (result.error) {
-      setNameMsg({ type: "error", text: result.error });
+
+    if (nameResult.error) {
+      setNameMsg({ type: "error", text: nameResult.error });
+    } else if (profileResult.error) {
+      setProfileMsg({ type: "error", text: profileResult.error });
     } else {
-      setNameMsg({ type: "success", text: "Name updated." });
+      setNameMsg({ type: "success", text: "Profile saved." });
       setUserName(name.trim());
     }
   };
@@ -314,15 +373,17 @@ export default function AccountPage() {
 
   if (!sessionLoaded) {
     return (
-      <div className="mx-auto max-w-3xl px-6 pb-12 pt-4">
-        <div className="mb-8 flex justify-center">
-          <div className="h-7 w-48 animate-pulse rounded-lg bg-gray-900/10 dark:bg-white/10" />
-        </div>
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-          <div className="h-72 animate-pulse rounded-2xl bg-gray-900/5 dark:bg-white/5" />
-          <div className="h-72 animate-pulse rounded-2xl bg-gray-900/5 dark:bg-white/5" />
-          <div className="h-48 animate-pulse rounded-2xl bg-gray-900/5 md:col-span-2 dark:bg-white/5" />
-          <div className="h-36 animate-pulse rounded-2xl bg-red-500/5 md:col-span-2" />
+      <div className="mx-auto max-w-5xl px-6 pb-12 pt-4">
+        <div className="mx-auto max-w-3xl">
+          <div className="mb-8 flex justify-center">
+            <div className="h-7 w-48 animate-pulse rounded-lg bg-gray-900/10 dark:bg-white/10" />
+          </div>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div className="h-72 animate-pulse rounded-2xl bg-gray-900/5 dark:bg-white/5" />
+            <div className="h-72 animate-pulse rounded-2xl bg-gray-900/5 dark:bg-white/5" />
+            <div className="h-48 animate-pulse rounded-2xl bg-gray-900/5 md:col-span-2 dark:bg-white/5" />
+            <div className="h-36 animate-pulse rounded-2xl bg-red-500/5 md:col-span-2" />
+          </div>
         </div>
       </div>
     );
@@ -333,67 +394,193 @@ export default function AccountPage() {
         variants={stagger}
         initial="hidden"
         animate="show"
-        className="mx-auto max-w-3xl px-6 pb-12 pt-4"
+        className="mx-auto max-w-5xl px-6 pb-12"
       >
-        {/* Page Title */}
-        <motion.h1
-          variants={fadeUp}
-          className="mb-8 text-center font-display text-2xl font-light text-gray-900 dark:text-white"
-        >
-          Account Settings
-        </motion.h1>
+        <BackButton href="/dashboard" label="Dashboard" />
 
+        <PageHeader title="Account Settings" />
+
+        <div className="mx-auto max-w-3xl">
         {/* Bento Grid — 2 cols on desktop, stacked on mobile */}
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-          {/* ── Profile ── */}
-          <motion.div variants={fadeUp} className={cardClass}>
+          {/* ── Profile — full width, 2-col internal layout ── */}
+          <motion.div variants={fadeUp} className={`${cardClass} md:col-span-2`}>
             <h2 className="mb-4 text-center font-display text-lg font-light text-gray-900 dark:text-white">
               Profile
             </h2>
             <form onSubmit={handleUpdateName} className="flex flex-col gap-4">
-              <div>
-                <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
-                  Display Name
-                </label>
-                <Input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your Name"
-                  required
-                  autoComplete="name"
-                  className={inputClass}
-                />
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {/* Left column — Name & Email */}
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
+                      Display Name
+                    </label>
+                    <Input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Your Name"
+                      required
+                      autoComplete="name"
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
+                      Email
+                    </label>
+                    <Input
+                      type="email"
+                      value={userEmail}
+                      readOnly
+                      className={`${inputClass} cursor-not-allowed opacity-50`}
+                    />
+                  </div>
+                </div>
+
+                {/* Right column — University & Gender */}
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
+                      University
+                    </label>
+                    <Popover open={uniOpen} onOpenChange={setUniOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          role="combobox"
+                          aria-expanded={uniOpen}
+                          className="flex h-10 w-full items-center justify-between rounded-full border border-gray-900/15 bg-gray-900/5 px-5 text-sm text-gray-900 transition-colors hover:bg-gray-900/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/15 dark:focus-visible:ring-white/30"
+                        >
+                          <span className={university ? "text-gray-900 dark:text-white" : "text-gray-900/40 dark:text-white/50"}>
+                            {university === "__other__"
+                              ? "Other"
+                              : university || "Select University"}
+                          </span>
+                          <CaretUpDown size={16} weight="duotone" className="text-gray-900/30 dark:text-white/40" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-[--radix-popover-trigger-width] border-gray-200 bg-white p-0 dark:border-white/20 dark:bg-gray-900/95 dark:backdrop-blur-xl"
+                        sideOffset={4}
+                      >
+                        <Command className="bg-transparent">
+                          <CommandInput
+                            placeholder="Search university..."
+                            className="text-gray-900 placeholder:text-gray-900/40 dark:text-white dark:placeholder:text-white/40"
+                          />
+                          <CommandList className="max-h-[240px]">
+                            <CommandEmpty className="py-3 text-center text-sm text-gray-900/40 dark:text-white/40">
+                              No university found.
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {UNIVERSITIES.map((uni) => (
+                                <CommandItem
+                                  key={uni}
+                                  value={uni}
+                                  onSelect={() => {
+                                    setUniversity(uni);
+                                    setCustomUniversity("");
+                                    setUniOpen(false);
+                                  }}
+                                  className="text-gray-900/80 aria-selected:bg-gray-900/5 aria-selected:text-gray-900 dark:text-white/80 dark:aria-selected:bg-white/10 dark:aria-selected:text-white"
+                                >
+                                  {university === uni && (
+                                    <Check size={14} className="mr-2 text-gray-900 dark:text-white" />
+                                  )}
+                                  {uni}
+                                </CommandItem>
+                              ))}
+                              <CommandItem
+                                value="Other — Type Your University"
+                                onSelect={() => {
+                                  setUniversity("__other__");
+                                  setUniOpen(false);
+                                }}
+                                className="text-gray-900/80 aria-selected:bg-gray-900/5 aria-selected:text-gray-900 dark:text-white/80 dark:aria-selected:bg-white/10 dark:aria-selected:text-white"
+                              >
+                                {university === "__other__" && (
+                                  <Check size={14} className="mr-2 text-gray-900 dark:text-white" />
+                                )}
+                                Other — Type Your University
+                              </CommandItem>
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Custom university input */}
+                  <AnimatePresence>
+                    {university === "__other__" && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                      >
+                        <Input
+                          type="text"
+                          placeholder="Your University Name"
+                          value={customUniversity}
+                          onChange={(e) => setCustomUniversity(e.target.value)}
+                          className={inputClass}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div>
+                    <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
+                      Gender
+                    </label>
+                    <div className="flex justify-center gap-2">
+                      {[
+                        { value: "male", label: "Male" },
+                        { value: "female", label: "Female" },
+                        { value: "prefer-not-to-say", label: "Prefer Not To Say" },
+                      ].map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setGender(opt.value)}
+                          className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                            gender === opt.value
+                              ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+                              : "bg-gray-900/5 text-gray-900/60 hover:bg-gray-900/10 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
-                  Email
-                </label>
-                <Input
-                  type="email"
-                  value={userEmail}
-                  readOnly
-                  className={`${inputClass} cursor-not-allowed opacity-50`}
-                />
-              </div>
+
               <AnimatePresence>
-                {nameMsg && (
+                {(nameMsg || profileMsg) && (
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className={`text-sm ${nameMsg.type === "error" ? "text-red-500 dark:text-red-300" : "text-emerald-600 dark:text-emerald-300"}`}
+                    className={`text-center text-sm ${
+                      (nameMsg?.type || profileMsg?.type) === "error"
+                        ? "text-red-500 dark:text-red-300"
+                        : "text-emerald-600 dark:text-emerald-300"
+                    }`}
                   >
-                    {nameMsg.text}
+                    {nameMsg?.text || profileMsg?.text}
                   </motion.p>
                 )}
               </AnimatePresence>
               <Button
                 type="submit"
-                disabled={nameLoading || !name.trim()}
-                className="w-full rounded-full bg-gray-900 font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-gray-900 dark:hover:bg-white/90"
+                disabled={nameLoading || profileLoading || !name.trim()}
+                className="mx-auto w-full max-w-xs rounded-full bg-gray-900 font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-gray-900 dark:hover:bg-white/90"
               >
-                {nameLoading ? "Saving..." : "Save"}
+                {nameLoading || profileLoading ? "Saving..." : "Save"}
               </Button>
             </form>
           </motion.div>
@@ -405,7 +592,7 @@ export default function AccountPage() {
             </h2>
             <form
               onSubmit={handleChangePassword}
-              className="flex flex-col gap-4"
+              className="mx-auto flex max-w-sm flex-col gap-4"
             >
               <PasswordInput
                 value={currentPw}
@@ -449,24 +636,24 @@ export default function AccountPage() {
             </form>
           </motion.div>
 
-          {/* ── Language Preference — full width ── */}
+          {/* ── Language Preference ── */}
           <motion.div
             variants={fadeUp}
-            className={`${cardClass} md:col-span-2`}
+            className={`${cardClass} flex flex-col`}
           >
             <h2 className="mb-4 text-center font-display text-lg font-light text-gray-900 dark:text-white">
               Language
             </h2>
-            <div className="flex justify-center gap-3">
+            <div className="flex flex-1 flex-col justify-center gap-2.5">
               {[
                 { code: "en", label: "English" },
                 { code: "tr", label: "Türkçe" },
-                { code: "fa", label: "فارسی" },
+                { code: "fa", label: "پارسی" },
               ].map((lang) => (
                 <button
                   key={lang.code}
                   onClick={() => handleLanguageChange(lang.code)}
-                  className={`rounded-full px-5 py-2.5 text-sm font-medium transition-all ${
+                  className={`w-full rounded-full px-5 py-2.5 text-sm font-medium transition-all ${
                     language === lang.code
                       ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
                       : "bg-gray-900/5 text-gray-900/60 hover:bg-gray-900/10 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10"
@@ -717,6 +904,7 @@ export default function AccountPage() {
               )}
             </AnimatePresence>
           </motion.div>
+        </div>
         </div>
       </motion.div>
   );

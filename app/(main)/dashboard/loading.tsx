@@ -13,16 +13,18 @@ export default function DashboardLoading() {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.4, ease }}
     >
-      {/* Skeleton major cards — top bar is persistent in layout */}
-      <div className="mx-auto max-w-5xl px-6 pb-12 pt-4">
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => (
+      <div className="flex h-full items-center justify-center px-6 pb-12">
+        <div className="grid w-full max-w-3xl grid-cols-1 gap-6 sm:grid-cols-2">
+          {Array.from({ length: 2 }).map((_, i) => (
             <div
               key={i}
-              className="rounded-2xl border border-gray-900/10 bg-white/50 p-6 text-center backdrop-blur-xl dark:border-white/10 dark:bg-white/5"
+              className="aspect-square overflow-hidden rounded-[3rem] border border-gray-900/10 bg-white/50 backdrop-blur-xl dark:border-white/10 dark:bg-white/5"
             >
-              <Skeleton className="mx-auto h-5 w-3/4 bg-gray-900/10 dark:bg-white/10" />
-              <Skeleton className="mx-auto mt-2 h-4 w-1/3 bg-gray-900/10 dark:bg-white/10" />
+              <div className="flex h-full flex-col items-center justify-center p-6 sm:p-8">
+                <Skeleton className="h-44 w-44 rounded-xl bg-gray-900/10 sm:h-52 sm:w-52 lg:h-60 lg:w-60 dark:bg-white/10" />
+                <Skeleton className="mx-auto mt-5 h-7 w-2/3 bg-gray-900/10 dark:bg-white/10" />
+                <Skeleton className="mx-auto mt-2 h-4 w-1/2 bg-gray-900/10 dark:bg-white/10" />
+              </div>
             </div>
           ))}
         </div>

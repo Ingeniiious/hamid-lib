@@ -3,6 +3,7 @@ import { course } from "@/database/schema";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { BackButton } from "@/components/BackButton";
+import { PageHeader } from "@/components/PageHeader";
 import { CourseDetail } from "@/components/CourseDetail";
 import { unslugify } from "@/lib/slugify";
 import type { Metadata } from "next";
@@ -25,10 +26,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: c.title,
-    description: c.description || `${c.title} on Hamid Library`,
+    description: c.description || `${c.title} on Libraryyy`,
     openGraph: {
-      title: `${c.title} | Hamid Library`,
-      description: c.description || `${c.title} on Hamid Library`,
+      title: `${c.title} | Libraryyy`,
+      description: c.description || `${c.title} on Libraryyy`,
     },
     robots: { index: false },
   };
@@ -48,11 +49,13 @@ export default async function CoursePage({ params }: Props) {
   const majorName = unslugify(majorSlug);
 
   return (
-    <div className="mx-auto max-w-5xl px-6 pb-12 pt-4">
+    <div className="mx-auto max-w-5xl px-6 pb-12">
       <BackButton
-        href={`/dashboard/${majorSlug}`}
+        href={`/dashboard/courses/${majorSlug}`}
         label={majorName}
       />
+
+      <PageHeader title={c.title} subtitle={c.description || undefined} />
 
       <CourseDetail course={c} />
     </div>

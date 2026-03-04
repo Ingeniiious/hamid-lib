@@ -16,12 +16,17 @@ A personal open-source university course library. Every course Hamid takes gets 
 - **i18n:** Multi-language support — English, Persian (فارسی), Turkish (Türkçe)
 - **Fonts:** Self-hosted custom fonts with unicode-range auto-detection (same method as GTA VI Iran)
 - **Language:** TypeScript
-- **Domain:** library.hamidproject.xyz (subdomain on Vercel)
+- **Domain:** libraryyy.com
 
 ## User Flow
 1. **Landing page** — simple, no scroll. "Hamid Library" title + login button. That's it.
 2. **Auth** — sign up / sign in (Neon Auth handles UI + logic)
-3. **Dashboard** — grid of course cards, grouped by major (divider line with major name, courses under it)
+3. **Dashboard** (`/dashboard`) — two illustrated cards: "My Studies" + "Courses"
+   - **Courses** (`/dashboard/courses`) — major cards grid
+   - **Major** (`/dashboard/courses/[majorSlug]`) — courses for that major
+   - **Course** (`/dashboard/courses/[majorSlug]/[courseSlug]`) — course detail (3-tab placeholder)
+   - **My Studies** (`/dashboard/me`) — student progress (placeholder)
+   - **Settings** (`/dashboard/users`) — account settings
 4. **Course page** (`/course/[slug]`) — three tabs:
    - **Teaching** — study material. Notion-style rich content (text, images, components). Students read/learn here.
    - **Presentation** — hidden by default. Hamid activates from admin when presenting in class. Once presented, stays visible forever.
@@ -51,13 +56,30 @@ A personal open-source university course library. Every course Hamid takes gets 
 
 ## Animations & Motion (Framer Motion — universal)
 Every component must use consistent Framer Motion animations. This is non-negotiable.
-- **Reveal animations** — elements animate in on mount/scroll (fade + subtle slide)
-- **Exit animations** — elements animate out on unmount (fade out)
-- **Page transitions** — smooth fade/slide between routes
-- **Proper easing** — natural easing curves (no linear), consistent duration + stagger delays
-- **Micro-interactions** — button hovers, card hovers, tab switches, toggle animations
-- **Universal motion config** — shared duration, easing, and stagger values across the entire app (defined once, used everywhere)
+- **Reveal animations** — **pure opacity fade only** (`initial={{ opacity: 0 }}` → `animate={{ opacity: 1 }}`). NO slide/translate (`y`, `x`) on reveal. Duration 0.5–0.8s with stagger delays.
+- **Exit animations** — pure opacity fade out (`exit={{ opacity: 0 }}`), same duration
+- **Page transitions** — `AnimatePresence mode="wait"` with FrozenRouter pattern (see below)
+- **Easing** — `[0.25, 0.46, 0.45, 0.94]` everywhere (no linear), consistent across entire app
+- **Micro-interactions** — button hovers, card hovers (`whileHover={{ scale: 1.02 }}`), tab switches, toggle animations
+- **Universal motion config** — shared easing + duration values across the entire app
 - **Framer Motion Plus** components where applicable
+
+### Page Transitions (FrozenRouter pattern — REQUIRED)
+Next.js App Router swaps `children` immediately on navigation, breaking exit animations. Use the FrozenRouter pattern in `components/PageTransition.tsx`:
+```tsx
+import { LayoutRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
+
+function FrozenRouter({ children }) {
+  const context = useContext(LayoutRouterContext);
+  const frozen = useRef(context).current;
+  return (
+    <LayoutRouterContext.Provider value={frozen}>
+      {children}
+    </LayoutRouterContext.Provider>
+  );
+}
+```
+Wrap page content with `<AnimatePresence mode="wait"><motion.div key={pathname}><FrozenRouter>{children}</FrozenRouter></motion.div></AnimatePresence>`. This freezes old content during exit so it fades out properly before new content fades in. Shared layout elements (top bar, nav) go OUTSIDE the PageTransition in the layout so they persist across navigations.
 
 ## UX Polish
 - **Skeleton UI** — every loading state shows skeletons, never blank screens
@@ -178,6 +200,14 @@ database/
   migrations/                   # Generated migrations
 middleware.ts                   # Auth middleware (protects /dashboard/*)
 ```
+
+## Static Assets (Cloudflare R2)
+- **Bucket:** `hamid-lib-assets` (EEUR region)
+- **Custom domain:** `https://lib.thevibecodedcompany.com` (Cloudflare CDN)
+- **Fallback:** `https://pub-7d1b6a5df85a4e308714a375e9ac81f7.r2.dev`
+- Images stored as optimized WebP (resized + compressed via `cwebp`)
+- Upload via: `npx wrangler r2 object put hamid-lib-assets/<path> --file=<local> --content-type=image/webp --remote`
+- Current assets: `images/courses.webp`, `images/my-studies.webp`, `images/back.webp`
 
 ## Environment Variables
 - `DATABASE_URL` — Neon PostgreSQL connection string

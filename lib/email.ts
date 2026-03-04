@@ -19,7 +19,7 @@ export async function sendEmail({
       body: JSON.stringify({
         from: {
           email: process.env.AUTOSEND_FROM_EMAIL,
-          name: "Hamid Library",
+          name: "Libraryyy",
         },
         to: { email: to },
         subject,

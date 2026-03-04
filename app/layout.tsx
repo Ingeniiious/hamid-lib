@@ -9,28 +9,28 @@ const geist = Geist({
   display: "swap",
 });
 
-const siteUrl = "https://library.hamidproject.xyz";
+const siteUrl = "https://libraryyy.com";
 
 export const metadata: Metadata = {
   title: {
-    default: "Hamid Library",
-    template: "%s | Hamid Library",
+    default: "Libraryyy",
+    template: "%s | Libraryyy",
   },
   description:
     "Your University Course Library — courses, presentations, resources, and more.",
   metadataBase: new URL(siteUrl),
   openGraph: {
-    title: "Hamid Library",
+    title: "Libraryyy",
     description:
       "Your University Course Library — courses, presentations, resources, and more.",
     url: siteUrl,
-    siteName: "Hamid Library",
+    siteName: "Libraryyy",
     locale: "en_US",
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "Hamid Library",
+    title: "Libraryyy",
     description:
       "Your University Course Library — courses, presentations, resources, and more.",
   },

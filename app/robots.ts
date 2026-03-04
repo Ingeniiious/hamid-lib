@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: ["/api/", "/dashboard/"],
     },
-    sitemap: "https://library.hamidproject.xyz/sitemap.xml",
+    sitemap: "https://libraryyy.com/sitemap.xml",
   };
 }

@@ -2,6 +2,9 @@
 
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { userProfile } from "@/database/schema";
 import { sendOTP, verifyOTP, type OTPType } from "@/app/(main)/auth/actions";
 
 async function getSession() {
@@ -110,6 +113,47 @@ export async function sendDeleteOTP(password: string) {
   if (result.error) return { error: result.error };
 
   return { success: true };
+}
+
+export async function getUserProfile(userId: string) {
+  try {
+    const rows = await db
+      .select()
+      .from(userProfile)
+      .where(eq(userProfile.userId, userId))
+      .limit(1);
+    return { profile: rows[0] || null };
+  } catch {
+    return { profile: null };
+  }
+}
+
+export async function updateUserProfile(
+  userId: string,
+  data: { university?: string; gender?: string }
+) {
+  try {
+    const existing = await db
+      .select()
+      .from(userProfile)
+      .where(eq(userProfile.userId, userId))
+      .limit(1);
+
+    if (existing[0]) {
+      await db
+        .update(userProfile)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(userProfile.userId, userId));
+    } else {
+      await db.insert(userProfile).values({
+        userId,
+        ...data,
+      });
+    }
+    return { success: true };
+  } catch {
+    return { error: "Failed to update profile." };
+  }
 }
 
 export async function confirmDeleteAccount(code: string) {

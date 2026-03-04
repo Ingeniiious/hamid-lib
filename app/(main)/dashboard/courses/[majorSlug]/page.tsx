@@ -3,6 +3,7 @@ import { course } from "@/database/schema";
 import { notFound } from "next/navigation";
 import { CourseGrid } from "@/components/CourseGrid";
 import { BackButton } from "@/components/BackButton";
+import { PageHeader } from "@/components/PageHeader";
 import { unslugify } from "@/lib/slugify";
 import type { Metadata } from "next";
 
@@ -16,9 +17,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: majorName,
-    description: `${majorName} courses on Hamid Library`,
+    description: `${majorName} courses on Libraryyy`,
     openGraph: {
-      title: `${majorName} | Hamid Library`,
+      title: `${majorName} | Libraryyy`,
       description: `Browse ${majorName} courses`,
     },
     robots: { index: false },
@@ -42,20 +43,17 @@ export default async function MajorCoursesPage({ params }: Props) {
   if (majorCourses.length === 0) notFound();
 
   return (
-    <div className="mx-auto max-w-5xl px-6 pb-12 pt-4">
-      <BackButton href="/dashboard" label="All Majors" />
+    <div className="mx-auto max-w-5xl px-6 pb-12">
+      <BackButton href="/dashboard/courses" label="All Majors" />
 
-      <h1 className="mt-4 text-center font-display text-2xl font-light text-gray-900 dark:text-white">
-        {majorName}
-      </h1>
-      <p className="mt-1 text-center text-sm text-gray-900/50 dark:text-white/50">
-        {majorCourses.length}{" "}
-        {majorCourses.length === 1 ? "Course" : "Courses"}
-      </p>
+      <PageHeader
+        title={majorName}
+        subtitle={`${majorCourses.length} ${majorCourses.length === 1 ? "Course" : "Courses"}`}
+      />
 
       <CourseGrid
         courses={majorCourses}
-        hrefPrefix={`/dashboard/${majorSlug}`}
+        hrefPrefix={`/dashboard/courses/${majorSlug}`}
       />
     </div>
   );
