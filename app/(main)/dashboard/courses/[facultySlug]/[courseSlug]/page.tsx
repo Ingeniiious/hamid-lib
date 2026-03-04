@@ -1,15 +1,14 @@
 import { db } from "@/lib/db";
-import { course } from "@/database/schema";
+import { course, faculty } from "@/database/schema";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { BackButton } from "@/components/BackButton";
 import { PageHeader } from "@/components/PageHeader";
 import { CourseDetail } from "@/components/CourseDetail";
-import { unslugify } from "@/lib/slugify";
 import type { Metadata } from "next";
 
 type Props = {
-  params: Promise<{ majorSlug: string; courseSlug: string }>;
+  params: Promise<{ facultySlug: string; courseSlug: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -36,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function CoursePage({ params }: Props) {
-  const { majorSlug, courseSlug } = await params;
+  const { facultySlug, courseSlug } = await params;
 
   const courses = await db
     .select()
@@ -46,18 +45,36 @@ export default async function CoursePage({ params }: Props) {
   const c = courses[0];
   if (!c) notFound();
 
-  const majorName = unslugify(majorSlug);
+  // Get faculty name for back button
+  const fac = await db
+    .select({ name: faculty.name })
+    .from(faculty)
+    .where(eq(faculty.slug, facultySlug))
+    .then((rows) => rows[0]);
 
   return (
-    <div className="mx-auto max-w-5xl px-6 pb-12">
-      <BackButton
-        href={`/dashboard/courses/${majorSlug}`}
-        label={majorName}
-      />
+    <div className="flex h-full flex-col">
+      {/* Fixed header */}
+      <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
+        <BackButton
+          href={`/dashboard/courses/${facultySlug}`}
+          label={fac?.name || "Back"}
+        />
+        <PageHeader title={c.title} subtitle={c.description || undefined} />
+      </div>
 
-      <PageHeader title={c.title} subtitle={c.description || undefined} />
-
-      <CourseDetail course={c} />
+      {/* Scrollable content */}
+      <div
+        className="min-h-0 flex-1 overflow-y-auto px-6 pb-12"
+        style={{
+          maskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
+          WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
+        }}
+      >
+        <div className="mx-auto max-w-5xl pt-8">
+          <CourseDetail course={c} />
+        </div>
+      </div>
     </div>
   );
 }

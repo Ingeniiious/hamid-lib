@@ -124,13 +124,23 @@ export default function AuthPage() {
       });
 
       if (authError) {
-        setError(authError.message || "Invalid email or password.");
+        const msg = (authError.message || "").toLowerCase();
+        if (msg.includes("invalid") || msg.includes("credential") || msg.includes("password") || msg.includes("not found") || msg.includes("user")) {
+          setError("Invalid email or password.");
+        } else {
+          setError(authError.message || "Invalid email or password.");
+        }
         return;
       }
 
       redirectByRole(data?.user as Record<string, unknown> | undefined);
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message.toLowerCase() : "";
+      if (msg.includes("invalid") || msg.includes("credential") || msg.includes("password") || msg.includes("not found") || msg.includes("user")) {
+        setError("Invalid email or password.");
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -480,7 +490,7 @@ export default function AuthPage() {
                         <InputOTPSlot
                           key={i}
                           index={i}
-                          className="border-white/20 bg-white/10 text-white"
+                          className="border-white/20 bg-white/10 text-white data-[active=true]:border-white/40 data-[active=true]:ring-white/20"
                         />
                       ))}
                     </InputOTPGroup>
@@ -1103,7 +1113,7 @@ export default function AuthPage() {
                         <InputOTPSlot
                           key={i}
                           index={i}
-                          className="border-white/20 bg-white/10 text-white"
+                          className="border-white/20 bg-white/10 text-white data-[active=true]:border-white/40 data-[active=true]:ring-white/20"
                         />
                       ))}
                     </InputOTPGroup>

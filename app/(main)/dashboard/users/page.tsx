@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, EyeSlash, CaretUpDown, Check } from "@phosphor-icons/react";
+import { Eye, EyeSlash, CaretUpDown, CaretLeft, Check } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import {
   updateName,
@@ -31,15 +31,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { UNIVERSITIES } from "@/lib/universities";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { AvatarCropModal } from "@/components/AvatarCropModal";
+import { getDefaultAvatar } from "@/lib/avatar";
+import { UNIVERSITY_DATA, UNIVERSITIES, type CountryGroup, type CityGroup } from "@/lib/universities";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -54,10 +50,10 @@ const fadeUp = {
 };
 
 const inputClass =
-  "rounded-full border-gray-900/15 bg-gray-900/5 text-center text-gray-900 placeholder:text-gray-900/40 focus-visible:ring-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:placeholder:text-white/50 dark:focus-visible:ring-white/30 px-5";
+  "h-10 rounded-full border-gray-900/15 bg-gray-900/5 text-center text-gray-900 placeholder:text-gray-900/40 focus-visible:ring-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:placeholder:text-white/50 dark:focus-visible:ring-white/30 px-5";
 
 const passwordInputClass =
-  "rounded-full border-gray-900/15 bg-gray-900/5 text-center text-gray-900 placeholder:text-gray-900/40 focus-visible:ring-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:placeholder:text-white/50 dark:focus-visible:ring-white/30 pl-11 pr-11";
+  "h-10 rounded-full border-gray-900/15 bg-gray-900/5 text-center text-gray-900 placeholder:text-gray-900/40 focus-visible:ring-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:placeholder:text-white/50 dark:focus-visible:ring-white/30 pl-11 pr-11";
 
 function PasswordInput({
   value,
@@ -188,11 +184,24 @@ export default function AccountPage() {
   const [customUniversity, setCustomUniversity] = useState("");
   const [gender, setGender] = useState("");
   const [uniOpen, setUniOpen] = useState(false);
+  const [uniStep, setUniStep] = useState<"country" | "city" | "university">("country");
+  const [selectedCountry, setSelectedCountry] = useState<CountryGroup | null>(null);
+  const [selectedCity, setSelectedCity] = useState<CityGroup | null>(null);
+  const [uniSearch, setUniSearch] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  // Avatar
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [hasCustomAvatar, setHasCustomAvatar] = useState(false);
+  const [avatarLoading, setAvatarLoading] = useState(false);
+  const [avatarMsg, setAvatarMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Language
   const [language, setLanguage] = useState("en");
@@ -223,9 +232,25 @@ export default function AccountPage() {
           setUniversity(profile.university || "");
         }
         setGender(profile.gender || "");
+        if (profile.avatarUrl) {
+          setAvatarUrl(profile.avatarUrl);
+          setHasCustomAvatar(!!profile.avatarKey);
+        } else {
+          setAvatarUrl(getDefaultAvatar(profile.gender));
+        }
+      } else {
+        setAvatarUrl(getDefaultAvatar(null));
       }
+      setProfileLoaded(true);
     });
   }, [router]);
+
+  // Update avatar preview when gender changes (if no custom avatar)
+  useEffect(() => {
+    if (!hasCustomAvatar && profileLoaded) {
+      setAvatarUrl(getDefaultAvatar(gender || null));
+    }
+  }, [gender, hasCustomAvatar, profileLoaded]);
 
   const handleLanguageChange = (lang: string) => {
     setLanguage(lang);
@@ -243,6 +268,60 @@ export default function AccountPage() {
   useEffect(() => {
     if (sessionLoaded) loadSessions();
   }, [sessionLoaded, loadSessions]);
+
+  // Avatar handlers
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarMsg({ type: "error", text: "File must be under 5MB." });
+      return;
+    }
+    setAvatarMsg(null);
+    const reader = new FileReader();
+    reader.onload = () => setCropSrc(reader.result as string);
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleCroppedUpload = async (blob: Blob) => {
+    setCropSrc(null);
+    setAvatarLoading(true);
+    setAvatarMsg(null);
+    const formData = new FormData();
+    formData.append("file", new File([blob], "avatar.png", { type: "image/png" }));
+
+    try {
+      const res = await fetch("/api/profile/avatar", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) {
+        setAvatarMsg({ type: "error", text: data.error || "Upload failed." });
+      } else {
+        setAvatarUrl(data.url);
+        setHasCustomAvatar(true);
+        setAvatarMsg({ type: "success", text: "Avatar updated." });
+      }
+    } catch {
+      setAvatarMsg({ type: "error", text: "Upload failed." });
+    }
+    setAvatarLoading(false);
+  };
+
+  const handleAvatarRemove = async () => {
+    setAvatarLoading(true);
+    setAvatarMsg(null);
+    try {
+      const res = await fetch("/api/profile/avatar", { method: "DELETE" });
+      if (res.ok) {
+        setAvatarUrl(getDefaultAvatar(gender || null));
+        setHasCustomAvatar(false);
+        setAvatarMsg({ type: "success", text: "Avatar removed." });
+      }
+    } catch {
+      setAvatarMsg({ type: "error", text: "Failed to remove avatar." });
+    }
+    setAvatarLoading(false);
+  };
 
   // Handlers
   const handleUpdateName = async (e: React.FormEvent) => {
@@ -373,16 +452,19 @@ export default function AccountPage() {
 
   if (!sessionLoaded) {
     return (
-      <div className="mx-auto max-w-5xl px-6 pb-12 pt-4">
-        <div className="mx-auto max-w-3xl">
-          <div className="mb-8 flex justify-center">
-            <div className="h-7 w-48 animate-pulse rounded-lg bg-gray-900/10 dark:bg-white/10" />
-          </div>
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <div className="h-72 animate-pulse rounded-2xl bg-gray-900/5 dark:bg-white/5" />
-            <div className="h-72 animate-pulse rounded-2xl bg-gray-900/5 dark:bg-white/5" />
-            <div className="h-48 animate-pulse rounded-2xl bg-gray-900/5 md:col-span-2 dark:bg-white/5" />
-            <div className="h-36 animate-pulse rounded-2xl bg-red-500/5 md:col-span-2" />
+      <div className="flex h-full flex-col">
+        <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
+          <BackButton href="/dashboard" label="Dashboard" />
+          <PageHeader title="Account Settings" />
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-12">
+          <div className="mx-auto max-w-3xl pt-8">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <div className="h-72 animate-pulse rounded-2xl bg-gray-900/5 dark:bg-white/5" />
+              <div className="h-72 animate-pulse rounded-2xl bg-gray-900/5 dark:bg-white/5" />
+              <div className="h-48 animate-pulse rounded-2xl bg-gray-900/5 md:col-span-2 dark:bg-white/5" />
+              <div className="h-36 animate-pulse rounded-2xl bg-red-500/5 md:col-span-2" />
+            </div>
           </div>
         </div>
       </div>
@@ -390,17 +472,27 @@ export default function AccountPage() {
   }
 
   return (
-    <motion.div
+    <div className="flex h-full flex-col">
+      {/* Fixed header — stays pinned */}
+      <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
+        <BackButton href="/dashboard" label="Dashboard" />
+        <PageHeader title="Account Settings" />
+      </div>
+
+      {/* Scrollable content */}
+      <div
+        className="min-h-0 flex-1 overflow-y-auto px-6 pb-12"
+        style={{
+          maskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
+          WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
+        }}
+      >
+      <motion.div
         variants={stagger}
         initial="hidden"
         animate="show"
-        className="mx-auto max-w-5xl px-6 pb-12"
+        className="mx-auto max-w-3xl pt-8"
       >
-        <BackButton href="/dashboard" label="Dashboard" />
-
-        <PageHeader title="Account Settings" />
-
-        <div className="mx-auto max-w-3xl">
         {/* Bento Grid — 2 cols on desktop, stacked on mobile */}
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           {/* ── Profile — full width, 2-col internal layout ── */}
@@ -408,6 +500,68 @@ export default function AccountPage() {
             <h2 className="mb-4 text-center font-display text-lg font-light text-gray-900 dark:text-white">
               Profile
             </h2>
+
+            {/* Avatar */}
+            <div className="mb-2 flex flex-col items-center gap-3">
+              {!profileLoaded ? (
+                <Skeleton className="h-20 w-20 rounded-full bg-gray-900/10 dark:bg-white/10" />
+              ) : (
+                <Avatar className="h-20 w-20 border border-gray-900/20 dark:border-white/20">
+                  {avatarUrl && <AvatarImage src={avatarUrl} alt={userName || "Avatar"} />}
+                  <AvatarFallback className="bg-gray-900/10 text-xl font-medium text-gray-900 dark:bg-white/10 dark:text-white">
+                    {(userName || "S").charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  type="button"
+                  disabled={avatarLoading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-xl bg-[#5227FF] px-4 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  {avatarLoading ? "Uploading..." : "Upload Photo"}
+                </motion.button>
+                {hasCustomAvatar && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    disabled={avatarLoading}
+                    onClick={handleAvatarRemove}
+                    className="rounded-xl border border-gray-900/10 px-4 py-2 text-xs font-medium text-gray-900/70 transition-colors hover:bg-gray-900/5 disabled:opacity-50 dark:border-white/15 dark:text-white/70 dark:hover:bg-white/5"
+                  >
+                    Remove
+                  </motion.button>
+                )}
+              </div>
+              <AnimatePresence>
+                {avatarMsg && (
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className={`text-center text-xs ${
+                      avatarMsg.type === "error"
+                        ? "text-red-500 dark:text-red-300"
+                        : "text-emerald-600 dark:text-emerald-300"
+                    }`}
+                  >
+                    {avatarMsg.text}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+            </div>
+
             <form onSubmit={handleUpdateName} className="flex flex-col gap-4">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {/* Left column — Name & Email */}
@@ -445,71 +599,214 @@ export default function AccountPage() {
                     <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
                       University
                     </label>
-                    <Popover open={uniOpen} onOpenChange={setUniOpen}>
+                    {!profileLoaded ? (
+                      <Skeleton className="mx-auto h-10 w-full rounded-full bg-gray-900/10 dark:bg-white/10" />
+                    ) : (
+                    <Popover
+                      open={uniOpen}
+                      onOpenChange={(open) => {
+                        setUniOpen(open);
+                        if (!open) {
+                          setUniStep("country");
+                          setSelectedCountry(null);
+                          setSelectedCity(null);
+                          setUniSearch("");
+                        }
+                      }}
+                    >
                       <PopoverTrigger asChild>
                         <button
                           type="button"
                           role="combobox"
                           aria-expanded={uniOpen}
-                          className="flex h-10 w-full items-center justify-between rounded-full border border-gray-900/15 bg-gray-900/5 px-5 text-sm text-gray-900 transition-colors hover:bg-gray-900/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/15 dark:focus-visible:ring-white/30"
+                          className="relative flex h-10 w-full items-center justify-center rounded-full border border-gray-900/15 bg-gray-900/5 px-5 text-center text-sm text-gray-900 transition-colors hover:bg-gray-900/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/15 dark:focus-visible:ring-white/30"
                         >
                           <span className={university ? "text-gray-900 dark:text-white" : "text-gray-900/40 dark:text-white/50"}>
                             {university === "__other__"
                               ? "Other"
                               : university || "Select University"}
                           </span>
-                          <CaretUpDown size={16} weight="duotone" className="text-gray-900/30 dark:text-white/40" />
+                          <CaretUpDown size={16} weight="duotone" className="absolute right-5 text-gray-900/30 dark:text-white/40" />
                         </button>
                       </PopoverTrigger>
                       <PopoverContent
-                        className="w-[--radix-popover-trigger-width] border-gray-200 bg-white p-0 dark:border-white/20 dark:bg-gray-900/95 dark:backdrop-blur-xl"
+                        className="!w-[--radix-popover-trigger-width] rounded-2xl border-gray-900/15 bg-white/90 p-1 backdrop-blur-xl dark:border-white/20 dark:bg-gray-900/95 dark:backdrop-blur-xl"
                         sideOffset={4}
                       >
-                        <Command className="bg-transparent">
-                          <CommandInput
-                            placeholder="Search university..."
-                            className="text-gray-900 placeholder:text-gray-900/40 dark:text-white dark:placeholder:text-white/40"
-                          />
-                          <CommandList className="max-h-[240px]">
-                            <CommandEmpty className="py-3 text-center text-sm text-gray-900/40 dark:text-white/40">
-                              No university found.
-                            </CommandEmpty>
-                            <CommandGroup>
-                              {UNIVERSITIES.map((uni) => (
-                                <CommandItem
-                                  key={uni}
-                                  value={uni}
-                                  onSelect={() => {
-                                    setUniversity(uni);
-                                    setCustomUniversity("");
-                                    setUniOpen(false);
-                                  }}
-                                  className="text-gray-900/80 aria-selected:bg-gray-900/5 aria-selected:text-gray-900 dark:text-white/80 dark:aria-selected:bg-white/10 dark:aria-selected:text-white"
-                                >
-                                  {university === uni && (
-                                    <Check size={14} className="mr-2 text-gray-900 dark:text-white" />
-                                  )}
-                                  {uni}
-                                </CommandItem>
-                              ))}
-                              <CommandItem
-                                value="Other — Type Your University"
-                                onSelect={() => {
-                                  setUniversity("__other__");
-                                  setUniOpen(false);
-                                }}
-                                className="text-gray-900/80 aria-selected:bg-gray-900/5 aria-selected:text-gray-900 dark:text-white/80 dark:aria-selected:bg-white/10 dark:aria-selected:text-white"
-                              >
-                                {university === "__other__" && (
-                                  <Check size={14} className="mr-2 text-gray-900 dark:text-white" />
+                        {(() => {
+                          const itemClass = "flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm text-gray-900/80 transition-colors hover:bg-gray-900/5 hover:text-gray-900 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white";
+                          const mutedItemClass = "flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm text-gray-900/40 transition-colors hover:bg-gray-900/5 hover:text-gray-900/60 dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white/60";
+                          const backClass = "flex w-full items-center justify-center gap-1 shrink-0 pb-1 pt-2 text-xs font-medium text-gray-900/40 transition-colors hover:text-gray-900/60 dark:text-white/40 dark:hover:text-white/60";
+                          const headingClass = "shrink-0 pb-1.5 pt-2 text-center text-xs font-medium text-gray-900/40 dark:text-white/40";
+
+                          const filtered = selectedCity
+                            ? selectedCity.universities.filter((uni) =>
+                                uni.name.toLowerCase().includes(uniSearch.toLowerCase())
+                              )
+                            : [];
+
+                          return (
+                            <div className="flex h-[260px] flex-col">
+                              <AnimatePresence mode="wait" initial={false}>
+                                {uniStep === "country" && (
+                                  <motion.div
+                                    key="country"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.15 }}
+                                    className="flex h-full flex-col"
+                                  >
+                                    <p className={headingClass}>Country</p>
+                                    <div className="min-h-0 flex-1 overflow-y-auto">
+                                      {UNIVERSITY_DATA.map((country) => (
+                                        <button
+                                          key={country.country}
+                                          type="button"
+                                          onClick={() => {
+                                            setSelectedCountry(country);
+                                            setUniStep(country.cities.length === 1 ? "university" : "city");
+                                            if (country.cities.length === 1) setSelectedCity(country.cities[0]);
+                                          }}
+                                          className={itemClass}
+                                        >
+                                          {country.country}
+                                        </button>
+                                      ))}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setUniversity("__other__");
+                                          setUniOpen(false);
+                                        }}
+                                        className={mutedItemClass}
+                                      >
+                                        Other
+                                      </button>
+                                    </div>
+                                  </motion.div>
                                 )}
-                                Other — Type Your University
-                              </CommandItem>
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
+
+                                {uniStep === "city" && selectedCountry && (
+                                  <motion.div
+                                    key="city"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.15 }}
+                                    className="flex h-full flex-col"
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setUniStep("country");
+                                        setSelectedCountry(null);
+                                      }}
+                                      className={backClass}
+                                    >
+                                      <CaretLeft size={12} weight="bold" />
+                                      {selectedCountry.country}
+                                    </button>
+                                    <div className="min-h-0 flex-1 overflow-y-auto">
+                                      {selectedCountry.cities.map((city) => (
+                                        <button
+                                          key={city.city}
+                                          type="button"
+                                          onClick={() => {
+                                            setSelectedCity(city);
+                                            setUniStep("university");
+                                          }}
+                                          className={itemClass}
+                                        >
+                                          {city.city}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </motion.div>
+                                )}
+
+                                {uniStep === "university" && selectedCity && (
+                                  <motion.div
+                                    key="university"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.15 }}
+                                    className="flex h-full flex-col"
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setUniSearch("");
+                                        if (selectedCountry && selectedCountry.cities.length > 1) {
+                                          setUniStep("city");
+                                          setSelectedCity(null);
+                                        } else {
+                                          setUniStep("country");
+                                          setSelectedCountry(null);
+                                          setSelectedCity(null);
+                                        }
+                                      }}
+                                      className={backClass}
+                                    >
+                                      <CaretLeft size={12} weight="bold" />
+                                      {selectedCity.city}
+                                    </button>
+                                    <div className="shrink-0 px-1 pb-1.5">
+                                      <input
+                                        type="text"
+                                        value={uniSearch}
+                                        onChange={(e) => setUniSearch(e.target.value)}
+                                        placeholder="Search..."
+                                        className="w-full rounded-lg border border-gray-900/10 bg-gray-900/5 px-3 py-1.5 text-center text-sm text-gray-900 placeholder:text-gray-900/30 focus:outline-none dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-white/30"
+                                        autoFocus
+                                      />
+                                    </div>
+                                    <div className="min-h-0 flex-1 overflow-y-auto">
+                                      {filtered.map((uni) => (
+                                        <button
+                                          key={uni.name}
+                                          type="button"
+                                          onClick={() => {
+                                            setUniversity(uni.name);
+                                            setCustomUniversity("");
+                                            setUniSearch("");
+                                            setUniOpen(false);
+                                          }}
+                                          className={itemClass}
+                                        >
+                                          {university === uni.name && (
+                                            <Check size={14} className="absolute left-3 text-gray-900 dark:text-white" />
+                                          )}
+                                          {uni.name}
+                                        </button>
+                                      ))}
+                                      {filtered.length === 0 && (
+                                        <p className="py-3 text-center text-sm text-gray-900/40 dark:text-white/40">
+                                          No match found.
+                                        </p>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setUniversity("__other__");
+                                          setUniSearch("");
+                                          setUniOpen(false);
+                                        }}
+                                        className={mutedItemClass}
+                                      >
+                                        Other — Type Your University
+                                      </button>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          );
+                        })()}
                       </PopoverContent>
                     </Popover>
+                    )}
                   </div>
 
                   {/* Custom university input */}
@@ -535,6 +832,13 @@ export default function AccountPage() {
                     <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
                       Gender
                     </label>
+                    {!profileLoaded ? (
+                      <div className="flex justify-center gap-2">
+                        <Skeleton className="h-9 w-16 rounded-full bg-gray-900/10 dark:bg-white/10" />
+                        <Skeleton className="h-9 w-20 rounded-full bg-gray-900/10 dark:bg-white/10" />
+                        <Skeleton className="h-9 w-36 rounded-full bg-gray-900/10 dark:bg-white/10" />
+                      </div>
+                    ) : (
                     <div className="flex justify-center gap-2">
                       {[
                         { value: "male", label: "Male" },
@@ -547,7 +851,7 @@ export default function AccountPage() {
                           onClick={() => setGender(opt.value)}
                           className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
                             gender === opt.value
-                              ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+                              ? "bg-[#5227FF] text-white"
                               : "bg-gray-900/5 text-gray-900/60 hover:bg-gray-900/10 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10"
                           }`}
                         >
@@ -555,6 +859,7 @@ export default function AccountPage() {
                         </button>
                       ))}
                     </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -578,7 +883,7 @@ export default function AccountPage() {
               <Button
                 type="submit"
                 disabled={nameLoading || profileLoading || !name.trim()}
-                className="mx-auto w-full max-w-xs rounded-full bg-gray-900 font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-gray-900 dark:hover:bg-white/90"
+                className="mx-auto w-full max-w-xs rounded-full bg-[#5227FF] font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {nameLoading || profileLoading ? "Saving..." : "Save"}
               </Button>
@@ -629,7 +934,7 @@ export default function AccountPage() {
               <Button
                 type="submit"
                 disabled={pwLoading}
-                className="w-full rounded-full bg-gray-900 font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-gray-900 dark:hover:bg-white/90"
+                className="w-full rounded-full bg-[#5227FF] font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {pwLoading ? "Updating..." : "Update Password"}
               </Button>
@@ -655,7 +960,7 @@ export default function AccountPage() {
                   onClick={() => handleLanguageChange(lang.code)}
                   className={`w-full rounded-full px-5 py-2.5 text-sm font-medium transition-all ${
                     language === lang.code
-                      ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+                      ? "bg-[#5227FF] text-white"
                       : "bg-gray-900/5 text-gray-900/60 hover:bg-gray-900/10 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10"
                   }`}
                 >
@@ -861,7 +1166,7 @@ export default function AccountPage() {
                         <InputOTPSlot
                           key={i}
                           index={i}
-                          className="border-red-500/20 bg-red-500/5 text-gray-900 dark:text-white"
+                          className="border-red-500/20 bg-red-500/5 text-gray-900 data-[active=true]:border-red-500/40 data-[active=true]:ring-red-500/20 dark:text-white"
                         />
                       ))}
                     </InputOTPGroup>
@@ -905,7 +1210,15 @@ export default function AccountPage() {
             </AnimatePresence>
           </motion.div>
         </div>
-        </div>
       </motion.div>
+      </div>
+
+      {/* Crop modal — always rendered so AnimatePresence can fade out */}
+      <AvatarCropModal
+        imageSrc={cropSrc}
+        onCrop={handleCroppedUpload}
+        onCancel={() => setCropSrc(null)}
+      />
+    </div>
   );
 }

@@ -5,6 +5,18 @@ import { pgTable, text, integer, timestamp, serial, boolean } from "drizzle-orm/
 // (Auth is managed by Neon Auth in the neon_auth schema)
 // ==================
 
+export const faculty = pgTable("faculty", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  university: text("university").notNull(),
+  illustration: text("illustration"),
+  description: text("description"),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const course = pgTable("course", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
@@ -14,6 +26,7 @@ export const course = pgTable("course", {
   semester: text("semester"),
   professor: text("professor"),
   coverImage: text("cover_image"),
+  facultyId: integer("faculty_id").references(() => faculty.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: text("created_by"),
@@ -33,6 +46,8 @@ export const userProfile = pgTable("user_profile", {
   userId: text("user_id").primaryKey(),
   university: text("university"),
   gender: text("gender"),
+  avatarUrl: text("avatar_url"),
+  avatarKey: text("avatar_key"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

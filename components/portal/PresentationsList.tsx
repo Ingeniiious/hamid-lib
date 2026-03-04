@@ -55,16 +55,16 @@ export function PresentationsList() {
           >
             <p className="font-display text-3xl font-light text-gray-900 sm:text-4xl dark:text-white">
               {presentations.length}
-              <span className="text-gray-900/25 dark:text-white/25">
+              <span className="text-gray-900 dark:text-white">
                 {" "}/ {MAX_FILES}
               </span>
             </p>
-            <p className="mt-1 text-xs text-gray-900/40 dark:text-white/40">
+            <p className="mt-1 text-xs text-gray-900 dark:text-white">
               Files Uploaded
             </p>
-            <div className="mx-auto mt-3 h-1.5 w-48 overflow-hidden rounded-full bg-gray-900/10 dark:bg-white/10">
+            <div className="mx-auto mt-3 h-1.5 w-48 overflow-hidden rounded-full bg-gray-900/20 dark:bg-white/20">
               <motion.div
-                className={`h-full rounded-full ${atLimit ? "bg-red-400" : "bg-gray-900/30 dark:bg-white/30"}`}
+                className={`h-full rounded-full ${atLimit ? "bg-red-400" : "bg-gray-900 dark:bg-white"}`}
                 initial={{ width: 0 }}
                 animate={{ width: `${progressPercent}%` }}
                 transition={{ duration: 0.8, ease }}

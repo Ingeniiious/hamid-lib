@@ -1,5 +1,9 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { userProfile } from "@/database/schema";
+import { getAvatarUrl } from "@/lib/avatar";
 import { DashboardTopBar } from "@/components/DashboardTopBar";
 import { DashboardShell } from "@/components/DashboardShell";
 
@@ -15,6 +19,15 @@ export default async function DashboardLayout({
 
   const userName = session.user?.name || "Student";
 
+  // Fetch profile for avatar
+  const profiles = await db
+    .select({ avatarUrl: userProfile.avatarUrl, gender: userProfile.gender })
+    .from(userProfile)
+    .where(eq(userProfile.userId, session.user.id))
+    .limit(1);
+  const profile = profiles[0];
+  const avatarUrl = getAvatarUrl(profile?.avatarUrl, profile?.gender);
+
   return (
     <div className="relative h-full w-full">
       {/* Gradient overlay — Grainient visible at top, smoothly fading to background */}
@@ -24,11 +37,11 @@ export default async function DashboardLayout({
       <div className="relative z-10 flex h-full flex-col">
         {/* Persistent top bar — stays across all dashboard routes */}
         <div className="shrink-0">
-          <DashboardTopBar userName={userName} />
+          <DashboardTopBar userName={userName} avatarUrl={avatarUrl} />
         </div>
 
         {/* Page content — cross-fades between dashboard routes */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1">
           <DashboardShell>{children}</DashboardShell>
         </div>
       </div>

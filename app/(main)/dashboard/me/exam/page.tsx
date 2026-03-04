@@ -1,22 +1,21 @@
 import { BackButton } from "@/components/BackButton";
 import { PageHeader } from "@/components/PageHeader";
-import { PresentationsList } from "@/components/portal/PresentationsList";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Presentations",
+  title: "Exam Results",
   robots: { index: false },
 };
 
-export default function PresentationsPage() {
+export default function ExamResultsPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Fixed header — stays pinned */}
       <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
         <BackButton href="/dashboard/me" label="My Studies" />
         <PageHeader
-          title="Presentations"
-          subtitle="Upload files and share them instantly via Portal."
+          title="Exam Results"
+          subtitle="Review your past exams, scores, and performance analysis."
         />
       </div>
 
@@ -25,11 +24,20 @@ export default function PresentationsPage() {
         className="min-h-0 flex-1 overflow-y-auto px-6 pb-12"
         style={{
           maskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
-          WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
+          WebkitMaskImage:
+            "linear-gradient(to bottom, transparent 0%, black 64px)",
         }}
       >
         <div className="mx-auto max-w-5xl pt-8">
-          <PresentationsList />
+          {/* Placeholder — will be replaced with actual exam results list */}
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <p className="text-lg font-light text-gray-900/50 dark:text-white/50">
+              No exam results yet.
+            </p>
+            <p className="mt-2 text-sm text-gray-900/30 dark:text-white/30">
+              Your scores and analysis will appear here after you take an exam.
+            </p>
+          </div>
         </div>
       </div>
     </div>

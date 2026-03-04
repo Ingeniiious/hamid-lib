@@ -1,14 +1,33 @@
 "use server";
 
 import { eq, and, gt, isNull } from "drizzle-orm";
+import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { portalCode, portalPresentation } from "@/database/schema";
+import { rateLimit } from "@/lib/rate-limit";
+
+function getClientIP(headersList: Headers): string {
+  return (
+    headersList.get("x-real-ip") ||
+    headersList.get("cf-connecting-ip") ||
+    headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown"
+  );
+}
 
 export async function verifyPortalCode(code: string) {
   const normalized = code.toUpperCase().trim();
 
   if (normalized.length !== 8) {
     return { error: "Invalid code." };
+  }
+
+  // Rate limit: 10 requests per minute per IP
+  const headersList = await headers();
+  const ip = getClientIP(headersList);
+  const { allowed, retryAfter } = await rateLimit(`portal:verify:${ip}`, 10, 60);
+  if (!allowed) {
+    return { error: `Too many attempts. Try again in ${retryAfter}s.` };
   }
 
   try {
@@ -59,7 +78,7 @@ export async function verifyPortalCode(code: string) {
       };
     }
 
-    // No approval needed — mark as used and return proxied file URL
+    // No approval needed — mark as used and return file URL
     await db
       .update(portalCode)
       .set({ usedAt: now, approved: true })
@@ -69,7 +88,7 @@ export async function verifyPortalCode(code: string) {
       status: "approved" as const,
       codeId: row.code.id,
       fileName: row.presentation.fileName,
-      fileUrl: `/api/portal/file?codeId=${row.code.id}`,
+      fileUrl: row.presentation.fileUrl,
       fileType: row.presentation.fileType,
       fileSize: row.presentation.fileSize,
     };
@@ -106,7 +125,7 @@ export async function checkApprovalStatus(codeId: number) {
       return {
         status: "approved" as const,
         fileName: row.presentation.fileName,
-        fileUrl: `/api/portal/file?codeId=${row.code.id}`,
+        fileUrl: row.presentation.fileUrl,
         fileType: row.presentation.fileType,
         fileSize: row.presentation.fileSize,
       };

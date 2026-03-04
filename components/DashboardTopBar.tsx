@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { authClient } from "@/lib/auth-client";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,13 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
-export function DashboardTopBar({ userName }: { userName: string }) {
+export function DashboardTopBar({
+  userName,
+  avatarUrl,
+}: {
+  userName: string;
+  avatarUrl?: string;
+}) {
   const router = useRouter();
   const initial = userName.charAt(0).toUpperCase();
 
@@ -37,6 +43,9 @@ export function DashboardTopBar({ userName }: { userName: string }) {
           <DropdownMenuTrigger asChild>
             <button className="focus-visible:outline-none">
               <Avatar className="h-9 w-9 cursor-pointer border border-gray-900/20 bg-gray-900/10 transition-colors hover:bg-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:hover:bg-white/20">
+                {avatarUrl && (
+                  <AvatarImage src={avatarUrl} alt={userName} />
+                )}
                 <AvatarFallback className="bg-transparent text-sm font-medium text-gray-900 dark:text-white">
                   {initial}
                 </AvatarFallback>

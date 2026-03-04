@@ -1,5 +1,31 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "lib.thevibecodedcompany.com",
+      },
+      {
+        protocol: "https",
+        hostname: "pub-7d1b6a5df85a4e308714a375e9ac81f7.r2.dev",
+      },
+    ],
+    minimumCacheTTL: 60 * 60 * 24 * 365, // 1 year — assets are content-hashed
+  },
+  headers: async () => [
+    {
+      // Aggressive caching for R2 CDN images proxied through Next.js Image
+      source: "/_next/image",
+      headers: [
+        {
+          key: "Cache-Control",
+          value: "public, max-age=31536000, immutable",
+        },
+      ],
+    },
+  ],
+};
 
 export default nextConfig;

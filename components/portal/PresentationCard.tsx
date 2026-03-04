@@ -65,6 +65,7 @@ export function PresentationCard({ presentation, onDeleted, index }: Presentatio
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [approval, setApproval] = useState(presentation.requireApproval);
   const [previewing, setPreviewing] = useState(false);
 
@@ -164,13 +165,31 @@ export function PresentationCard({ presentation, onDeleted, index }: Presentatio
           <span className="rounded-md bg-gray-900/5 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-gray-900/50 dark:bg-white/10 dark:text-white/50">
             {fileType}
           </span>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="text-[11px] text-gray-900/30 transition-colors hover:text-red-500 disabled:opacity-50 dark:text-white/30 dark:hover:text-red-400"
-          >
-            {deleting ? "Deleting..." : "Delete"}
-          </button>
+          {confirmDelete ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="text-[11px] font-medium text-red-500 transition-colors hover:text-red-600 disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
+              >
+                {deleting ? "Deleting..." : "Confirm"}
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+                className="text-[11px] text-gray-900/30 transition-colors hover:text-gray-900/60 disabled:opacity-50 dark:text-white/30 dark:hover:text-white/60"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="text-[11px] text-gray-900/30 transition-colors hover:text-red-500 dark:text-white/30 dark:hover:text-red-400"
+            >
+              Delete
+            </button>
+          )}
         </div>
 
         {/* File name */}
@@ -190,7 +209,7 @@ export function PresentationCard({ presentation, onDeleted, index }: Presentatio
             whileTap={{ scale: 0.98 }}
             onClick={handlePresent}
             disabled={loading || !!codeData}
-            className="rounded-xl bg-gray-900 px-5 py-2.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 dark:bg-white dark:text-gray-900"
+            className="rounded-xl bg-[#5227FF] px-5 py-2.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {loading ? "Generating..." : codeData ? "Active" : "Present"}
           </motion.button>
@@ -211,7 +230,7 @@ export function PresentationCard({ presentation, onDeleted, index }: Presentatio
           >
             <div
               className={`h-5 w-9 rounded-full transition-colors duration-300 ${
-                approval ? "bg-blue-500" : "bg-gray-900/15 dark:bg-white/20"
+                approval ? "bg-[#5227FF]" : "bg-gray-900/15 dark:bg-white/20"
               }`}
             >
               <motion.div

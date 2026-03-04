@@ -117,6 +117,28 @@ export default function PortalPage() {
         </Link>
       </motion.div>
 
+      {/* Portal illustration — pinned to page center, independent of card */}
+      <AnimatePresence>
+        {state.step !== "viewing" && (
+          <motion.div
+            key="portal-img"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5, ease, delay: state.step === "input" ? 0.5 : 0 }}
+            className="pointer-events-none absolute z-0 flex w-full max-w-xl justify-center px-3 sm:px-6"
+            style={{ bottom: "calc(50% + 72px)" }}
+          >
+            <img
+              src="https://lib.thevibecodedcompany.com/images/portal.webp"
+              alt=""
+              className="h-64 w-64 object-contain sm:h-80 sm:w-80"
+              draggable={false}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Main Content */}
       <AnimatePresence mode="wait">
         {state.step === "viewing" ? (
@@ -143,15 +165,16 @@ export default function PortalPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5, ease }}
-            className="w-full max-w-xl px-3 sm:px-6"
+            className="relative w-full max-w-xl px-3 sm:px-6"
           >
             <LayoutGroup>
               <motion.div
                 layout
-                className="overflow-hidden rounded-3xl border border-white/20 bg-white/10 px-4 py-6 shadow-2xl backdrop-blur-xl sm:px-8 sm:py-8"
+                className="relative z-10 rounded-3xl border border-white/20 bg-white/10 px-4 py-6 shadow-2xl backdrop-blur-xl sm:px-8 sm:py-8"
                 style={{ borderRadius: "1.5rem" }}
                 transition={{ layout: { duration: 0.35, ease } }}
               >
+
                 <AnimatePresence mode="wait" initial={false}>
                   {state.step === "input" && (
                     <motion.div
@@ -173,7 +196,7 @@ export default function PortalPage() {
                         className="mb-6 text-center text-sm text-white/50"
                         transition={{ layout: { duration: 0.3, ease } }}
                       >
-                        Enter your 8-character access code
+                        Enter your 8-character code to grab your file
                       </motion.p>
 
                       <PortalCodeInput
