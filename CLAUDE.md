@@ -239,7 +239,7 @@ middleware.ts                   # Auth middleware (protects /dashboard/*)
 
 ## Notes
 - **Next.js 16:** `middleware.ts` has been deprecated and renamed to `proxy.ts` — don't confuse them. Use `proxy.ts` for request interception/routing.
-- This is a personal project, not commercial — ~10 university students
+- Targeting 10,000+ users in the first 6 months — build for scale from day one
 - Keep dependencies minimal
 - Path alias: `@/*` maps to project root
 - Hosted on Vercel Pro plan

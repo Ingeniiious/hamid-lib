@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, serial, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, serial, boolean, unique } from "drizzle-orm/pg-core";
 
 // ==================
 // App tables
@@ -113,6 +113,34 @@ export const calendarEvent = pgTable("calendar_event", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const pushSubscription = pgTable(
+  "push_subscription",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh"),
+    auth: text("auth"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    unique("push_sub_user_endpoint").on(table.userId, table.endpoint),
+  ]
+);
+
+export const notificationLog = pgTable(
+  "notification_log",
+  {
+    id: serial("id").primaryKey(),
+    eventId: text("event_id").notNull(),
+    alertMinutes: integer("alert_minutes").notNull(),
+    sentAt: timestamp("sent_at").notNull().defaultNow(),
+  },
+  (table) => [
+    unique("notif_log_event_alert").on(table.eventId, table.alertMinutes),
+  ]
+);
 
 export const material = pgTable("material", {
   id: text("id").primaryKey(),

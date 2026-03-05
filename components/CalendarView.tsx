@@ -27,6 +27,7 @@ import {
   addCalendarEvents,
   deleteCalendarEvent,
 } from "@/app/(main)/dashboard/me/calendar/actions";
+import { NotificationPrompt } from "@/components/NotificationPrompt";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -198,10 +199,14 @@ export function CalendarView() {
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    getCalendarEvents().then((events) => {
-      setEvents(events as CalendarEvent[]);
-      setMounted(true);
-    });
+    getCalendarEvents()
+      .then((events) => {
+        setEvents(events as CalendarEvent[]);
+      })
+      .catch(() => {
+        // Failed to load — start with empty
+      })
+      .finally(() => setMounted(true));
   }, []);
 
   // Scroll to current hour on mount
@@ -355,12 +360,20 @@ export function CalendarView() {
 
     setEvents((prev) => [...prev, ...newEvents]);
     setShowForm(false);
-    addCalendarEvents(newEvents);
+    addCalendarEvents(newEvents).catch(() => {
+      // Rollback on failure — remove the optimistically added events
+      const newIds = new Set(newEvents.map((e) => e.id));
+      setEvents((prev) => prev.filter((e) => !newIds.has(e.id)));
+    });
   };
 
   const handleDeleteEvent = (id: string) => {
+    const backup = events;
     setEvents((prev) => prev.filter((e) => e.id !== id));
-    deleteCalendarEvent(id);
+    deleteCalendarEvent(id).catch(() => {
+      // Rollback on failure — restore deleted event
+      setEvents(backup);
+    });
   };
 
   /* ── Render ──────────────────────────────────────────── */
@@ -520,6 +533,11 @@ export function CalendarView() {
           </div>
         </div>
       )}
+
+      {/* ── Notification Prompt ──────────────────────────── */}
+      <div className="mb-2">
+        <NotificationPrompt />
+      </div>
 
       {/* ── Timeline ─────────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-900/10 bg-white/50 backdrop-blur-xl md:rounded-2xl dark:border-white/15 dark:bg-white/5">

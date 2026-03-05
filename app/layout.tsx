@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ServiceWorkerProvider } from "@/components/ServiceWorkerProvider";
 import "./globals.css";
 
 const geist = Geist({
@@ -59,6 +60,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geist.variable} font-sans antialiased`}>
         <ThemeProvider>{children}</ThemeProvider>
+        <ServiceWorkerProvider />
       </body>
     </html>
   );

@@ -20,7 +20,19 @@
     "province": "Alberta"
   },
   {
+    "name": "Grande Prairie Regional College",
+    "province": "Alberta"
+  },
+  {
+    "name": "Keyano College",
+    "province": "Alberta"
+  },
+  {
     "name": "King's University College",
+    "province": "Alberta"
+  },
+  {
+    "name": "Lakeland College",
     "province": "Alberta"
   },
   {
@@ -32,11 +44,31 @@
     "province": "Alberta"
   },
   {
+    "name": "Medicine Hat College",
+    "province": "Alberta"
+  },
+  {
     "name": "Mount Royal University",
     "province": "Alberta"
   },
   {
+    "name": "NorQuest College",
+    "province": "Alberta"
+  },
+  {
     "name": "Northern Alberta Institute of Technology",
+    "province": "Alberta"
+  },
+  {
+    "name": "Olds College",
+    "province": "Alberta"
+  },
+  {
+    "name": "Portage College",
+    "province": "Alberta"
+  },
+  {
+    "name": "Red Deer Polytechnic",
     "province": "Alberta"
   },
   {
@@ -120,6 +152,10 @@
     "province": "British Columbia"
   },
   {
+    "name": "Okanagan College",
+    "province": "British Columbia"
+  },
+  {
     "name": "Okanagan University College",
     "province": "British Columbia"
   },
@@ -188,6 +224,10 @@
     "province": "British Columbia"
   },
   {
+    "name": "Assiniboine Community College",
+    "province": "Manitoba"
+  },
+  {
     "name": "Brandon University",
     "province": "Manitoba"
   },
@@ -196,7 +236,15 @@
     "province": "Manitoba"
   },
   {
+    "name": "Red River College Polytechnic",
+    "province": "Manitoba"
+  },
+  {
     "name": "University College of Saint-Boniface",
+    "province": "Manitoba"
+  },
+  {
+    "name": "University College of the North",
     "province": "Manitoba"
   },
   {
@@ -212,11 +260,19 @@
     "province": "Manitoba"
   },
   {
+    "name": "Collège communautaire du Nouveau-Brunswick",
+    "province": "New Brunswick"
+  },
+  {
     "name": "Lansbridge University",
     "province": "New Brunswick"
   },
   {
     "name": "Mount Allison University",
+    "province": "New Brunswick"
+  },
+  {
+    "name": "New Brunswick Community College",
     "province": "New Brunswick"
   },
   {
@@ -240,6 +296,10 @@
     "province": "New Brunswick"
   },
   {
+    "name": "College of the North Atlantic",
+    "province": "Newfoundland and Labrador"
+  },
+  {
     "name": "Memorial University of Newfoundland",
     "province": "Newfoundland and Labrador"
   },
@@ -261,6 +321,10 @@
   },
   {
     "name": "Nova Scotia College of Art and Design",
+    "province": "Nova Scotia"
+  },
+  {
+    "name": "Nova Scotia Community College",
     "province": "Nova Scotia"
   },
   {
@@ -292,6 +356,10 @@
     "province": "Ontario"
   },
   {
+    "name": "Canadore College",
+    "province": "Ontario"
+  },
+  {
     "name": "Carleton University",
     "province": "Ontario"
   },
@@ -308,6 +376,10 @@
     "province": "Ontario"
   },
   {
+    "name": "Confederation College",
+    "province": "Ontario"
+  },
+  {
     "name": "Dominican College of Philosophy and Theology",
     "province": "Ontario"
   },
@@ -317,6 +389,10 @@
   },
   {
     "name": "Fanshawe College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Fleming College",
     "province": "Ontario"
   },
   {
@@ -340,6 +416,10 @@
     "province": "Ontario"
   },
   {
+    "name": "La Cité collégiale",
+    "province": "Ontario"
+  },
+  {
     "name": "Lakehead University",
     "province": "Ontario"
   },
@@ -352,6 +432,10 @@
     "province": "Ontario"
   },
   {
+    "name": "Loyalist College",
+    "province": "Ontario"
+  },
+  {
     "name": "McMaster University",
     "province": "Ontario"
   },
@@ -360,11 +444,19 @@
     "province": "Ontario"
   },
   {
+    "name": "Niagara College",
+    "province": "Ontario"
+  },
+  {
     "name": "Niagara College Canada",
     "province": "Ontario"
   },
   {
     "name": "Nipissing University",
+    "province": "Ontario"
+  },
+  {
+    "name": "Northern College",
     "province": "Ontario"
   },
   {
@@ -392,11 +484,23 @@
     "province": "Ontario"
   },
   {
+    "name": "Sault College",
+    "province": "Ontario"
+  },
+  {
     "name": "Seneca College",
     "province": "Ontario"
   },
   {
     "name": "Sheridan College",
+    "province": "Ontario"
+  },
+  {
+    "name": "St. Clair College",
+    "province": "Ontario"
+  },
+  {
+    "name": "St. Lawrence College",
     "province": "Ontario"
   },
   {
@@ -468,6 +572,10 @@
     "province": "Ontario"
   },
   {
+    "name": "Holland College",
+    "province": "Prince Edward Island"
+  },
+  {
     "name": "University of Prince Edward Island",
     "province": "Prince Edward Island"
   },
@@ -476,7 +584,55 @@
     "province": "Quebec"
   },
   {
+    "name": "Cégep de l'Outaouais",
+    "province": "Quebec"
+  },
+  {
     "name": "Cégep de Saint-Jérôme",
+    "province": "Quebec"
+  },
+  {
+    "name": "Cégep de Sherbrooke",
+    "province": "Quebec"
+  },
+  {
+    "name": "Cégep de Trois-Rivières",
+    "province": "Quebec"
+  },
+  {
+    "name": "Cégep du Vieux Montréal",
+    "province": "Quebec"
+  },
+  {
+    "name": "Cégep Édouard-Montpetit",
+    "province": "Quebec"
+  },
+  {
+    "name": "Cégep Limoilou",
+    "province": "Quebec"
+  },
+  {
+    "name": "Cégep Marie-Victorin",
+    "province": "Quebec"
+  },
+  {
+    "name": "Collège Ahuntsic",
+    "province": "Quebec"
+  },
+  {
+    "name": "Collège de Maisonneuve",
+    "province": "Quebec"
+  },
+  {
+    "name": "Collège de Rosemont",
+    "province": "Quebec"
+  },
+  {
+    "name": "Collège Lionel-Groulx",
+    "province": "Quebec"
+  },
+  {
+    "name": "Collège Montmorency",
     "province": "Quebec"
   },
   {
@@ -517,6 +673,14 @@
   },
   {
     "name": "Institut National de la Recherche Scientifique, Université du Québec",
+    "province": "Quebec"
+  },
+  {
+    "name": "John Abbott College",
+    "province": "Quebec"
+  },
+  {
+    "name": "Marianopolis College",
     "province": "Quebec"
   },
   {
@@ -581,6 +745,10 @@
   },
   {
     "name": "Saskatchewan Indian Federated College",
+    "province": "Saskatchewan"
+  },
+  {
+    "name": "Saskatchewan Polytechnic",
     "province": "Saskatchewan"
   },
   {
