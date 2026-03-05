@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { calendarEvent } from "@/database/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gte } from "drizzle-orm";
 
 async function getSession() {
   const { data: session } = await auth.getSession();
@@ -109,6 +109,22 @@ export async function deleteCalendarEvent(eventId: string) {
       and(
         eq(calendarEvent.id, eventId),
         eq(calendarEvent.userId, session.user.id)
+      )
+    );
+
+  return { success: true };
+}
+
+export async function deleteSeriesFromDate(seriesId: string, fromDate: string) {
+  const session = await getSession();
+
+  await db
+    .delete(calendarEvent)
+    .where(
+      and(
+        eq(calendarEvent.seriesId, seriesId),
+        eq(calendarEvent.userId, session.user.id),
+        gte(calendarEvent.date, fromDate)
       )
     );
 

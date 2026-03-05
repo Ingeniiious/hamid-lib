@@ -26,6 +26,7 @@ import {
   getCalendarEvents,
   addCalendarEvents,
   deleteCalendarEvent,
+  deleteSeriesFromDate,
   toggleEventNotify,
 } from "@/app/(main)/dashboard/me/calendar/actions";
 import { NotificationPrompt } from "@/components/NotificationPrompt";
@@ -200,6 +201,8 @@ export function CalendarView() {
   // Notifications
   const [formNotify, setFormNotify] = useState(true);
   const [notifPromptTrigger, setNotifPromptTrigger] = useState(0);
+  // Delete confirmation for recurring events
+  const [deleteConfirm, setDeleteConfirm] = useState<CalendarEvent | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -397,12 +400,39 @@ export function CalendarView() {
   };
 
   const handleDeleteEvent = (id: string) => {
+    const event = events.find((e) => e.id === id);
+    if (!event) return;
+
+    // If part of a series, show confirmation dialog
+    if (event.seriesId) {
+      setDeleteConfirm(event);
+      return;
+    }
+
+    // Non-recurring: delete immediately
     const backup = events;
     setEvents((prev) => prev.filter((e) => e.id !== id));
-    deleteCalendarEvent(id).catch(() => {
-      // Rollback on failure — restore deleted event
-      setEvents(backup);
-    });
+    deleteCalendarEvent(id).catch(() => setEvents(backup));
+  };
+
+  const handleDeleteThisOnly = () => {
+    if (!deleteConfirm) return;
+    const backup = events;
+    const id = deleteConfirm.id;
+    setEvents((prev) => prev.filter((e) => e.id !== id));
+    setDeleteConfirm(null);
+    deleteCalendarEvent(id).catch(() => setEvents(backup));
+  };
+
+  const handleDeleteThisAndFuture = () => {
+    if (!deleteConfirm) return;
+    const backup = events;
+    const { seriesId, date } = deleteConfirm;
+    setEvents((prev) =>
+      prev.filter((e) => !(e.seriesId === seriesId && e.date >= date))
+    );
+    setDeleteConfirm(null);
+    deleteSeriesFromDate(seriesId!, date).catch(() => setEvents(backup));
   };
 
   /* ── Render ──────────────────────────────────────────── */
@@ -999,6 +1029,60 @@ export function CalendarView() {
                     {formRecurrence !== "none" ? "Add Series" : "Add Event"}
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Delete Recurring Event Confirmation ────────── */}
+      <AnimatePresence>
+        {deleteConfirm && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease }}
+              className="fixed inset-0 z-50 bg-black/40"
+              onClick={() => setDeleteConfirm(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.97 }}
+              transition={{ duration: 0.2, ease }}
+              className="fixed inset-x-4 top-1/2 z-50 mx-auto max-w-sm -translate-y-1/2 overflow-hidden rounded-2xl border border-gray-900/10 bg-white shadow-xl dark:border-white/15 dark:bg-[var(--background)]"
+            >
+              <div className="p-5">
+                <h3 className="text-center font-display text-base font-light text-gray-900 dark:text-white">
+                  Delete Recurring Event
+                </h3>
+                <p className="mt-1.5 text-center text-xs text-gray-500 dark:text-white/50">
+                  &ldquo;{deleteConfirm.title}&rdquo; on {deleteConfirm.date}
+                </p>
+              </div>
+              <div className="flex flex-col gap-0 border-t border-gray-900/10 dark:border-white/10">
+                <button
+                  onClick={handleDeleteThisOnly}
+                  className="py-3 text-center text-sm font-medium text-gray-900 transition-colors hover:bg-gray-900/5 dark:text-white dark:hover:bg-white/5"
+                >
+                  This Event Only
+                </button>
+                <div className="mx-5 h-px bg-gray-900/10 dark:bg-white/10" />
+                <button
+                  onClick={handleDeleteThisAndFuture}
+                  className="py-3 text-center text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/5"
+                >
+                  This & Future Events
+                </button>
+                <div className="mx-5 h-px bg-gray-900/10 dark:bg-white/10" />
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="py-3 text-center text-sm font-medium text-gray-500 transition-colors hover:bg-gray-900/5 dark:text-white/50 dark:hover:bg-white/5"
+                >
+                  Cancel
+                </button>
               </div>
             </motion.div>
           </>
