@@ -33,6 +33,7 @@ export async function getCalendarEvents() {
     room: e.room || undefined,
     url: e.url || undefined,
     alerts: e.alerts ? JSON.parse(e.alerts) : undefined,
+    notify: e.notify,
     recurrence: e.recurrence || undefined,
     seriesId: e.seriesId || undefined,
   }));
@@ -52,6 +53,7 @@ export async function addCalendarEvents(
     room?: string;
     url?: string;
     alerts?: any[];
+    notify?: boolean;
     recurrence?: string;
     seriesId?: string;
   }[]
@@ -73,10 +75,27 @@ export async function addCalendarEvents(
       room: e.room || null,
       url: e.url || null,
       alerts: e.alerts ? JSON.stringify(e.alerts) : null,
+      notify: e.notify ?? true,
       recurrence: e.recurrence || null,
       seriesId: e.seriesId || null,
     }))
   );
+
+  return { success: true };
+}
+
+export async function toggleEventNotify(eventId: string, notify: boolean) {
+  const session = await getSession();
+
+  await db
+    .update(calendarEvent)
+    .set({ notify })
+    .where(
+      and(
+        eq(calendarEvent.id, eventId),
+        eq(calendarEvent.userId, session.user.id)
+      )
+    );
 
   return { success: true };
 }

@@ -27,13 +27,14 @@ export async function GET(request: NextRequest) {
   // Current time in minutes since midnight (Istanbul)
   const currentMinutes = istanbulHours * 60 + istanbulMins;
 
-  // Fetch today's events that have alerts
+  // Fetch today's events that have alerts and notifications enabled
   const events = await db
     .select()
     .from(calendarEvent)
     .where(
       and(
         eq(calendarEvent.date, todayStr),
+        eq(calendarEvent.notify, true),
         sql`${calendarEvent.alerts} IS NOT NULL AND ${calendarEvent.alerts} != 'null'`
       )
     );

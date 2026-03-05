@@ -26,6 +26,7 @@ import {
   getCalendarEvents,
   addCalendarEvents,
   deleteCalendarEvent,
+  toggleEventNotify,
 } from "@/app/(main)/dashboard/me/calendar/actions";
 import { NotificationPrompt } from "@/components/NotificationPrompt";
 
@@ -60,6 +61,8 @@ interface CalendarEvent {
   url?: string;
   // Alerts — up to 2
   alerts?: CalendarAlert[];
+  // Notifications
+  notify: boolean;
   // Recurrence
   recurrence?: Recurrence;
   seriesId?: string; // groups recurring events together
@@ -194,6 +197,9 @@ export function CalendarView() {
   const [alertPickerOpen, setAlertPickerOpen] = useState(false);
   // Recurrence
   const [formRecurrence, setFormRecurrence] = useState<Recurrence>("none");
+  // Notifications
+  const [formNotify, setFormNotify] = useState(true);
+  const [notifPromptTrigger, setNotifPromptTrigger] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -311,6 +317,7 @@ export function CalendarView() {
     setFormTravelTime(0);
     setAlertPickerOpen(false);
     setFormRecurrence("none");
+    setFormNotify(true);
     setShowForm(true);
     setTimeout(() => titleRef.current?.focus(), 100);
   };
@@ -354,16 +361,38 @@ export function CalendarView() {
       room: hasLoc && formLocationType === "in-person" ? formRoom.trim() || undefined : undefined,
       url: hasLoc && formLocationType === "online" ? formUrl.trim() || undefined : undefined,
       alerts: alerts.length > 0 ? alerts : undefined,
+      notify: formNotify,
       recurrence: formRecurrence !== "none" ? formRecurrence : undefined,
       seriesId,
     }));
 
     setEvents((prev) => [...prev, ...newEvents]);
     setShowForm(false);
+
+    // Prompt to enable push notifications if creating events with alerts
+    if (alerts.length > 0 && formNotify) {
+      setNotifPromptTrigger((n) => n + 1);
+    }
+
     addCalendarEvents(newEvents).catch(() => {
       // Rollback on failure — remove the optimistically added events
       const newIds = new Set(newEvents.map((e) => e.id));
       setEvents((prev) => prev.filter((e) => !newIds.has(e.id)));
+    });
+  };
+
+  const handleToggleNotify = (id: string) => {
+    const event = events.find((e) => e.id === id);
+    if (!event) return;
+    const newValue = !event.notify;
+    setEvents((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, notify: newValue } : e))
+    );
+    toggleEventNotify(id, newValue).catch(() => {
+      // Rollback
+      setEvents((prev) =>
+        prev.map((e) => (e.id === id ? { ...e, notify: !newValue } : e))
+      );
     });
   };
 
@@ -536,7 +565,7 @@ export function CalendarView() {
 
       {/* ── Notification Prompt ──────────────────────────── */}
       <div className="mb-2">
-        <NotificationPrompt />
+        <NotificationPrompt context="calendar" trigger={notifPromptTrigger} />
       </div>
 
       {/* ── Timeline ─────────────────────────────────────── */}
@@ -663,16 +692,36 @@ export function CalendarView() {
                           )}
                         </div>
 
-                        {/* Delete — hover only, desktop */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteEvent(event.id);
-                          }}
-                          className="hidden shrink-0 items-center px-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 md:flex"
-                        >
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-40 hover:opacity-70"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                        </button>
+                        {/* Actions — hover only, desktop */}
+                        <div className="hidden shrink-0 flex-col items-center justify-center gap-0.5 px-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 md:flex">
+                          {/* Notify toggle */}
+                          {event.alerts && event.alerts.length > 0 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleNotify(event.id);
+                              }}
+                              title={event.notify ? "Notifications on" : "Notifications off"}
+                              className="flex h-5 w-5 items-center justify-center rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                            >
+                              {event.notify ? (
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-50 hover:opacity-80"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
+                              ) : (
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-25 hover:opacity-50"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                              )}
+                            </button>
+                          )}
+                          {/* Delete */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteEvent(event.id);
+                            }}
+                            className="flex h-5 w-5 items-center justify-center rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                          >
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-40 hover:opacity-70"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -892,6 +941,26 @@ export function CalendarView() {
                     </div>
                   </PopoverContent>
                 </Popover>
+
+                {/* Notify toggle — only when alerts exist */}
+                {formAlerts.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setFormNotify((v) => !v)}
+                    className={`flex h-10 w-full items-center justify-center gap-2 rounded-full border text-sm font-medium transition-all duration-200 ${
+                      formNotify
+                        ? "border-[#5227FF]/20 bg-[#5227FF]/5 text-[#5227FF] dark:border-[#5227FF]/30 dark:bg-[#5227FF]/10 dark:text-[#8B6FFF]"
+                        : "border-gray-900/15 bg-gray-900/5 text-gray-900/40 dark:border-white/20 dark:bg-white/10 dark:text-white/40"
+                    }`}
+                  >
+                    {formNotify ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                    )}
+                    {formNotify ? "Push Notification On" : "Push Notification Off"}
+                  </button>
+                )}
 
                 {/* Travel time — only when alerts exist + in-person location */}
                 {formAlerts.length > 0 && HAS_LOCATION.includes(formCategory) && formLocationType === "in-person" && (

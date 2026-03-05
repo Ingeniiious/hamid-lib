@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { DashboardCard } from "@/components/DashboardCard";
+import { DashboardNotificationPrompt } from "@/components/DashboardNotificationPrompt";
 import { Greeting } from "@/components/Greeting";
 import { PageHeader } from "@/components/PageHeader";
 import type { Metadata } from "next";
@@ -24,12 +25,13 @@ export default async function DashboardPage() {
 
       {/* Scrollable content */}
       <div
-        className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-6 pb-8 sm:pb-6"
+        className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-y-auto px-6 pb-8 sm:pb-6"
         style={{
           maskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
           WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
         }}
       >
+        <DashboardNotificationPrompt />
         <div className="mx-auto grid w-full max-w-[340px] grid-cols-1 gap-3 sm:max-w-3xl sm:grid-cols-2 sm:gap-6">
           <DashboardCard
             title="My Studies"

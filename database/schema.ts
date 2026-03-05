@@ -108,6 +108,7 @@ export const calendarEvent = pgTable("calendar_event", {
   room: text("room"),
   url: text("url"),
   alerts: text("alerts"), // JSON string of alert config
+  notify: boolean("notify").notNull().default(true),
   recurrence: text("recurrence"), // none, weekly, biweekly, monthly
   seriesId: text("series_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

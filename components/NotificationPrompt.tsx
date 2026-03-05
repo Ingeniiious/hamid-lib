@@ -1,31 +1,75 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { isPushSupported, isPushSubscribed, subscribeToPush } from "@/lib/push";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
+const STORAGE_KEY = "libraryyy-notif-prompt";
+const COOLDOWN_DAYS = 30;
 
-export function NotificationPrompt() {
+function isDismissedRecently(): boolean {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return false;
+    const dismissed = JSON.parse(stored);
+    return Date.now() - dismissed.at < COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
+  } catch {
+    return false;
+  }
+}
+
+function markDismissed() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ at: Date.now() }));
+  } catch {}
+}
+
+interface NotificationPromptProps {
+  /** "dashboard" = show on first dashboard visit, "calendar" = show after adding event with alerts */
+  context?: "dashboard" | "calendar";
+  /** Bump this to re-trigger visibility check (e.g. after creating an event with alerts) */
+  trigger?: number;
+}
+
+export function NotificationPrompt({ context = "dashboard", trigger = 0 }: NotificationPromptProps) {
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    // Only show if push is supported and user hasn't subscribed yet
+  const checkAndShow = useCallback(async () => {
     if (!isPushSupported()) return;
+    if (Notification.permission === "denied") return;
+    if (isDismissedRecently()) return;
 
-    isPushSubscribed().then((subscribed) => {
-      if (!subscribed && Notification.permission !== "denied") {
-        setShow(true);
-      }
-    });
+    const subscribed = await isPushSubscribed();
+    if (subscribed) return;
+
+    setShow(true);
   }, []);
+
+  // Initial check on mount
+  useEffect(() => {
+    checkAndShow();
+  }, [checkAndShow]);
+
+  // Re-check when trigger bumps (e.g. after creating an event with alerts)
+  useEffect(() => {
+    if (trigger > 0) checkAndShow();
+  }, [trigger, checkAndShow]);
 
   const handleEnable = async () => {
     setLoading(true);
     const success = await subscribeToPush();
     setLoading(false);
-    if (success) setShow(false);
+    if (success) {
+      markDismissed();
+      setShow(false);
+    }
+  };
+
+  const handleDismiss = () => {
+    markDismissed();
+    setShow(false);
   };
 
   return (
@@ -40,15 +84,19 @@ export function NotificationPrompt() {
         >
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-gray-900 dark:text-white">
-              Turn On Notifications
+              {context === "calendar"
+                ? "Get Event Reminders"
+                : "Turn On Notifications"}
             </p>
             <p className="mt-0.5 text-xs text-gray-500 dark:text-white/50">
-              Get reminders for your calendar events
+              {context === "calendar"
+                ? "Enable push notifications for your alerts"
+                : "Get reminders for your calendar events"}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button
-              onClick={() => setShow(false)}
+              onClick={handleDismiss}
               className="rounded-full px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-900/5 dark:text-white/50 dark:hover:bg-white/10"
             >
               Later
