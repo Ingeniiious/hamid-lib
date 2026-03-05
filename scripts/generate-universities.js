@@ -1,17 +1,20 @@
 #!/usr/bin/env node
 /**
- * Reads turkey-universities.json + the UNI_NAME_MAP from seed-all-faculties.ts
- * and generates lib/universities.ts with all 202 universities across 81 cities.
+ * Reads all university JSON files and generates lib/universities.ts.
+ * Sources: turkey-universities.json, us-universities.json,
+ *          canada-universities.json, eu-universities.json
+ *
+ * Run: node scripts/generate-universities.js
  */
 
 const fs = require("fs");
 const path = require("path");
 
-const data = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "../database/turkey-universities.json"), "utf-8")
-);
+const DB = (...p) => path.join(__dirname, "../database", ...p);
 
-// Same mapping from seed-all-faculties.ts
+// --- Turkey data ---
+const turkeyData = JSON.parse(fs.readFileSync(DB("turkey-universities.json"), "utf-8"));
+
 const UNI_NAME_MAP = {
   "İSTİNYE ÜNİVERSİTESİ": "Istinye University",
   "ALTINBAŞ ÜNİVERSİTESİ": "Altinbas University",
@@ -62,7 +65,6 @@ function fixTurkishChars(text) {
 
 function getEnglishUniName(turkishName) {
   if (UNI_NAME_MAP[turkishName]) return UNI_NAME_MAP[turkishName];
-  // Auto-translate: "X ÜNİVERSİTESİ" -> "X University"
   let name = turkishName
     .replace(" ÜNİVERSİTESİ", "")
     .split(" ")
@@ -71,36 +73,111 @@ function getEnglishUniName(turkishName) {
   return fixTurkishChars(name) + " University";
 }
 
-// Group by city
-const cityMap = new Map();
-for (const uni of data) {
-  const city = uni.city;
-  if (!cityMap.has(city)) cityMap.set(city, []);
-  cityMap.get(city).push({
-    name: getEnglishUniName(uni.name),
-    turkishName: uni.name,
-    city: uni.city,
-    country: "Türkiye",
-  });
+// Normalize country names from ROR
+const COUNTRY_NORMALIZE = {
+  "The Netherlands": "Netherlands",
+  "Czechia": "Czech Republic",
+};
+
+// --- Helpers ---
+function groupBy(data, keyFn, entryFn) {
+  const map = new Map();
+  for (const item of data) {
+    const key = keyFn(item);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(entryFn(item));
+  }
+  const sorted = [...map.keys()].sort((a, b) => a.localeCompare(b));
+  return sorted.map((key) => ({
+    city: key,
+    universities: map.get(key).sort((a, b) => a.name.localeCompare(b.name)),
+  }));
 }
 
-// Sort cities alphabetically, sort universities within each city
-const sortedCities = [...cityMap.keys()].sort((a, b) => a.localeCompare(b, "tr"));
+// --- Build country groups ---
 
-const cityGroups = sortedCities.map((city) => {
-  const unis = cityMap.get(city).sort((a, b) => a.name.localeCompare(b.name));
-  return { city, universities: unis };
-});
+function buildTurkeyGroups() {
+  return groupBy(
+    turkeyData,
+    (u) => u.city,
+    (u) => ({
+      name: getEnglishUniName(u.name),
+      localName: u.name,
+      city: u.city,
+      country: "Türkiye",
+    })
+  );
+}
+
+function buildUSAGroups() {
+  const data = JSON.parse(fs.readFileSync(DB("us-universities.json"), "utf-8"));
+  return groupBy(
+    data,
+    (u) => u.state,
+    (u) => ({ name: u.name, localName: "", city: u.state, country: "United States" })
+  );
+}
+
+function buildCanadaGroups() {
+  const data = JSON.parse(fs.readFileSync(DB("canada-universities.json"), "utf-8"));
+  return groupBy(
+    data,
+    (u) => u.province,
+    (u) => ({ name: u.name, localName: "", city: u.province, country: "Canada" })
+  );
+}
+
+function buildRORGroups(jsonFile) {
+  const data = JSON.parse(fs.readFileSync(DB(jsonFile), "utf-8"));
+  // Group by country, then by city within each country
+  const byCountry = new Map();
+  for (const uni of data) {
+    const country = COUNTRY_NORMALIZE[uni.country] || uni.country;
+    if (!byCountry.has(country)) byCountry.set(country, []);
+    byCountry.get(country).push({ ...uni, country });
+  }
+
+  const results = [];
+  for (const [country, unis] of [...byCountry.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const cityGroups = groupBy(
+      unis,
+      (u) => u.city || country,
+      (u) => ({ name: u.name, localName: u.localName || "", city: u.city || country, country })
+    );
+    results.push({ country, cities: cityGroups });
+  }
+  return results;
+}
+
+// --- Generate ---
+const turkeyGroups = buildTurkeyGroups();
+const usaGroups = buildUSAGroups();
+const canadaGroups = buildCanadaGroups();
+const euCountries = buildRORGroups("eu-universities.json");
+const intlCountries = buildRORGroups("intl-universities.json");
+
+// Combine all countries, sorted alphabetically
+const countries = [
+  { country: "Canada", cities: canadaGroups },
+  ...euCountries,
+  ...intlCountries,
+  { country: "Türkiye", cities: turkeyGroups },
+  { country: "United States", cities: usaGroups },
+].sort((a, b) => a.country.localeCompare(b.country));
 
 // Stats
-const totalUnis = data.length;
-const totalCities = sortedCities.length;
-console.log(`Generating ${totalUnis} universities across ${totalCities} cities...`);
+let grandTotal = 0;
+for (const c of countries) {
+  const total = c.cities.reduce((sum, g) => sum + g.universities.length, 0);
+  grandTotal += total;
+  console.log(`${c.country}: ${total} universities, ${c.cities.length} regions`);
+}
 
 // Generate TypeScript
 let ts = `export interface UniversityEntry {
   name: string;
-  turkishName: string;
+  /** Local/native name for bilingual search (e.g. Turkish, German, French) */
+  localName: string;
   city: string;
   country: string;
 }
@@ -115,22 +192,21 @@ export interface CountryGroup {
   cities: CityGroup[];
 }
 
-const UNIVERSITY_DATA: CountryGroup[] = [
-  {
-    country: "Türkiye",
-    cities: [\n`;
+const UNIVERSITY_DATA: CountryGroup[] = [\n`;
 
-for (const cg of cityGroups) {
-  ts += `      {\n        city: ${JSON.stringify(cg.city)},\n        universities: [\n`;
-  for (const u of cg.universities) {
-    ts += `          { name: ${JSON.stringify(u.name)}, turkishName: ${JSON.stringify(u.turkishName)}, city: ${JSON.stringify(u.city)}, country: "Türkiye" },\n`;
+for (const c of countries) {
+  ts += `  {\n    country: ${JSON.stringify(c.country)},\n    cities: [\n`;
+  for (const cg of c.cities) {
+    ts += `      {\n        city: ${JSON.stringify(cg.city)},\n        universities: [\n`;
+    for (const u of cg.universities) {
+      ts += `          { name: ${JSON.stringify(u.name)}, localName: ${JSON.stringify(u.localName)}, city: ${JSON.stringify(u.city)}, country: ${JSON.stringify(u.country)} },\n`;
+    }
+    ts += `        ],\n      },\n`;
   }
-  ts += `        ],\n      },\n`;
+  ts += `    ],\n  },\n`;
 }
 
-ts += `    ],
-  },
-];
+ts += `];
 
 export { UNIVERSITY_DATA };
 
@@ -146,4 +222,4 @@ export type University = string;
 `;
 
 fs.writeFileSync(path.join(__dirname, "../lib/universities.ts"), ts, "utf-8");
-console.log(`Written lib/universities.ts (${totalUnis} universities, ${totalCities} cities)`);
+console.log(`\nWritten lib/universities.ts — ${grandTotal} total universities across ${countries.length} countries`);

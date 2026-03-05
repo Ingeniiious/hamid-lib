@@ -130,7 +130,7 @@ export async function getUserProfile(userId: string) {
 
 export async function updateUserProfile(
   userId: string,
-  data: { university?: string; gender?: string }
+  data: { university?: string; gender?: string; facultyId?: number | null; programId?: number | null }
 ) {
   try {
     const existing = await db

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
@@ -12,12 +13,26 @@ interface BackButtonProps {
   label: string;
   invisible?: boolean;
   floating?: boolean;
+  closeTab?: boolean;
 }
 
-export function BackButton({ href, label, invisible, floating }: BackButtonProps) {
+export function BackButton({ href, label, invisible, floating, closeTab }: BackButtonProps) {
   const [imgFailed, setImgFailed] = useState(false);
+  const router = useRouter();
+
+  const handleCloseTab = (e: React.MouseEvent) => {
+    e.preventDefault();
+    // Try to close the tab (works when opened via target="_blank")
+    window.close();
+    // Fallback if window.close() didn't work (e.g. user navigated directly)
+    router.push(href);
+  };
 
   if (floating) {
+    const linkProps = closeTab
+      ? { href, onClick: handleCloseTab }
+      : { href };
+
     return (
       <motion.div
         initial={{ opacity: 0 }}
@@ -26,7 +41,7 @@ export function BackButton({ href, label, invisible, floating }: BackButtonProps
         className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-start pb-6 pl-6 sm:justify-center sm:pl-0"
       >
         <Link
-          href={href}
+          {...linkProps}
           className="pointer-events-auto inline-flex items-center gap-2 transition-opacity hover:opacity-80 sm:-translate-x-[37vw]"
         >
           {!imgFailed ? (

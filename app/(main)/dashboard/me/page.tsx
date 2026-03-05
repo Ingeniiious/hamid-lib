@@ -26,20 +26,27 @@ export default function MyStudiesPage() {
           WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
         }}
       >
-        <div className="mx-auto grid w-full max-w-[340px] grid-cols-1 gap-3 pt-8 sm:max-w-3xl sm:grid-cols-2 sm:gap-6 sm:pt-0">
+        <div className="mx-auto grid w-full max-w-[340px] grid-cols-1 gap-3 pt-8 sm:max-w-3xl sm:grid-cols-2 sm:gap-6 sm:pt-0 lg:max-w-5xl lg:grid-cols-3">
           <DashboardCard
             title="Presentations"
             description="Upload and share files"
             href="/dashboard/me/presentations"
-            image={`${R2_BASE}/images/presentation.webp`}
+            image={`${R2_BASE}/images/present.webp`}
             index={0}
           />
           <DashboardCard
             title="Exam Results"
             description="View your results"
             href="/dashboard/me/exam"
-            image={`${R2_BASE}/images/exam.webp`}
+            image={`${R2_BASE}/images/exam-results.webp`}
             index={1}
+          />
+          <DashboardCard
+            title="Calendar"
+            description="Schedules and deadlines"
+            href="/dashboard/me/calendar"
+            image={`${R2_BASE}/images/calendar.webp`}
+            index={2}
           />
         </div>
       </div>

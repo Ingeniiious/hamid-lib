@@ -66,7 +66,7 @@ export function UniversityPicker({
         const q = search.toLowerCase();
         return (
           uni.name.toLowerCase().includes(q) ||
-          uni.turkishName.toLowerCase().includes(q)
+          uni.localName.toLowerCase().includes(q)
         );
       })
     : [];
@@ -160,7 +160,7 @@ export function UniversityPicker({
                     className={backClass}
                   >
                     <CaretLeft size={12} weight="bold" />
-                    {selectedCountry.country}
+                    {selectedCountry.country === "United States" ? "States" : selectedCountry.country === "Canada" ? "Provinces" : selectedCountry.country}
                   </button>
                   <div className="min-h-0 flex-1 overflow-y-auto">
                     {selectedCountry.cities.map((city) => (

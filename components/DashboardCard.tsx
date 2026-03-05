@@ -11,6 +11,7 @@ interface DashboardCardProps {
   href: string;
   image: string;
   index: number;
+  imageClassName?: string;
 }
 
 export function DashboardCard({
@@ -19,6 +20,7 @@ export function DashboardCard({
   href,
   image,
   index,
+  imageClassName,
 }: DashboardCardProps) {
   return (
     <motion.div
@@ -48,20 +50,24 @@ export function DashboardCard({
           />
 
           {/* Content */}
-          <div className="relative z-10 flex h-full flex-col items-center justify-center p-4 sm:p-8">
-            {/* Image */}
-            <img
-              src={image}
-              alt={title}
-              width={512}
-              height={512}
-              loading="eager"
-              decoding="async"
-              className="w-1/2 object-contain sm:w-3/4"
-            />
+          <div className="relative z-10 flex h-full flex-col items-center p-4 sm:p-8">
+            {/* Image — fills available space, only clipped at bottom */}
+            <div className="relative min-h-0 flex-1 w-full">
+              <div className="absolute -top-4 -left-4 -right-4 -bottom-2 flex items-center justify-center overflow-hidden">
+                <img
+                  src={image}
+                  alt={title}
+                  width={512}
+                  height={512}
+                  loading="eager"
+                  decoding="async"
+                  className={imageClassName || "max-h-full w-full object-contain scale-125"}
+                />
+              </div>
+            </div>
 
-            {/* Text */}
-            <div className="mt-3 shrink-0 text-center sm:mt-5">
+            {/* Text — always pinned at bottom */}
+            <div className="shrink-0 pt-3 text-center sm:pt-5">
               <h2 className="font-display text-2xl font-light text-gray-900 sm:text-3xl dark:text-white">
                 {title}
               </h2>

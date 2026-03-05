@@ -40,22 +40,22 @@ export function PortalCodeInput({
         pattern="[A-Za-z0-9]*"
         autoFocus
       >
-        <InputOTPGroup className="gap-1 sm:gap-1.5">
+        <InputOTPGroup>
           {[0, 1, 2, 3].map((i) => (
             <InputOTPSlot
               key={i}
               index={i}
-              className="h-12 w-10 rounded-lg border border-white/20 bg-white/10 font-mono text-base font-semibold text-white shadow-none placeholder:text-white/20 data-[active=true]:border-white/40 data-[active=true]:ring-[2px] data-[active=true]:ring-white/20 sm:h-14 sm:w-11 sm:text-lg"
+              className="border-white/20 bg-white/10 text-white data-[active=true]:border-white/40 data-[active=true]:ring-white/20"
             />
           ))}
         </InputOTPGroup>
-        <InputOTPSeparator className="mx-1 text-white/20 sm:mx-2" />
-        <InputOTPGroup className="gap-1 sm:gap-1.5">
+        <InputOTPSeparator className="text-white/20" />
+        <InputOTPGroup>
           {[4, 5, 6, 7].map((i) => (
             <InputOTPSlot
               key={i}
               index={i}
-              className="h-12 w-10 rounded-lg border border-white/20 bg-white/10 font-mono text-base font-semibold text-white shadow-none placeholder:text-white/20 data-[active=true]:border-white/40 data-[active=true]:ring-[2px] data-[active=true]:ring-white/20 sm:h-14 sm:w-11 sm:text-lg"
+              className="border-white/20 bg-white/10 text-white data-[active=true]:border-white/40 data-[active=true]:ring-white/20"
             />
           ))}
         </InputOTPGroup>

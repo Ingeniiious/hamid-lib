@@ -32,6 +32,9 @@ import { AvatarCropModal } from "@/components/AvatarCropModal";
 import { getDefaultAvatar } from "@/lib/avatar";
 import { UNIVERSITIES } from "@/lib/universities";
 import { UniversityPicker } from "@/components/UniversityPicker";
+import { FacultyPicker } from "@/components/FacultyPicker";
+import { ProgramPicker } from "@/components/ProgramPicker";
+import { getFacultiesForUniversity, getProgramsForFaculty } from "@/app/(main)/auth/actions";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -186,6 +189,16 @@ export default function AccountPage() {
     text: string;
   } | null>(null);
 
+  // Faculty & Program
+  const [facultyId, setFacultyId] = useState<number | null>(null);
+  const [availableFaculties, setAvailableFaculties] = useState<
+    { id: number; name: string; slug: string }[]
+  >([]);
+  const [programId, setProgramId] = useState<number | null>(null);
+  const [availablePrograms, setAvailablePrograms] = useState<
+    { id: number; name: string; slug: string }[]
+  >([]);
+
   // Avatar
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [hasCustomAvatar, setHasCustomAvatar] = useState(false);
@@ -223,6 +236,8 @@ export default function AccountPage() {
           setUniversity(profile.university || "");
         }
         setGender(profile.gender || "");
+        setFacultyId(profile.facultyId ?? null);
+        setProgramId(profile.programId ?? null);
         if (profile.avatarUrl) {
           setAvatarUrl(profile.avatarUrl);
           setHasCustomAvatar(!!profile.avatarKey);
@@ -242,6 +257,54 @@ export default function AccountPage() {
       setAvatarUrl(getDefaultAvatar(gender || null));
     }
   }, [gender, hasCustomAvatar, profileLoaded]);
+
+  // Load faculties when university changes
+  useEffect(() => {
+    const uni = university === "__other__" ? "" : university;
+    if (!uni) {
+      setAvailableFaculties([]);
+      setFacultyId(null);
+      setAvailablePrograms([]);
+      setProgramId(null);
+      return;
+    }
+    let cancelled = false;
+    getFacultiesForUniversity(uni).then(({ faculties }) => {
+      if (!cancelled) {
+        setAvailableFaculties(faculties);
+        if (faculties.length === 0) {
+          setFacultyId(null);
+          setAvailablePrograms([]);
+          setProgramId(null);
+        } else if (facultyId && !faculties.some((f) => f.id === facultyId)) {
+          setFacultyId(null);
+          setAvailablePrograms([]);
+          setProgramId(null);
+        }
+      }
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [university]);
+
+  // Load programs when faculty changes
+  useEffect(() => {
+    if (!facultyId) {
+      setAvailablePrograms([]);
+      setProgramId(null);
+      return;
+    }
+    let cancelled = false;
+    getProgramsForFaculty(facultyId).then(({ programs }) => {
+      if (!cancelled) {
+        setAvailablePrograms(programs);
+        // Only clear programId if the new faculty doesn't have it
+        if (programId && !programs.some((p) => p.id === programId)) setProgramId(null);
+      }
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [facultyId]);
 
   const handleLanguageChange = (lang: string) => {
     setLanguage(lang);
@@ -331,6 +394,8 @@ export default function AccountPage() {
         return updateUserProfile(session.user.id, {
           university: finalUniversity,
           gender,
+          facultyId,
+          programId,
         });
       })(),
     ]);
@@ -602,6 +667,34 @@ export default function AccountPage() {
                     />
                     )}
                   </div>
+
+                  {availableFaculties.length > 0 && (
+                    <div>
+                      <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
+                        Faculty
+                      </label>
+                      <FacultyPicker
+                        faculties={availableFaculties}
+                        value={facultyId}
+                        onChange={setFacultyId}
+                        variant="settings"
+                      />
+                    </div>
+                  )}
+
+                  {availablePrograms.length > 0 && (
+                    <div>
+                      <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
+                        Program
+                      </label>
+                      <ProgramPicker
+                        programs={availablePrograms}
+                        value={programId}
+                        onChange={setProgramId}
+                        variant="settings"
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">

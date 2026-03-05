@@ -1,7 +1,7 @@
 # Hamid Library
 
 ## Project Overview
-A personal open-source university course library. Every course Hamid takes gets turned into a global library with teachings, presentations, resources, and more. Shared with ~10 university peers. Free and open to university students.
+An open-source, community-driven university course library following a contribution-based model. Students contribute their own course documents, which are reviewed, moderated, and used as a foundation to create original study resources: examples, practices, presentations, study guides, and mock exams. The platform does NOT host university course materials directly (to avoid legal issues). All published content is original work created from verified student contributions. Free and open to university students.
 
 ## Tech Stack
 - **Framework:** Next.js 16 (App Router, Turbopack)
@@ -34,13 +34,20 @@ A personal open-source university course library. Every course Hamid takes gets 
 5. **Student dashboard** — personal progress tracking. Scores, improvement over time per course. Visual history of practice results.
 6. **Admin** (`/admin`) — Hamid only. Full control: analytics, user management, content CRUD, exam management, presentation toggle, stats.
 
+## Content Model (Student Contributions)
+- **Students are the source** — they contribute course documents from their universities
+- **Contributor verification** — students must verify their university email to become Contributors
+- **Professor/teacher contributors** — professors can become Core Contributors by verifying their university email + identity (student confirmation on course pages)
+- **Moderation** — all contributions are reviewed, compared across multiple submissions, and verified before use
+- **Platform-created content** — based on verified contributions, original study resources are created (examples, practices, presentations, mock exams). This content belongs to the platform.
+- **Content workflow:** student contributions → moderation & verification → discuss with Claude → structured original content → publish to DB
+
 ## Architecture
 - SSR-first with Next.js App Router
 - Server Components by default, Client Components only when needed
-- No file storage — professor PDFs are discussed with Claude, restructured, and published as clean content to database
 - All data lives in the database as structured JSON content (Notion-style blocks)
 - Content supports: text, images, embedded components — flexible enough for rich course pages
-- Admin panel for Hamid to manage everything (no professor access for now)
+- Admin panel for Hamid to manage everything (professor Core Contributor role planned)
 - Auth required for sign-up/sign-in so university students can access the library
 
 ## Design Principles
@@ -236,5 +243,5 @@ middleware.ts                   # Auth middleware (protects /dashboard/*)
 - Keep dependencies minimal
 - Path alias: `@/*` maps to project root
 - Hosted on Vercel Pro plan
-- Admin is Hamid only — no professor roles for now
-- Content workflow: professor PDFs → discuss with Claude → structured content → publish to DB
+- Admin is Hamid only — professor Core Contributor role planned
+- Content workflow: student contributions → moderation → Claude → original structured content → publish to DB

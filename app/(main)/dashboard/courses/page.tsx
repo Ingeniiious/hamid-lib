@@ -19,15 +19,17 @@ export default async function CoursesPage() {
   const { data: session } = await auth.getSession();
   const userId = session?.user?.id;
 
-  // Get user's university
+  // Get user's university and faculty
   let university: string | null = null;
+  let userFacultyId: number | null = null;
   if (userId) {
     const profile = await db
-      .select({ university: userProfile.university })
+      .select({ university: userProfile.university, facultyId: userProfile.facultyId })
       .from(userProfile)
       .where(eq(userProfile.userId, userId))
       .then((rows) => rows[0]);
     university = profile?.university ?? null;
+    userFacultyId = profile?.facultyId ?? null;
   }
 
   if (!university) {
@@ -94,20 +96,52 @@ export default async function CoursesPage() {
               Faculties for {university} will appear here once they&apos;re added.
             </p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 pt-8 sm:grid-cols-2 lg:grid-cols-3">
-            {faculties.map((f, index) => (
-              <FacultyCard
-                key={f.id}
-                name={f.name}
-                slug={f.slug}
-                illustration={f.illustration}
-                courseCount={f.courseCount}
-                index={index}
-              />
-            ))}
-          </div>
-        )}
+        ) : (() => {
+          const pinnedFaculty = userFacultyId ? faculties.find((f) => f.id === userFacultyId) : null;
+          const otherFaculties = pinnedFaculty ? faculties.filter((f) => f.id !== userFacultyId) : faculties;
+          return (
+            <div className="pt-8">
+              {pinnedFaculty && (
+                <div className="mb-8">
+                  <p className="mb-3 text-center text-sm font-medium text-gray-900/40 dark:text-white/40">
+                    Your Faculty
+                  </p>
+                  <div className="mx-auto max-w-xs">
+                    <FacultyCard
+                      name={pinnedFaculty.name}
+                      slug={pinnedFaculty.slug}
+                      illustration={pinnedFaculty.illustration}
+                      courseCount={pinnedFaculty.courseCount}
+                      index={0}
+                      highlighted
+                    />
+                  </div>
+                </div>
+              )}
+              {otherFaculties.length > 0 && (
+                <>
+                  {pinnedFaculty && (
+                    <p className="mb-3 text-center text-sm font-medium text-gray-900/40 dark:text-white/40">
+                      All Faculties
+                    </p>
+                  )}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {otherFaculties.map((f, index) => (
+                      <FacultyCard
+                        key={f.id}
+                        name={f.name}
+                        slug={f.slug}
+                        illustration={f.illustration}
+                        courseCount={f.courseCount}
+                        index={pinnedFaculty ? index + 1 : index}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })()}
       </div>
       <BackButton href="/dashboard" label="Dashboard" floating />
     </div>

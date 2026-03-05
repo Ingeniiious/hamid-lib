@@ -13,6 +13,7 @@ interface FacultyCardProps {
   illustration: string | null;
   courseCount: number;
   index: number;
+  highlighted?: boolean;
 }
 
 export function FacultyCard({
@@ -21,6 +22,7 @@ export function FacultyCard({
   illustration,
   courseCount,
   index,
+  highlighted,
 }: FacultyCardProps) {
   const [imgLoaded, setImgLoaded] = useState(false);
 
@@ -32,7 +34,7 @@ export function FacultyCard({
       whileHover={{ scale: 1.02 }}
     >
       <Link href={`/dashboard/courses/${slug}`} className="block">
-        <div className="group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-[2rem] border border-gray-900/10 bg-white/50 backdrop-blur-xl transition-shadow duration-300 hover:shadow-lg sm:aspect-square sm:rounded-[3rem] dark:border-white/15 dark:bg-white/5">
+        <div className={`group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-[2rem] border bg-white/50 backdrop-blur-xl transition-shadow duration-300 hover:shadow-lg sm:aspect-square sm:rounded-[3rem] dark:bg-white/5 ${highlighted ? "border-[#5227FF]/40 ring-2 ring-[#5227FF]/20" : "border-gray-900/10 dark:border-white/15"}`}>
           {/* Grainient hover overlay */}
           <div
             className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 ease-out group-hover:opacity-100"

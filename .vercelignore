@@ -4,3 +4,5 @@ screenshots/
 .playwright-mcp/
 test-email.ts
 scripts/
+database/*.json
+database/seed*.ts

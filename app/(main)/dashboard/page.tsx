@@ -24,13 +24,13 @@ export default async function DashboardPage() {
 
       {/* Scrollable content */}
       <div
-        className="min-h-0 flex-1 overflow-y-auto px-6 pb-8 sm:flex sm:items-center sm:justify-center sm:pb-6"
+        className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-6 pb-8 sm:pb-6"
         style={{
           maskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
           WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
         }}
       >
-        <div className="mx-auto grid w-full max-w-[340px] grid-cols-1 gap-3 pt-8 sm:max-w-3xl sm:grid-cols-2 sm:gap-6 sm:pt-0">
+        <div className="mx-auto grid w-full max-w-[340px] grid-cols-1 gap-3 sm:max-w-3xl sm:grid-cols-2 sm:gap-6">
           <DashboardCard
             title="My Studies"
             description="Track your progress"
@@ -43,6 +43,7 @@ export default async function DashboardPage() {
             description="Browse all courses"
             href="/dashboard/courses"
             image={`${R2_BASE}/images/courses.webp`}
+            imageClassName="max-h-full w-full object-contain scale-110"
             index={1}
           />
         </div>

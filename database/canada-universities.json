@@ -1,0 +1,598 @@
+[
+  {
+    "name": "Athabasca University",
+    "province": "Alberta"
+  },
+  {
+    "name": "Augustana University College",
+    "province": "Alberta"
+  },
+  {
+    "name": "Bow Valley College",
+    "province": "Alberta"
+  },
+  {
+    "name": "Concordia University College of Alberta",
+    "province": "Alberta"
+  },
+  {
+    "name": "DeVry Institute of Technology",
+    "province": "Alberta"
+  },
+  {
+    "name": "King's University College",
+    "province": "Alberta"
+  },
+  {
+    "name": "Lethbridge College",
+    "province": "Alberta"
+  },
+  {
+    "name": "MacEwan University",
+    "province": "Alberta"
+  },
+  {
+    "name": "Mount Royal University",
+    "province": "Alberta"
+  },
+  {
+    "name": "Northern Alberta Institute of Technology",
+    "province": "Alberta"
+  },
+  {
+    "name": "Southern Alberta Institute of Technology",
+    "province": "Alberta"
+  },
+  {
+    "name": "University of Alberta",
+    "province": "Alberta"
+  },
+  {
+    "name": "University of Calgary",
+    "province": "Alberta"
+  },
+  {
+    "name": "University of Lethbridge",
+    "province": "Alberta"
+  },
+  {
+    "name": "Ashton College",
+    "province": "British Columbia"
+  },
+  {
+    "name": "British Columbia Institute of Technology",
+    "province": "British Columbia"
+  },
+  {
+    "name": "British Columbia Open University",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Camosun College",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Capilano College",
+    "province": "British Columbia"
+  },
+  {
+    "name": "College of New Caledonia",
+    "province": "British Columbia"
+  },
+  {
+    "name": "College of the Rockies",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Columbia College",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Douglas College",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Emily Carr Institute of Art + Design",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Kwantleen University College",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Langara College",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Malaspina University College",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Nicola Valley Institute of Technology",
+    "province": "British Columbia"
+  },
+  {
+    "name": "North Island College",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Northern Lights College",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Okanagan University College",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Pacific International College",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Quest University",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Regent College",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Royal Roads University",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Sauder School of Business",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Selkirk College",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Simon Fraser University",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Thompson Rivers University",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Trinity Western University",
+    "province": "British Columbia"
+  },
+  {
+    "name": "University Canada West",
+    "province": "British Columbia"
+  },
+  {
+    "name": "University College of the Cariboo",
+    "province": "British Columbia"
+  },
+  {
+    "name": "University of British Columbia",
+    "province": "British Columbia"
+  },
+  {
+    "name": "University of Northern British Columbia",
+    "province": "British Columbia"
+  },
+  {
+    "name": "University of the Fraser Valley",
+    "province": "British Columbia"
+  },
+  {
+    "name": "University of Victoria",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Vancouver Community College",
+    "province": "British Columbia"
+  },
+  {
+    "name": "Brandon University",
+    "province": "Manitoba"
+  },
+  {
+    "name": "Canadian Mennonite University",
+    "province": "Manitoba"
+  },
+  {
+    "name": "University College of Saint-Boniface",
+    "province": "Manitoba"
+  },
+  {
+    "name": "University of Manitoba",
+    "province": "Manitoba"
+  },
+  {
+    "name": "University of Winnipeg",
+    "province": "Manitoba"
+  },
+  {
+    "name": "William and Catherine Booth College",
+    "province": "Manitoba"
+  },
+  {
+    "name": "Lansbridge University",
+    "province": "New Brunswick"
+  },
+  {
+    "name": "Mount Allison University",
+    "province": "New Brunswick"
+  },
+  {
+    "name": "University of Moncton",
+    "province": "New Brunswick"
+  },
+  {
+    "name": "University of Moncton, Edmundston",
+    "province": "New Brunswick"
+  },
+  {
+    "name": "University of Moncton, Shippagan",
+    "province": "New Brunswick"
+  },
+  {
+    "name": "University of New Brunswick",
+    "province": "New Brunswick"
+  },
+  {
+    "name": "University of New Brunswick, Saint John",
+    "province": "New Brunswick"
+  },
+  {
+    "name": "Memorial University of Newfoundland",
+    "province": "Newfoundland and Labrador"
+  },
+  {
+    "name": "Acadia University",
+    "province": "Nova Scotia"
+  },
+  {
+    "name": "Dalhousie University",
+    "province": "Nova Scotia"
+  },
+  {
+    "name": "Mount Saint Vincent University",
+    "province": "Nova Scotia"
+  },
+  {
+    "name": "Nova Scotia Agricultural College",
+    "province": "Nova Scotia"
+  },
+  {
+    "name": "Nova Scotia College of Art and Design",
+    "province": "Nova Scotia"
+  },
+  {
+    "name": "University College of Cape Breton",
+    "province": "Nova Scotia"
+  },
+  {
+    "name": "University of King's College",
+    "province": "Nova Scotia"
+  },
+  {
+    "name": "Algonquin College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Assumption University",
+    "province": "Ontario"
+  },
+  {
+    "name": "Brock University",
+    "province": "Ontario"
+  },
+  {
+    "name": "Cambrian College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Canadian College of Business & Computers",
+    "province": "Ontario"
+  },
+  {
+    "name": "Carleton University",
+    "province": "Ontario"
+  },
+  {
+    "name": "Centennial College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Collège Boréal",
+    "province": "Ontario"
+  },
+  {
+    "name": "Conestoga College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Dominican College of Philosophy and Theology",
+    "province": "Ontario"
+  },
+  {
+    "name": "Durham College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Fanshawe College",
+    "province": "Ontario"
+  },
+  {
+    "name": "George Brown College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Georgian College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Humber College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Huron University College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Kingston College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Lakehead University",
+    "province": "Ontario"
+  },
+  {
+    "name": "Lambton College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Laurentian University of Sudbury",
+    "province": "Ontario"
+  },
+  {
+    "name": "McMaster University",
+    "province": "Ontario"
+  },
+  {
+    "name": "Mohawk College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Niagara College Canada",
+    "province": "Ontario"
+  },
+  {
+    "name": "Nipissing University",
+    "province": "Ontario"
+  },
+  {
+    "name": "Ontario College of Art and Design",
+    "province": "Ontario"
+  },
+  {
+    "name": "Ontario Tech University",
+    "province": "Ontario"
+  },
+  {
+    "name": "Queen's University",
+    "province": "Ontario"
+  },
+  {
+    "name": "Redeemer College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Royal Military College of Canada",
+    "province": "Ontario"
+  },
+  {
+    "name": "Ryerson Polytechnic University",
+    "province": "Ontario"
+  },
+  {
+    "name": "Seneca College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Sheridan College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Toronto Baptist Seminary and Bible College",
+    "province": "Ontario"
+  },
+  {
+    "name": "Toronto Metropolitan University",
+    "province": "Ontario"
+  },
+  {
+    "name": "Trent University",
+    "province": "Ontario"
+  },
+  {
+    "name": "University of Guelph",
+    "province": "Ontario"
+  },
+  {
+    "name": "University of Ontario Institute of Technology",
+    "province": "Ontario"
+  },
+  {
+    "name": "University of Ottawa",
+    "province": "Ontario"
+  },
+  {
+    "name": "University of Sudbury",
+    "province": "Ontario"
+  },
+  {
+    "name": "University of Toronto",
+    "province": "Ontario"
+  },
+  {
+    "name": "University of Toronto, Mississauga",
+    "province": "Ontario"
+  },
+  {
+    "name": "University of Toronto, Scarborough",
+    "province": "Ontario"
+  },
+  {
+    "name": "University of Trinity College",
+    "province": "Ontario"
+  },
+  {
+    "name": "University of Waterloo",
+    "province": "Ontario"
+  },
+  {
+    "name": "University of Western Ontario",
+    "province": "Ontario"
+  },
+  {
+    "name": "University of Windsor",
+    "province": "Ontario"
+  },
+  {
+    "name": "Victoria University Toronto, University of Toronto",
+    "province": "Ontario"
+  },
+  {
+    "name": "Wilfrid Laurier University",
+    "province": "Ontario"
+  },
+  {
+    "name": "York University",
+    "province": "Ontario"
+  },
+  {
+    "name": "University of Prince Edward Island",
+    "province": "Prince Edward Island"
+  },
+  {
+    "name": "Bishop's University",
+    "province": "Quebec"
+  },
+  {
+    "name": "Cégep de Saint-Jérôme",
+    "province": "Quebec"
+  },
+  {
+    "name": "College of Bois-de-Boulogne",
+    "province": "Quebec"
+  },
+  {
+    "name": "Collège Universel Gatineau",
+    "province": "Quebec"
+  },
+  {
+    "name": "Concordia University",
+    "province": "Quebec"
+  },
+  {
+    "name": "Dawson College",
+    "province": "Quebec"
+  },
+  {
+    "name": "École de technologie supérieure, Université du Québec",
+    "province": "Quebec"
+  },
+  {
+    "name": "École des Hautes Études Commerciales",
+    "province": "Quebec"
+  },
+  {
+    "name": "École nationale d'administration publique, Université du Québec",
+    "province": "Quebec"
+  },
+  {
+    "name": "École Polytechnique de Montréal, Université de Montréal",
+    "province": "Quebec"
+  },
+  {
+    "name": "Institut Armand-Frappier, Université du Québec",
+    "province": "Quebec"
+  },
+  {
+    "name": "Institut National de la Recherche Scientifique, Université du Québec",
+    "province": "Quebec"
+  },
+  {
+    "name": "McGill University",
+    "province": "Quebec"
+  },
+  {
+    "name": "Télé-université, Université du Québec",
+    "province": "Quebec"
+  },
+  {
+    "name": "Université de Montréal",
+    "province": "Quebec"
+  },
+  {
+    "name": "Université de Sherbrooke",
+    "province": "Quebec"
+  },
+  {
+    "name": "Université du Québec à Chicoutimi",
+    "province": "Quebec"
+  },
+  {
+    "name": "Université du Québec à Montréal",
+    "province": "Quebec"
+  },
+  {
+    "name": "Université du Québec à Rimouski",
+    "province": "Quebec"
+  },
+  {
+    "name": "Université du Québec à Trois-Rivières",
+    "province": "Quebec"
+  },
+  {
+    "name": "Université du Québec en Abitibi-Témiscamingue",
+    "province": "Quebec"
+  },
+  {
+    "name": "Université du Québec en Outaouais",
+    "province": "Quebec"
+  },
+  {
+    "name": "Université Laval",
+    "province": "Quebec"
+  },
+  {
+    "name": "University of Québec",
+    "province": "Quebec"
+  },
+  {
+    "name": "Vanier College",
+    "province": "Quebec"
+  },
+  {
+    "name": "First Nations University of Canada",
+    "province": "Saskatchewan"
+  },
+  {
+    "name": "Luther College",
+    "province": "Saskatchewan"
+  },
+  {
+    "name": "Saskatchewan Indian Federated College",
+    "province": "Saskatchewan"
+  },
+  {
+    "name": "University of Regina",
+    "province": "Saskatchewan"
+  },
+  {
+    "name": "University of Saskatchewan",
+    "province": "Saskatchewan"
+  },
+  {
+    "name": "Yukon College",
+    "province": "Yukon"
+  }
+]

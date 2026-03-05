@@ -1,7 +1,9 @@
 import "dotenv/config";
+import { createHash } from "crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
+import { eq } from "drizzle-orm";
 import postgres from "postgres";
-import { faculty } from "./schema";
+import { faculty, program } from "./schema";
 import data from "./turkey-universities.json";
 
 // Map Turkish faculty names to English
@@ -136,19 +138,21 @@ async function seed() {
   console.log(`Seeding ${(data as any[]).length} universities...`);
 
   let totalFaculties = 0;
+  let totalPrograms = 0;
 
   for (const uni of data as any[]) {
     const uniName = getEnglishUniName(uni.name);
     const faculties = uni.faculties || {};
-    const facultyNames = Object.keys(faculties);
+    const facultyEntries = Object.entries(faculties) as [string, string[]][];
 
-    for (let i = 0; i < facultyNames.length; i++) {
-      const turkishFacName = facultyNames[i];
+    for (let i = 0; i < facultyEntries.length; i++) {
+      const [turkishFacName, programs] = facultyEntries[i];
       const englishFacName = getEnglishFacultyName(turkishFacName);
 
-      const facSlug = slugify(uniName + " " + englishFacName);
+      const longSlug = slugify(uniName + " " + englishFacName);
+      const facSlug = createHash("md5").update(longSlug).digest("hex").slice(0, 8);
 
-      await db
+      const [inserted] = await db
         .insert(faculty)
         .values({
           name: englishFacName,
@@ -156,13 +160,46 @@ async function seed() {
           university: uniName,
           displayOrder: i + 1,
         })
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .returning({ id: faculty.id });
+
+      // If faculty was already inserted (conflict), look it up
+      let facultyId = inserted?.id;
+      if (!facultyId) {
+        const existing = await db
+          .select({ id: faculty.id })
+          .from(faculty)
+          .where(eq(faculty.slug, facSlug))
+          .limit(1);
+        facultyId = existing[0]?.id;
+      }
 
       totalFaculties++;
+
+      // Seed programs for this faculty
+      if (facultyId && programs && programs.length > 0) {
+        for (let j = 0; j < programs.length; j++) {
+          const progName = programs[j];
+          const progLongSlug = slugify(uniName + " " + englishFacName + " " + progName);
+          const progSlug = createHash("md5").update(progLongSlug).digest("hex").slice(0, 8);
+
+          await db
+            .insert(program)
+            .values({
+              name: progName,
+              slug: progSlug,
+              facultyId,
+              displayOrder: j + 1,
+            })
+            .onConflictDoNothing();
+
+          totalPrograms++;
+        }
+      }
     }
   }
 
-  console.log(`Seeded ${totalFaculties} faculties across ${(data as any[]).length} universities.`);
+  console.log(`Seeded ${totalFaculties} faculties and ${totalPrograms} programs across ${(data as any[]).length} universities.`);
   await client.end();
 }
 

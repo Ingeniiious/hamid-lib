@@ -17,6 +17,18 @@ export const faculty = pgTable("faculty", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+export const program = pgTable("program", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  facultyId: integer("faculty_id")
+    .notNull()
+    .references(() => faculty.id, { onDelete: "cascade" }),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const course = pgTable("course", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
@@ -45,6 +57,8 @@ export const emailVerification = pgTable("email_verification", {
 export const userProfile = pgTable("user_profile", {
   userId: text("user_id").primaryKey(),
   university: text("university"),
+  facultyId: integer("faculty_id").references(() => faculty.id, { onDelete: "set null" }),
+  programId: integer("program_id").references(() => program.id, { onDelete: "set null" }),
   gender: text("gender"),
   avatarUrl: text("avatar_url"),
   avatarKey: text("avatar_key"),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import Link from "next/link";
@@ -12,7 +12,11 @@ import {
   saveUserProfile,
   sendPasswordResetOTP,
   resetPasswordWithOTP,
+  getFacultiesForUniversity,
+  getProgramsForFaculty,
 } from "./actions";
+import { FacultyPicker } from "@/components/FacultyPicker";
+import { ProgramPicker } from "@/components/ProgramPicker";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -86,7 +90,13 @@ function PasswordInput({
 
 export default function AuthPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("sign-in");
+  const [mode, setMode] = useState<Mode>(() => {
+    // Default to sign-up for new users, sign-in for returning users
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("hamid-lib-visited") ? "sign-in" : "sign-up";
+    }
+    return "sign-in";
+  });
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -101,8 +111,58 @@ export default function AuthPage() {
   const [customUniversity, setCustomUniversity] = useState("");
   const [gender, setGender] = useState("");
   const [genderOpen, setGenderOpen] = useState(false);
+  const [facultyId, setFacultyId] = useState<number | null>(null);
+  const [availableFaculties, setAvailableFaculties] = useState<
+    { id: number; name: string; slug: string }[]
+  >([]);
+  const [facultiesLoading, setFacultiesLoading] = useState(false);
+  const [programId, setProgramId] = useState<number | null>(null);
+  const [availablePrograms, setAvailablePrograms] = useState<
+    { id: number; name: string; slug: string }[]
+  >([]);
+
+  // Load faculties when university changes
+  useEffect(() => {
+    if (!university || university === "__other__") {
+      setAvailableFaculties([]);
+      setFacultyId(null);
+      setAvailablePrograms([]);
+      setProgramId(null);
+      return;
+    }
+    let cancelled = false;
+    setFacultiesLoading(true);
+    getFacultiesForUniversity(university).then(({ faculties }) => {
+      if (!cancelled) {
+        setAvailableFaculties(faculties);
+        setFacultyId(null);
+        setAvailablePrograms([]);
+        setProgramId(null);
+        setFacultiesLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [university]);
+
+  // Load programs when faculty changes
+  useEffect(() => {
+    if (!facultyId) {
+      setAvailablePrograms([]);
+      setProgramId(null);
+      return;
+    }
+    let cancelled = false;
+    getProgramsForFaculty(facultyId).then(({ programs }) => {
+      if (!cancelled) {
+        setAvailablePrograms(programs);
+        setProgramId(null);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [facultyId]);
 
   const redirectByRole = (user: Record<string, unknown> | undefined) => {
+    localStorage.setItem("hamid-lib-visited", "1");
     const isAdmin = user?.role === "admin";
     router.replace(isAdmin ? "/admin" : "/dashboard");
   };
@@ -191,7 +251,7 @@ export default function AuthPage() {
       if (userId) {
         const finalUniversity = university === "__other__" ? customUniversity : university;
         if (finalUniversity || gender) {
-          await saveUserProfile(userId, finalUniversity, gender);
+          await saveUserProfile(userId, finalUniversity, gender, facultyId, programId);
         }
       }
 
@@ -445,11 +505,11 @@ export default function AuthPage() {
                   <motion.p
                     layout
                     transition={{ layout: { duration: 0.3, ease } }}
-                    className="mt-5 text-center text-sm text-white/50"
+                    className="mt-5 text-center text-sm text-white/70"
                   >
                     <button
                       onClick={() => switchMode("sign-in")}
-                      className="text-white/80 underline underline-offset-2 transition-colors hover:text-white"
+                      className="text-white underline underline-offset-2 transition-colors hover:text-white"
                     >
                       Back To Sign In
                     </button>
@@ -513,13 +573,13 @@ export default function AuthPage() {
                     <button
                       onClick={handleResetResend}
                       disabled={loading}
-                      className="text-white/50 underline underline-offset-2 transition-colors hover:text-white/80 disabled:opacity-50"
+                      className="text-white/70 underline underline-offset-2 transition-colors hover:text-white disabled:opacity-50"
                     >
                       Resend Code
                     </button>
                     <button
                       onClick={() => switchMode("forgot-password")}
-                      className="text-white/50 underline underline-offset-2 transition-colors hover:text-white/80"
+                      className="text-white/70 underline underline-offset-2 transition-colors hover:text-white"
                     >
                       Back
                     </button>
@@ -603,11 +663,11 @@ export default function AuthPage() {
                 <motion.p
                   layout
                   transition={{ layout: { duration: 0.3, ease } }}
-                  className="mt-5 text-center text-sm text-white/50"
+                  className="mt-5 text-center text-sm text-white/70"
                 >
                   <button
                     onClick={() => switchMode("sign-in")}
-                    className="text-white/80 underline underline-offset-2 transition-colors hover:text-white"
+                    className="text-white underline underline-offset-2 transition-colors hover:text-white"
                   >
                     Back To Sign In
                   </button>
@@ -718,6 +778,48 @@ export default function AuthPage() {
                     )}
                   </AnimatePresence>
 
+                  {/* Faculty — sign-up only, when university has faculties */}
+                  <AnimatePresence mode="popLayout">
+                    {isSignUp && availableFaculties.length > 0 && (
+                      <motion.div
+                        key="faculty-field"
+                        layout
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.25, ease }}
+                      >
+                        <FacultyPicker
+                          faculties={availableFaculties}
+                          value={facultyId}
+                          onChange={setFacultyId}
+                          variant="auth"
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Program — sign-up only, when faculty has programs */}
+                  <AnimatePresence mode="popLayout">
+                    {isSignUp && availablePrograms.length > 0 && (
+                      <motion.div
+                        key="program-field"
+                        layout
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.25, ease }}
+                      >
+                        <ProgramPicker
+                          programs={availablePrograms}
+                          value={programId}
+                          onChange={setProgramId}
+                          variant="auth"
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   {/* Gender — sign-up only */}
                   <AnimatePresence mode="popLayout">
                     {isSignUp && (
@@ -789,7 +891,7 @@ export default function AuthPage() {
                       <button
                         type="button"
                         onClick={() => switchMode("forgot-password")}
-                        className="text-xs text-white/40 transition-colors hover:text-white/70"
+                        className="text-xs text-white/60 transition-colors hover:text-white/90"
                       >
                         Forgot Password?
                       </button>
@@ -830,20 +932,47 @@ export default function AuthPage() {
                           : "Sign In"}
                     </Button>
                   </motion.div>
+
+                  {/* Legal agreement */}
+                  {isSignUp && (
+                    <motion.p
+                      layout
+                      transition={{ layout: { duration: 0.3, ease } }}
+                      className="mt-3 text-center text-xs text-white/70"
+                    >
+                      By signing up, you agree to our{" "}
+                      <a
+                        href="/terms"
+                        target="_blank"
+                        className="text-white underline underline-offset-2 hover:text-white"
+                      >
+                        Terms Of Service
+                      </a>{" "}
+                      and{" "}
+                      <a
+                        href="/privacy"
+                        target="_blank"
+                        className="text-white underline underline-offset-2 hover:text-white"
+                      >
+                        Privacy Policy
+                      </a>
+                      .
+                    </motion.p>
+                  )}
                 </form>
 
                 {/* Toggle link — smoothly repositions */}
                 <motion.p
                   layout
                   transition={{ layout: { duration: 0.3, ease } }}
-                  className="mt-5 text-center text-sm text-white/50"
+                  className="mt-5 text-center text-sm text-white/70"
                 >
                   {isSignUp ? (
                     <>
                       Already have an account?{" "}
                       <button
                         onClick={() => switchMode("sign-in")}
-                        className="text-white/80 underline underline-offset-2 transition-colors hover:text-white"
+                        className="text-white underline underline-offset-2 transition-colors hover:text-white"
                       >
                         Sign In
                       </button>
@@ -853,7 +982,7 @@ export default function AuthPage() {
                       Don&apos;t have an account?{" "}
                       <button
                         onClick={() => switchMode("sign-up")}
-                        className="text-white/80 underline underline-offset-2 transition-colors hover:text-white"
+                        className="text-white underline underline-offset-2 transition-colors hover:text-white"
                       >
                         Sign Up
                       </button>
@@ -918,13 +1047,13 @@ export default function AuthPage() {
                     <button
                       onClick={handleResend}
                       disabled={loading}
-                      className="text-white/50 underline underline-offset-2 transition-colors hover:text-white/80 disabled:opacity-50"
+                      className="text-white/70 underline underline-offset-2 transition-colors hover:text-white disabled:opacity-50"
                     >
                       Resend Code
                     </button>
                     <button
                       onClick={() => switchMode("sign-up")}
-                      className="text-white/50 underline underline-offset-2 transition-colors hover:text-white/80"
+                      className="text-white/70 underline underline-offset-2 transition-colors hover:text-white"
                     >
                       Back
                     </button>

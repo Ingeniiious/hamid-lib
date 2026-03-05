@@ -127,10 +127,10 @@ export default function PortalPage() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5, ease, delay: state.step === "input" ? 0.5 : 0 }}
             className="pointer-events-none absolute z-0 flex w-full max-w-xl justify-center px-3 sm:px-6"
-            style={{ bottom: "calc(50% + 72px)" }}
+            style={{ bottom: "calc(50% + 16px)" }}
           >
             <img
-              src="https://lib.thevibecodedcompany.com/images/portal.webp"
+              src="https://lib.thevibecodedcompany.com/images/portal-new.webp"
               alt=""
               className="h-64 w-64 object-contain sm:h-80 sm:w-80"
               draggable={false}

@@ -4,8 +4,8 @@ import { randomInt, randomBytes } from "crypto";
 import { scrypt } from "@noble/hashes/scrypt.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { db } from "@/lib/db";
-import { emailVerification, userProfile } from "@/database/schema";
-import { eq, and, gt, sql } from "drizzle-orm";
+import { emailVerification, userProfile, faculty, program } from "@/database/schema";
+import { eq, and, gt, sql, asc } from "drizzle-orm";
 import { sendEmail } from "@/lib/email";
 import { getEmailTemplate } from "@/lib/email-templates";
 
@@ -137,16 +137,46 @@ function hashPasswordScrypt(password: string): string {
   return `${bytesToHex(salt)}:${bytesToHex(derived)}`;
 }
 
+export async function getFacultiesForUniversity(universityName: string) {
+  try {
+    const rows = await db
+      .select({ id: faculty.id, name: faculty.name, slug: faculty.slug })
+      .from(faculty)
+      .where(eq(faculty.university, universityName))
+      .orderBy(asc(faculty.displayOrder));
+    return { faculties: rows };
+  } catch {
+    return { faculties: [] };
+  }
+}
+
+export async function getProgramsForFaculty(facultyId: number) {
+  try {
+    const rows = await db
+      .select({ id: program.id, name: program.name, slug: program.slug })
+      .from(program)
+      .where(eq(program.facultyId, facultyId))
+      .orderBy(asc(program.displayOrder));
+    return { programs: rows };
+  } catch {
+    return { programs: [] };
+  }
+}
+
 export async function saveUserProfile(
   userId: string,
   university: string,
-  gender: string
+  gender: string,
+  facultyId?: number | null,
+  programId?: number | null
 ) {
   try {
     await db.insert(userProfile).values({
       userId,
       university,
       gender,
+      facultyId: facultyId ?? null,
+      programId: programId ?? null,
     });
     return { success: true };
   } catch {
