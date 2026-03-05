@@ -27,12 +27,22 @@ export const metadata: Metadata = {
     siteName: "Libraryyy",
     locale: "en_US",
     type: "website",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Libraryyy — Your University Course Library",
+        type: "image/jpeg",
+      },
+    ],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Libraryyy",
     description:
       "Your University Course Library — courses, presentations, resources, and more.",
+    images: ["/og-image.jpg"],
   },
   robots: {
     index: true,
