@@ -22,6 +22,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { CaretUpDown, Check } from "@phosphor-icons/react";
+import {
+  getCalendarEvents,
+  addCalendarEvents,
+  deleteCalendarEvent,
+} from "@/app/(main)/dashboard/me/calendar/actions";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -103,8 +108,6 @@ const HOURS = Array.from(
   (_, i) => START_HOUR + i
 );
 const HOUR_HEIGHT = 60;
-const STORAGE_KEY = "hamid-lib-calendar-events";
-
 const CATEGORY_CONFIG: Record<
   EventCategory,
   { label: string; bg: string; accent: string; text: string; dot: string }
@@ -140,19 +143,6 @@ const CATEGORY_CONFIG: Record<
 };
 
 /* ── Helpers ──────────────────────────────────────────────── */
-
-function loadEvents(): CalendarEvent[] {
-  if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveEvents(events: CalendarEvent[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
-}
 
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
@@ -208,8 +198,10 @@ export function CalendarView() {
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setEvents(loadEvents());
-    setMounted(true);
+    getCalendarEvents().then((events) => {
+      setEvents(events as CalendarEvent[]);
+      setMounted(true);
+    });
   }, []);
 
   // Scroll to current hour on mount
@@ -361,16 +353,14 @@ export function CalendarView() {
       seriesId,
     }));
 
-    const updated = [...events, ...newEvents];
-    setEvents(updated);
-    saveEvents(updated);
+    setEvents((prev) => [...prev, ...newEvents]);
     setShowForm(false);
+    addCalendarEvents(newEvents);
   };
 
   const handleDeleteEvent = (id: string) => {
-    const updated = events.filter((e) => e.id !== id);
-    setEvents(updated);
-    saveEvents(updated);
+    setEvents((prev) => prev.filter((e) => e.id !== id));
+    deleteCalendarEvent(id);
   };
 
   /* ── Render ──────────────────────────────────────────── */

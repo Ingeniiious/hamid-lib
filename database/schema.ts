@@ -94,6 +94,26 @@ export const portalCode = pgTable("portal_code", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const calendarEvent = pgTable("calendar_event", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  title: text("title").notNull(),
+  date: text("date").notNull(), // YYYY-MM-DD
+  startTime: text("start_time").notNull(), // HH:mm
+  endTime: text("end_time").notNull(), // HH:mm
+  category: text("category").notNull(), // class, exam, deadline, reminder
+  note: text("note"),
+  locationType: text("location_type"), // in-person, online
+  campus: text("campus"),
+  room: text("room"),
+  url: text("url"),
+  alerts: text("alerts"), // JSON string of alert config
+  recurrence: text("recurrence"), // none, weekly, biweekly, monthly
+  seriesId: text("series_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const material = pgTable("material", {
   id: text("id").primaryKey(),
   courseId: text("course_id")
