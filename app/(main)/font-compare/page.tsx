@@ -3,6 +3,8 @@
 import { motion } from "framer-motion";
 import { BackButton } from "@/components/BackButton";
 
+const ease = [0.25, 0.46, 0.45, 0.94] as const;
+
 const OUR_FONTS = [
   {
     name: "Geist (Current Sans)",
