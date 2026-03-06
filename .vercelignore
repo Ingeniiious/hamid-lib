@@ -6,3 +6,7 @@ test-email.ts
 scripts/
 database/*.json
 database/seed*.ts
+
+# Landing page sandbox (WIP)
+app/landing-clone/
+public/clones/

@@ -1,0 +1,3 @@
+import{t as e}from"./rolldown-runtime.BvHXOKAc.mjs";function t(e,t){return{description:`Hey there, I'm Libraryyy, a product designer based in beautiful Your Campus, Every University. ☀️. 
+I design tools that help people do their best work.`,favicon:`/clones/landing-template/assets/potqc1e78ykFKgIWmc4xIvb50.png`,robots:`max-image-preview:large`,socialImage:`/clones/landing-template/assets/rD6rBlswWHwt3kseTKnf98TFUQ8.png`,title:`Libraryyy`}}var n=e((()=>{}));export{t as n,n as t};
+//# sourceMappingURL=shared-lib.CFiS14AF.mjs.map

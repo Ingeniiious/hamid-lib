@@ -23,3 +23,7 @@ test-email.ts
 
 # Seed data (already in DB)
 database/*.json
+
+# Landing page reference images
+current-landing.png
+landing-clone-full.png
