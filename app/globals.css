@@ -21,6 +21,22 @@
   unicode-range: U+0600-06FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 
+@font-face {
+  font-family: "Gochi Hand";
+  src: url("/fonts/GochiHand-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Delicious Handrawn";
+  src: url("/fonts/DeliciousHandrawn-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @keyframes skeleton-delay {
   to { opacity: 1; }
 }

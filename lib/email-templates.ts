@@ -1,10 +1,11 @@
-type TemplateType = "signup-otp" | "password-reset-otp" | "account-deletion-otp" | "admin-login-otp";
+type TemplateType = "signup-otp" | "password-reset-otp" | "account-deletion-otp" | "admin-login-otp" | "contributor-verification-otp";
 
 const subjects: Record<TemplateType, string> = {
   "signup-otp": "Your Verification Code",
   "password-reset-otp": "Password Reset Code",
   "account-deletion-otp": "Account Deletion Code",
   "admin-login-otp": "Admin Login Code",
+  "contributor-verification-otp": "Contributor Verification Code",
 };
 
 const bodyText: Record<TemplateType, (code: string) => string> = {
@@ -16,6 +17,8 @@ const bodyText: Record<TemplateType, (code: string) => string> = {
     `Your account deletion code is: ${code}. Expires in 90 seconds. Didn't request this? Please secure your account.`,
   "admin-login-otp": (code) =>
     `Your admin login code is: ${code}. Expires in 90 seconds. If you didn't request this, please secure your account immediately.`,
+  "contributor-verification-otp": (code) =>
+    `Your contributor verification code is: ${code}. Expires in 90 seconds. Use this to verify your university email.`,
 };
 
 const headings: Record<TemplateType, string> = {
@@ -23,6 +26,7 @@ const headings: Record<TemplateType, string> = {
   "password-reset-otp": "Reset Your Password",
   "account-deletion-otp": "Confirm Deletion",
   "admin-login-otp": "Admin Verification",
+  "contributor-verification-otp": "Verify Your University Email",
 };
 
 const descriptions: Record<TemplateType, string> = {
@@ -34,6 +38,8 @@ const descriptions: Record<TemplateType, string> = {
     "Enter The Code Below To Confirm. This Action Cannot Be Undone.",
   "admin-login-otp":
     "Enter The Code Below To Access The Admin Panel.",
+  "contributor-verification-otp":
+    "Enter The Code Below To Become A Contributor.",
 };
 
 const signoffs: Record<TemplateType, string> = {
@@ -41,6 +47,7 @@ const signoffs: Record<TemplateType, string> = {
   "password-reset-otp": "You'll be back in no time.",
   "account-deletion-otp": "We're sorry to see you go.",
   "admin-login-otp": "Stay secure.",
+  "contributor-verification-otp": "Welcome to the contributor community!",
 };
 
 function buildHtml({

@@ -84,6 +84,16 @@ export default async function FacultyCoursesPage({ params }: Props) {
               hrefPrefix={`/dashboard/courses/${facultySlug}`}
             />
           )}
+
+          {/* Request link */}
+          <div className="mt-8 text-center">
+            <a
+              href="/dashboard/contribute"
+              className="text-sm text-gray-900/40 underline hover:text-gray-900/60 dark:text-white/40 dark:hover:text-white/60"
+            >
+              Can&apos;t Find Your Course?
+            </a>
+          </div>
         </div>
       </div>
       <BackButton href="/dashboard/courses" label="All Faculties" floating />

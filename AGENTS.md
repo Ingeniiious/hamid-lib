@@ -40,7 +40,7 @@ An open-source, community-driven university course library following a contribut
 - **Professor/teacher contributors** — professors can become Core Contributors by verifying their university email + identity (student confirmation on course pages)
 - **Moderation** — all contributions are reviewed, compared across multiple submissions, and verified before use
 - **Platform-created content** — based on verified contributions, original study resources are created (examples, practices, presentations, mock exams). This content belongs to the platform.
-- **Content workflow:** student contributions → moderation & verification → discuss with Claude → structured original content → publish to DB
+- **Content workflow:** student contributions → moderation & verification → discuss with Codex → structured original content → publish to DB
 
 ## Architecture
 - SSR-first with Next.js App Router
@@ -126,7 +126,7 @@ Wrap page content with `<AnimatePresence mode="wait"><motion.div key={pathname}>
 - Three languages: English (en), Persian (fa), Turkish (tr)
 - Route-based locale detection (e.g. `/en/`, `/fa/`, `/tr/`)
 - All UI strings externalized for translation
-- Translations done manually with Claude — no third-party translation service
+- Translations done manually with Codex — no third-party translation service
 - Same centered layout for all languages, no RTL/LTR differences
 
 ## Key Commands
@@ -285,4 +285,4 @@ Public-facing professor & course rating system. Students rate professors at spec
 - Path alias: `@/*` maps to project root
 - Hosted on Vercel Pro plan
 - Admin is Hamid only — professor Core Contributor role planned
-- Content workflow: student contributions → moderation → Claude → original structured content → publish to DB
+- Content workflow: student contributions → moderation → Codex → original structured content → publish to DB

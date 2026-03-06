@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Separator } from "@/components/ui/separator";
+import Link from "next/link";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -14,9 +15,10 @@ interface CourseDetailProps {
     semester: string | null;
     major: string | null;
   };
+  isContributor?: boolean;
 }
 
-export function CourseDetail({ course }: CourseDetailProps) {
+export function CourseDetail({ course, isContributor }: CourseDetailProps) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -53,6 +55,23 @@ export function CourseDetail({ course }: CourseDetailProps) {
           </motion.div>
         ))}
       </div>
+
+      {/* Contribute CTA */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6, ease, delay: 0.6 }}
+        className="mt-8 text-center"
+      >
+        <Link
+          href={`/dashboard/contribute?courseId=${course.id}`}
+          className="inline-flex items-center gap-2 rounded-xl border border-gray-900/10 bg-white/50 px-5 py-2.5 text-sm font-medium text-gray-900/70 transition-colors hover:bg-gray-900/5 dark:border-white/10 dark:bg-white/5 dark:text-white/70 dark:hover:bg-white/10"
+        >
+          {isContributor
+            ? "Contribute To This Course"
+            : "Become A Contributor"}
+        </Link>
+      </motion.div>
     </motion.div>
   );
 }

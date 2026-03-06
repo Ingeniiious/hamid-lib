@@ -9,7 +9,7 @@ import { eq, and, gt, sql, asc } from "drizzle-orm";
 import { sendEmail } from "@/lib/email";
 import { getEmailTemplate } from "@/lib/email-templates";
 
-export type OTPType = "signup" | "password-reset" | "account-deletion" | "admin-login";
+export type OTPType = "signup" | "password-reset" | "account-deletion" | "admin-login" | "contributor-verification";
 
 export async function sendOTP(email: string, type: OTPType = "signup") {
   // Rate limit: 3 OTP requests per 5 minutes per email+type
@@ -58,6 +58,7 @@ export async function sendOTP(email: string, type: OTPType = "signup") {
     "password-reset": "password-reset-otp",
     "account-deletion": "account-deletion-otp",
     "admin-login": "admin-login-otp",
+    "contributor-verification": "contributor-verification-otp",
   } as const;
   const templateType = templateMap[type];
   const { subject, html, text } = getEmailTemplate(templateType, {

@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
-import { course, faculty } from "@/database/schema";
+import { auth } from "@/lib/auth";
+import { course, faculty, userProfile } from "@/database/schema";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { BackButton } from "@/components/BackButton";
@@ -52,6 +53,22 @@ export default async function CoursePage({ params }: Props) {
     .where(eq(faculty.slug, facultySlug))
     .then((rows) => rows[0]);
 
+  // Check if user is a contributor
+  let isContributor = false;
+  try {
+    const { data: session } = await auth.getSession();
+    if (session?.user?.id) {
+      const profile = await db
+        .select({ contributorVerifiedAt: userProfile.contributorVerifiedAt })
+        .from(userProfile)
+        .where(eq(userProfile.userId, session.user.id))
+        .limit(1);
+      isContributor = !!profile[0]?.contributorVerifiedAt;
+    }
+  } catch {
+    // Ignore
+  }
+
   return (
     <div className="flex h-full flex-col">
       {/* Fixed header */}
@@ -68,7 +85,7 @@ export default async function CoursePage({ params }: Props) {
         }}
       >
         <div className="mx-auto max-w-5xl pt-8">
-          <CourseDetail course={c} />
+          <CourseDetail course={c} isContributor={isContributor} />
         </div>
       </div>
       <BackButton
