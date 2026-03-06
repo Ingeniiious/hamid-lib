@@ -63,8 +63,12 @@ export const userProfile = pgTable("user_profile", {
   facultyId: integer("faculty_id").references(() => faculty.id, { onDelete: "set null" }),
   programId: integer("program_id").references(() => program.id, { onDelete: "set null" }),
   gender: text("gender"),
+  birthday: text("birthday"),             // YYYY-MM-DD
+  timezone: text("timezone"),             // IANA timezone e.g. "Europe/Istanbul", "America/New_York"
   avatarUrl: text("avatar_url"),
   avatarKey: text("avatar_key"),
+  contributorVerifiedAt: timestamp("contributor_verified_at"),
+  lastActiveAt: timestamp("last_active_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
@@ -139,6 +143,7 @@ export const pushSubscription = pgTable(
   },
   (table) => [
     unique("push_sub_user_endpoint").on(table.userId, table.endpoint),
+    index("push_sub_user_id_idx").on(table.userId),
   ]
 );
 
@@ -154,6 +159,66 @@ export const notificationLog = pgTable(
     unique("notif_log_event_alert").on(table.eventId, table.alertMinutes),
   ]
 );
+
+// ==================
+// Notification System (admin-managed push campaigns)
+// ==================
+
+export const notificationTemplate = pgTable("notification_template", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  title: text("title").notNull(),    // supports {{name}}, {{days}}, etc.
+  body: text("body").notNull(),       // supports {{name}}, {{days}}, etc.
+  url: text("url"),                   // click target, supports variables too
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const notificationCampaign = pgTable("notification_campaign", {
+  id: serial("id").primaryKey(),
+  templateId: integer("template_id").references(() => notificationTemplate.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  url: text("url"),
+  target: text("target").notNull(),                 // "all" | "user"
+  targetUserId: text("target_user_id"),              // only when target = "user"
+  scheduledAt: timestamp("scheduled_at"),            // null = send immediately
+  sentAt: timestamp("sent_at"),
+  status: text("status").notNull().default("draft"), // draft, scheduled, sending, sent, failed
+  statsSent: integer("stats_sent").notNull().default(0),
+  statsFailed: integer("stats_failed").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("notif_campaign_status_idx").on(table.status),
+  index("notif_campaign_scheduled_idx").on(table.scheduledAt),
+]);
+
+// Automated notification triggers
+export const notificationAutomation = pgTable("notification_automation", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  trigger: text("trigger").notNull(),       // welcome, birthday, inactivity, milestone, anniversary
+  triggerDays: integer("trigger_days"),      // days threshold (e.g. 1 for welcome_day1, 7 for inactivity_7d)
+  templateId: integer("template_id")
+    .notNull()
+    .references(() => notificationTemplate.id, { onDelete: "cascade" }),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Tracks which automations have fired for which users (dedup)
+export const notificationAutomationLog = pgTable("notification_automation_log", {
+  id: serial("id").primaryKey(),
+  automationId: integer("automation_id")
+    .notNull()
+    .references(() => notificationAutomation.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  period: text("period").notNull(),         // dedup key: "once", "2026", "2026-W10", "2026-03-06"
+  sentAt: timestamp("sent_at").notNull().defaultNow(),
+}, (table) => [
+  unique("notif_auto_log_dedup").on(table.automationId, table.userId, table.period),
+  index("notif_auto_log_automation_idx").on(table.automationId),
+]);
 
 // ==================
 // Admin RBAC
@@ -243,6 +308,73 @@ export const analyticsEvent = pgTable("analytics_event", {
 ]);
 
 // ==================
+// Professor Ratings
+// ==================
+
+export const professor = pgTable("professor", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  university: text("university").notNull(),
+  department: text("department"),
+  bio: text("bio"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("professor_university_idx").on(table.university),
+  index("professor_slug_idx").on(table.slug),
+]);
+
+export const professorReview = pgTable("professor_review", {
+  id: serial("id").primaryKey(),
+  professorId: integer("professor_id")
+    .notNull()
+    .references(() => professor.id, { onDelete: "cascade" }),
+  courseId: text("course_id").references(() => course.id, { onDelete: "set null" }),
+  userId: text("user_id").notNull(),
+  overallRating: integer("overall_rating").notNull(),      // 1-5
+  difficultyRating: integer("difficulty_rating").notNull(), // 1-5
+  wouldTakeAgain: boolean("would_take_again").notNull(),
+  reviewText: text("review_text"),
+  tags: jsonb("tags").$type<string[]>(),
+  courseName: text("course_name"),                          // denormalized for display
+  status: text("status").notNull().default("pending"),      // pending, approved, rejected
+  moderatedBy: text("moderated_by"),
+  moderatedAt: timestamp("moderated_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("prof_review_professor_id_idx").on(table.professorId),
+  index("prof_review_status_idx").on(table.status),
+  index("prof_review_user_id_idx").on(table.userId),
+  index("prof_review_created_at_idx").on(table.createdAt),
+  unique("prof_review_user_professor").on(table.userId, table.professorId),
+]);
+
+export const enrollmentVerification = pgTable("enrollment_verification", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  professorId: integer("professor_id")
+    .notNull()
+    .references(() => professor.id, { onDelete: "cascade" }),
+  courseName: text("course_name").notNull(),
+  semester: text("semester").notNull(),
+  proofFileKey: text("proof_file_key").notNull(),
+  proofFileUrl: text("proof_file_url").notNull(),
+  proofFileName: text("proof_file_name").notNull(),
+  proofFileSize: integer("proof_file_size"),
+  status: text("status").notNull().default("pending"), // pending, approved, rejected
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNote: text("review_note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("enrollment_verif_user_id_idx").on(table.userId),
+  index("enrollment_verif_professor_id_idx").on(table.professorId),
+  index("enrollment_verif_status_idx").on(table.status),
+  unique("enrollment_verif_user_professor").on(table.userId, table.professorId),
+]);
+
+// ==================
 // Content
 // ==================
 
@@ -260,4 +392,108 @@ export const material = pgTable("material", {
   createdBy: text("created_by"),
 }, (table) => [
   index("material_course_id_idx").on(table.courseId),
+]);
+
+// ==================
+// Contribution System
+// ==================
+
+export const universityDomain = pgTable("university_domain", {
+  id: serial("id").primaryKey(),
+  universityName: text("university_name").notNull(),
+  domain: text("domain").notNull().unique(),
+  country: text("country"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const contributorVerification = pgTable("contributor_verification", {
+  userId: text("user_id").primaryKey(),
+  universityEmail: text("university_email").notNull(),
+  universityName: text("university_name").notNull(),
+  verifiedAt: timestamp("verified_at").notNull().defaultNow(),
+});
+
+export const contribution = pgTable("contribution", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  courseId: text("course_id").references(() => course.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  type: text("type").notNull(), // 'file' | 'text'
+  // File fields
+  fileKey: text("file_key"),
+  fileUrl: text("file_url"),
+  fileName: text("file_name"),
+  fileSize: integer("file_size"),
+  fileType: text("file_type"),
+  // Text field
+  textContent: text("text_content"),
+  // Moderation
+  status: text("status").notNull().default("pending"), // pending, approved, rejected, under_review
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNote: text("review_note"),
+  reportCount: integer("report_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("contribution_user_id_idx").on(table.userId),
+  index("contribution_course_id_idx").on(table.courseId),
+  index("contribution_status_idx").on(table.status),
+  index("contribution_created_at_idx").on(table.createdAt),
+]);
+
+export const contentRequest = pgTable("content_request", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  universityName: text("university_name"),
+  type: text("type").notNull(), // 'faculty' | 'course'
+  // Faculty request fields
+  facultyName: text("faculty_name"),
+  // Course request fields
+  existingFacultyId: integer("existing_faculty_id").references(() => faculty.id, { onDelete: "set null" }),
+  courseName: text("course_name"),
+  courseProfessor: text("course_professor"),
+  courseSemester: text("course_semester"),
+  // Moderation
+  status: text("status").notNull().default("pending"), // pending, approved, rejected
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNote: text("review_note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("content_request_user_id_idx").on(table.userId),
+  index("content_request_status_idx").on(table.status),
+]);
+
+export const contributorStats = pgTable("contributor_stats", {
+  userId: text("user_id").primaryKey(),
+  totalContributions: integer("total_contributions").notNull().default(0),
+  approvedContributions: integer("approved_contributions").notNull().default(0),
+  firstContributionAt: timestamp("first_contribution_at"),
+  lastContributionAt: timestamp("last_contribution_at"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const contentReport = pgTable("content_report", {
+  id: serial("id").primaryKey(),
+  contributionId: integer("contribution_id")
+    .notNull()
+    .references(() => contribution.id, { onDelete: "cascade" }),
+  reporterId: text("reporter_id").notNull(),
+  reason: text("reason").notNull(), // 'fake' | 'incorrect' | 'copyright' | 'other'
+  description: text("description"),
+  evidenceFileKey: text("evidence_file_key"),
+  evidenceFileUrl: text("evidence_file_url"),
+  evidenceFileName: text("evidence_file_name"),
+  evidenceFileSize: integer("evidence_file_size"),
+  status: text("status").notNull().default("pending"), // pending, reviewed, dismissed
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNote: text("review_note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("content_report_contribution_id_idx").on(table.contributionId),
+  index("content_report_status_idx").on(table.status),
+  index("content_report_created_at_idx").on(table.createdAt),
 ]);

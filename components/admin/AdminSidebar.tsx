@@ -10,6 +10,7 @@ import {
   BookOpen,
   Buildings,
   GitPullRequest,
+  Star,
   PresentationChart,
   CalendarBlank,
   ChartLine,
@@ -18,6 +19,7 @@ import {
   Gear,
   CaretLeft,
   EnvelopeSimple,
+  BellRinging,
 } from "@phosphor-icons/react";
 import Image from "next/image";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -41,9 +43,11 @@ const navItems: NavItem[] = [
   { icon: BookOpen, label: "Courses", href: "/admin/courses", permission: "courses.view" },
   { icon: Buildings, label: "Faculties", href: "/admin/faculties", permission: "faculties.view" },
   { icon: GitPullRequest, label: "Contributions", href: "/admin/contributions", permission: "contributions.view" },
+  { icon: Star, label: "Reviews", href: "/admin/reviews", permission: "contributions.view" },
   { icon: PresentationChart, label: "Presentations", href: "/admin/presentations", permission: "presentations.view" },
   { icon: CalendarBlank, label: "Calendar", href: "/admin/calendar", permission: "calendar.view" },
   { icon: ChartLine, label: "Analytics", href: "/admin/analytics", permission: "analytics.view" },
+  { icon: BellRinging, label: "Notifications", href: "/admin/notifications", permission: null },
   { icon: EnvelopeSimple, label: "Email", href: "/admin/email", permission: "email.view" },
   { icon: UserGear, label: "Team", href: "/admin/team", permission: "team.view" },
   { icon: ClockCounterClockwise, label: "Audit Log", href: "/admin/audit-log", permission: "audit.view" },
