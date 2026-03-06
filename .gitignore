@@ -20,3 +20,6 @@ tsconfig.tsbuildinfo
 
 # Test scripts
 test-email.ts
+
+# Seed data (already in DB)
+database/*.json
