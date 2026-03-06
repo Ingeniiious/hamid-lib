@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { pageView, analyticsEvent } from "@/database/schema";
+import { pageView, analyticsEvent, userProfile } from "@/database/schema";
+import { eq } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
+import { auth } from "@/lib/auth";
 
 function parseUA(ua: string) {
   let deviceType = "desktop";
-  if (/mobile|android|iphone|ipad/i.test(ua)) deviceType = "mobile";
-  else if (/tablet|ipad/i.test(ua)) deviceType = "tablet";
+  if (/tablet|ipad/i.test(ua)) deviceType = "tablet";
+  else if (/mobile|android|iphone/i.test(ua)) deviceType = "mobile";
 
   let browser = "unknown";
   if (/firefox/i.test(ua)) browser = "Firefox";
@@ -42,7 +44,16 @@ export async function POST(request: NextRequest) {
       return new NextResponse(null, { status: 413 });
     }
     const body = JSON.parse(raw);
-    const { type, path, eventName, properties, sessionId, userId } = body;
+    const { type, path, eventName, properties, sessionId } = body;
+
+    // Server-side session for trusted userId (never trust client-supplied userId)
+    let verifiedUserId: string | null = null;
+    try {
+      const { data: session } = await auth.getSession();
+      if (session?.user?.id) verifiedUserId = session.user.id;
+    } catch {
+      // Anonymous tracking is fine
+    }
 
     const ua = request.headers.get("user-agent") || "";
     const referrer = request.headers.get("referer") || "";
@@ -56,7 +67,7 @@ export async function POST(request: NextRequest) {
     if (type === "pageview" && path) {
       await db.insert(pageView).values({
         path,
-        userId: userId || null,
+        userId: verifiedUserId,
         sessionId: sessionId || null,
         referrer: referrer || null,
         userAgent: ua || null,
@@ -66,11 +77,19 @@ export async function POST(request: NextRequest) {
         browser,
         os,
       });
+
+      // Update lastActiveAt for inactivity tracking (fire-and-forget)
+      if (verifiedUserId) {
+        db.update(userProfile)
+          .set({ lastActiveAt: new Date() })
+          .where(eq(userProfile.userId, verifiedUserId))
+          .catch(() => {});
+      }
     } else if (type === "event" && eventName) {
       await db.insert(analyticsEvent).values({
         eventName,
         properties: properties || null,
-        userId: userId || null,
+        userId: verifiedUserId,
         sessionId: sessionId || null,
       });
     }

@@ -65,8 +65,11 @@ function rejectCrossOrigin(request: NextRequest): NextResponse | null {
   const method = request.method.toUpperCase();
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") return null;
 
-  // Allow cron jobs authenticated via Bearer token
-  if (request.headers.get("authorization")?.startsWith("Bearer ")) return null;
+  // Allow cron jobs authenticated via Bearer token (cron routes only)
+  if (
+    request.nextUrl.pathname.startsWith("/api/cron/") &&
+    request.headers.get("authorization")?.startsWith("Bearer ")
+  ) return null;
 
   const origin = request.headers.get("origin");
   const referer = request.headers.get("referer");

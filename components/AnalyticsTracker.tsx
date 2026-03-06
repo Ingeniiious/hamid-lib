@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { authClient } from "@/lib/auth-client";
 
 function getSessionId() {
   if (typeof window === "undefined") return null;
@@ -16,9 +17,44 @@ function getSessionId() {
 export function AnalyticsTracker() {
   const pathname = usePathname();
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [sessionReady, setSessionReady] = useState(false);
+  const userIdRef = useRef<string | null>(null);
+
+  // Fetch userId once on mount + auto-detect timezone
+  useEffect(() => {
+    // Only call getSession if a session cookie exists (avoids cold-start network call for anon users)
+    const hasSessionCookie = document.cookie.includes("session_token");
+    if (!hasSessionCookie) {
+      setSessionReady(true);
+      return;
+    }
+
+    authClient
+      .getSession()
+      .then(({ data }) => {
+        userIdRef.current = data?.user?.id || null;
+
+        // Save timezone once per session (auto-detect from browser)
+        if (data?.user?.id && !sessionStorage.getItem("tz-saved")) {
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          if (tz) {
+            fetch("/api/profile/timezone", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ timezone: tz }),
+              keepalive: true,
+            })
+              .then(() => sessionStorage.setItem("tz-saved", "1"))
+              .catch(() => {});
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setSessionReady(true));
+  }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !sessionReady) return;
 
     // Check consent
     const consent = localStorage.getItem("analytics-consent");
@@ -41,7 +77,7 @@ export function AnalyticsTracker() {
     }, 300);
 
     return () => clearTimeout(timeoutRef.current);
-  }, [pathname]);
+  }, [pathname, sessionReady]);
 
   return null;
 }
