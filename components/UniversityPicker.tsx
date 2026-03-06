@@ -36,6 +36,8 @@ export function UniversityPicker({
   const [selectedCountry, setSelectedCountry] = useState<CountryGroup | null>(null);
   const [selectedCity, setSelectedCity] = useState<CityGroup | null>(null);
   const [search, setSearch] = useState("");
+  const [countrySearch, setCountrySearch] = useState("");
+  const [citySearch, setCitySearch] = useState("");
 
   const isAuth = variant === "auth";
 
@@ -82,6 +84,8 @@ export function UniversityPicker({
             setSelectedCountry(null);
             setSelectedCity(null);
             setSearch("");
+            setCountrySearch("");
+            setCitySearch("");
           }
         }}
       >
@@ -112,14 +116,26 @@ export function UniversityPicker({
                   transition={{ duration: 0.15 }}
                   className="flex h-full flex-col"
                 >
-                  <p className={headingClass}>Country</p>
+                  <div className="shrink-0 px-1 pb-1.5 pt-1">
+                    <input
+                      type="text"
+                      value={countrySearch}
+                      onChange={(e) => setCountrySearch(e.target.value)}
+                      placeholder="Search..."
+                      className={searchInputClass}
+                      autoFocus
+                    />
+                  </div>
                   <div className="min-h-0 flex-1 overflow-y-auto">
-                    {UNIVERSITY_DATA.map((country) => (
+                    {UNIVERSITY_DATA.filter((c) =>
+                      c.country.toLowerCase().includes(countrySearch.toLowerCase())
+                    ).map((country) => (
                       <button
                         key={country.country}
                         type="button"
                         onClick={() => {
                           setSelectedCountry(country);
+                          setCountrySearch("");
                           setStep(country.cities.length === 1 ? "university" : "city");
                           if (country.cities.length === 1) setSelectedCity(country.cities[0]);
                         }}
@@ -132,6 +148,7 @@ export function UniversityPicker({
                       type="button"
                       onClick={() => {
                         onChange("__other__");
+                        setCountrySearch("");
                         setOpen(false);
                       }}
                       className={mutedItemClass}
@@ -154,6 +171,7 @@ export function UniversityPicker({
                   <button
                     type="button"
                     onClick={() => {
+                      setCitySearch("");
                       setStep("country");
                       setSelectedCountry(null);
                     }}
@@ -162,13 +180,26 @@ export function UniversityPicker({
                     <CaretLeft size={12} weight="bold" />
                     {selectedCountry.country === "United States" ? "States" : selectedCountry.country === "Canada" ? "Provinces" : selectedCountry.country}
                   </button>
+                  <div className="shrink-0 px-1 pb-1.5">
+                    <input
+                      type="text"
+                      value={citySearch}
+                      onChange={(e) => setCitySearch(e.target.value)}
+                      placeholder="Search..."
+                      className={searchInputClass}
+                      autoFocus
+                    />
+                  </div>
                   <div className="min-h-0 flex-1 overflow-y-auto">
-                    {selectedCountry.cities.map((city) => (
+                    {selectedCountry.cities.filter((c) =>
+                      c.city.toLowerCase().includes(citySearch.toLowerCase())
+                    ).map((city) => (
                       <button
                         key={city.city}
                         type="button"
                         onClick={() => {
                           setSelectedCity(city);
+                          setCitySearch("");
                           setStep("university");
                         }}
                         className={itemClass}

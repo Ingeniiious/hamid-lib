@@ -9,9 +9,16 @@ import { eq, and, gt, sql, asc } from "drizzle-orm";
 import { sendEmail } from "@/lib/email";
 import { getEmailTemplate } from "@/lib/email-templates";
 
-export type OTPType = "signup" | "password-reset" | "account-deletion";
+export type OTPType = "signup" | "password-reset" | "account-deletion" | "admin-login";
 
 export async function sendOTP(email: string, type: OTPType = "signup") {
+  // Rate limit: 3 OTP requests per 5 minutes per email+type
+  const { rateLimit } = await import("@/lib/rate-limit");
+  const rl = await rateLimit(`otp:${email}:${type}`, 3, 300);
+  if (!rl.allowed) {
+    return { error: "Too many requests. Please wait before requesting a new code." };
+  }
+
   const otp = randomInt(100000, 999999).toString();
 
   // Remove any existing OTPs for this email + type
@@ -50,6 +57,7 @@ export async function sendOTP(email: string, type: OTPType = "signup") {
     signup: "signup-otp",
     "password-reset": "password-reset-otp",
     "account-deletion": "account-deletion-otp",
+    "admin-login": "admin-login-otp",
   } as const;
   const templateType = templateMap[type];
   const { subject, html, text } = getEmailTemplate(templateType, {
@@ -164,12 +172,18 @@ export async function getProgramsForFaculty(facultyId: number) {
 }
 
 export async function saveUserProfile(
-  userId: string,
   university: string,
   gender: string,
   facultyId?: number | null,
   programId?: number | null
 ) {
+  const { auth } = await import("@/lib/auth");
+  const { data: session } = await auth.getSession();
+  if (!session?.user?.id) {
+    return { error: "Not authenticated." };
+  }
+  const userId = session.user.id;
+
   try {
     await db.insert(userProfile).values({
       userId,

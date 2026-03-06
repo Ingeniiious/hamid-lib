@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ServiceWorkerProvider } from "@/components/ServiceWorkerProvider";
+import { AnalyticsTracker } from "@/components/AnalyticsTracker";
+import { CookieConsent } from "@/components/CookieConsent";
 import "./globals.css";
 
 const geist = Geist({
@@ -59,7 +61,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geist.variable} font-sans antialiased`}>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          <AnalyticsTracker />
+          <CookieConsent />
+        </ThemeProvider>
         <ServiceWorkerProvider />
       </body>
     </html>

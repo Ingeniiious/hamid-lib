@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 
-const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days in seconds
+const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days in seconds
 const SESSION_COOKIE_MARKER = "session_token";
 
 /**

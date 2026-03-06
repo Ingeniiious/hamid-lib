@@ -115,7 +115,9 @@ export async function sendDeleteOTP(password: string) {
   return { success: true };
 }
 
-export async function getUserProfile(userId: string) {
+export async function getUserProfile() {
+  const session = await getSession();
+  const userId = session.user.id;
   try {
     const rows = await db
       .select()
@@ -129,9 +131,10 @@ export async function getUserProfile(userId: string) {
 }
 
 export async function updateUserProfile(
-  userId: string,
   data: { university?: string; gender?: string; facultyId?: number | null; programId?: number | null }
 ) {
+  const session = await getSession();
+  const userId = session.user.id;
   try {
     const existing = await db
       .select()

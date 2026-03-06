@@ -100,6 +100,52 @@ export async function toggleEventNotify(eventId: string, notify: boolean) {
   return { success: true };
 }
 
+export async function updateCalendarEvent(
+  eventId: string,
+  data: {
+    title: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    category: string;
+    note?: string;
+    locationType?: string;
+    campus?: string;
+    room?: string;
+    url?: string;
+    alerts?: any[];
+    notify?: boolean;
+  }
+) {
+  const session = await getSession();
+
+  await db
+    .update(calendarEvent)
+    .set({
+      title: data.title,
+      date: data.date,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      category: data.category,
+      note: data.note || null,
+      locationType: data.locationType || null,
+      campus: data.campus || null,
+      room: data.room || null,
+      url: data.url || null,
+      alerts: data.alerts ? JSON.stringify(data.alerts) : null,
+      notify: data.notify ?? true,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(calendarEvent.id, eventId),
+        eq(calendarEvent.userId, session.user.id)
+      )
+    );
+
+  return { success: true };
+}
+
 export async function deleteCalendarEvent(eventId: string) {
   const session = await getSession();
 

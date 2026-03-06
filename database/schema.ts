@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, serial, boolean, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, serial, boolean, unique, jsonb, index } from "drizzle-orm/pg-core";
 
 // ==================
 // App tables
@@ -42,7 +42,10 @@ export const course = pgTable("course", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: text("created_by"),
-});
+}, (table) => [
+  index("course_faculty_id_idx").on(table.facultyId),
+  index("course_created_at_idx").on(table.createdAt),
+]);
 
 export const emailVerification = pgTable("email_verification", {
   id: serial("id").primaryKey(),
@@ -64,7 +67,9 @@ export const userProfile = pgTable("user_profile", {
   avatarKey: text("avatar_key"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => [
+  index("user_profile_university_idx").on(table.university),
+]);
 
 export const portalPresentation = pgTable("portal_presentation", {
   id: serial("id").primaryKey(),
@@ -76,7 +81,10 @@ export const portalPresentation = pgTable("portal_presentation", {
   fileType: text("file_type").notNull(),
   requireApproval: boolean("require_approval").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => [
+  index("portal_presentation_user_id_idx").on(table.userId),
+  index("portal_presentation_created_at_idx").on(table.createdAt),
+]);
 
 export const portalCode = pgTable("portal_code", {
   id: serial("id").primaryKey(),
@@ -113,7 +121,11 @@ export const calendarEvent = pgTable("calendar_event", {
   seriesId: text("series_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => [
+  index("calendar_event_user_id_idx").on(table.userId),
+  index("calendar_event_date_idx").on(table.date),
+  index("calendar_event_user_date_idx").on(table.userId, table.date),
+]);
 
 export const pushSubscription = pgTable(
   "push_subscription",
@@ -143,6 +155,97 @@ export const notificationLog = pgTable(
   ]
 );
 
+// ==================
+// Admin RBAC
+// ==================
+
+export const adminRole = pgTable("admin_role", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  permissions: jsonb("permissions").notNull().$type<string[]>(),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const adminUser = pgTable("admin_user", {
+  userId: text("user_id").primaryKey(),
+  roleId: integer("role_id")
+    .notNull()
+    .references(() => adminRole.id, { onDelete: "restrict" }),
+  invitedBy: text("invited_by"),
+  otpVerifiedAt: timestamp("otp_verified_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const adminInvite = pgTable("admin_invite", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull(),
+  roleId: integer("role_id")
+    .notNull()
+    .references(() => adminRole.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  invitedBy: text("invited_by").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const auditLog = pgTable("audit_log", {
+  id: serial("id").primaryKey(),
+  adminUserId: text("admin_user_id").notNull(),
+  action: text("action").notNull(),
+  entityType: text("entity_type"),
+  entityId: text("entity_id"),
+  details: jsonb("details").$type<Record<string, unknown>>(),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("audit_log_created_at_idx").on(table.createdAt),
+  index("audit_log_admin_user_id_idx").on(table.adminUserId),
+  index("audit_log_action_idx").on(table.action),
+]);
+
+// ==================
+// Analytics
+// ==================
+
+export const pageView = pgTable("page_view", {
+  id: serial("id").primaryKey(),
+  path: text("path").notNull(),
+  userId: text("user_id"),
+  sessionId: text("session_id"),
+  referrer: text("referrer"),
+  userAgent: text("user_agent"),
+  country: text("country"),
+  city: text("city"),
+  deviceType: text("device_type"),
+  browser: text("browser"),
+  os: text("os"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("page_view_created_at_idx").on(table.createdAt),
+  index("page_view_session_id_idx").on(table.sessionId),
+  index("page_view_path_idx").on(table.path),
+]);
+
+export const analyticsEvent = pgTable("analytics_event", {
+  id: serial("id").primaryKey(),
+  eventName: text("event_name").notNull(),
+  properties: jsonb("properties").$type<Record<string, unknown>>(),
+  userId: text("user_id"),
+  sessionId: text("session_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("analytics_event_created_at_idx").on(table.createdAt),
+  index("analytics_event_name_idx").on(table.eventName),
+]);
+
+// ==================
+// Content
+// ==================
+
 export const material = pgTable("material", {
   id: text("id").primaryKey(),
   courseId: text("course_id")
@@ -155,4 +258,6 @@ export const material = pgTable("material", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: text("created_by"),
-});
+}, (table) => [
+  index("material_course_id_idx").on(table.courseId),
+]);

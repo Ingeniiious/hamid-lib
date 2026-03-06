@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import Link from "next/link";
@@ -12,11 +12,11 @@ import {
   saveUserProfile,
   sendPasswordResetOTP,
   resetPasswordWithOTP,
-  getFacultiesForUniversity,
-  getProgramsForFaculty,
 } from "./actions";
-import { FacultyPicker } from "@/components/FacultyPicker";
-import { ProgramPicker } from "@/components/ProgramPicker";
+import {
+  sendAdminOTP,
+  verifyAdminOTP,
+} from "@/app/(main)/admin/verify/actions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,8 +29,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { UniversityPicker } from "@/components/UniversityPicker";
-
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
 type Mode =
@@ -39,7 +37,8 @@ type Mode =
   | "verify"
   | "forgot-password"
   | "forgot-verify"
-  | "forgot-new-password";
+  | "forgot-new-password"
+  | "admin-verify";
 
 function PasswordInput({
   value,
@@ -107,64 +106,33 @@ export default function AuthPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [resetOtp, setResetOtp] = useState("");
   const [resetSuccess, setResetSuccess] = useState(false);
-  const [university, setUniversity] = useState("");
-  const [customUniversity, setCustomUniversity] = useState("");
   const [gender, setGender] = useState("");
   const [genderOpen, setGenderOpen] = useState(false);
-  const [facultyId, setFacultyId] = useState<number | null>(null);
-  const [availableFaculties, setAvailableFaculties] = useState<
-    { id: number; name: string; slug: string }[]
-  >([]);
-  const [facultiesLoading, setFacultiesLoading] = useState(false);
-  const [programId, setProgramId] = useState<number | null>(null);
-  const [availablePrograms, setAvailablePrograms] = useState<
-    { id: number; name: string; slug: string }[]
-  >([]);
 
-  // Load faculties when university changes
-  useEffect(() => {
-    if (!university || university === "__other__") {
-      setAvailableFaculties([]);
-      setFacultyId(null);
-      setAvailablePrograms([]);
-      setProgramId(null);
-      return;
-    }
-    let cancelled = false;
-    setFacultiesLoading(true);
-    getFacultiesForUniversity(university).then(({ faculties }) => {
-      if (!cancelled) {
-        setAvailableFaculties(faculties);
-        setFacultyId(null);
-        setAvailablePrograms([]);
-        setProgramId(null);
-        setFacultiesLoading(false);
-      }
-    });
-    return () => { cancelled = true; };
-  }, [university]);
+  const [adminOtp, setAdminOtp] = useState("");
+  const adminOtpSending = useRef(false);
 
-  // Load programs when faculty changes
-  useEffect(() => {
-    if (!facultyId) {
-      setAvailablePrograms([]);
-      setProgramId(null);
-      return;
-    }
-    let cancelled = false;
-    getProgramsForFaculty(facultyId).then(({ programs }) => {
-      if (!cancelled) {
-        setAvailablePrograms(programs);
-        setProgramId(null);
-      }
-    });
-    return () => { cancelled = true; };
-  }, [facultyId]);
-
-  const redirectByRole = (user: Record<string, unknown> | undefined) => {
+  const redirectByRole = async (user: Record<string, unknown> | undefined) => {
     localStorage.setItem("hamid-lib-visited", "1");
     const isAdmin = user?.role === "admin";
-    router.replace(isAdmin ? "/admin" : "/dashboard");
+    if (isAdmin) {
+      if (adminOtpSending.current) return;
+      adminOtpSending.current = true;
+      try {
+        const result = await sendAdminOTP();
+        if (result.error) {
+          setError(result.error);
+          adminOtpSending.current = false;
+          return;
+        }
+        setMode("admin-verify");
+      } catch {
+        setError("Failed to send admin verification code.");
+        adminOtpSending.current = false;
+      }
+    } else {
+      router.replace("/dashboard");
+    }
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -246,13 +214,9 @@ export default function AuthPage() {
         return;
       }
 
-      // Save university & gender profile
-      const userId = (data?.user as Record<string, unknown> | undefined)?.id as string | undefined;
-      if (userId) {
-        const finalUniversity = university === "__other__" ? customUniversity : university;
-        if (finalUniversity || gender) {
-          await saveUserProfile(userId, finalUniversity, gender, facultyId, programId);
-        }
+      // Save gender profile
+      if (gender) {
+        await saveUserProfile("", gender);
       }
 
       redirectByRole(data?.user as Record<string, unknown> | undefined);
@@ -268,6 +232,41 @@ export default function AuthPage() {
     setLoading(true);
     try {
       const result = await sendOTP(email);
+      if (result.error) setError(result.error);
+    } catch {
+      setError("Failed to resend code.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAdminVerify = async (code?: string) => {
+    const otpValue = code || adminOtp;
+    if (otpValue.length !== 6) return;
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const result = await verifyAdminOTP(otpValue);
+      if ("error" in result && result.error) {
+        setError(result.error);
+        setAdminOtp("");
+        return;
+      }
+      router.replace("/admin");
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAdminResend = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const result = await sendAdminOTP();
       if (result.error) setError(result.error);
     } catch {
       setError("Failed to resend code.");
@@ -382,6 +381,7 @@ export default function AuthPage() {
   const isForgot = mode === "forgot-password";
   const isForgotVerify = mode === "forgot-verify";
   const isForgotNewPassword = mode === "forgot-new-password";
+  const isAdminVerify = mode === "admin-verify";
 
   return (
     <div className="flex w-full flex-col items-center justify-center">
@@ -410,7 +410,68 @@ export default function AuthPage() {
           transition={{ layout: { duration: 0.35, ease } }}
         >
           <AnimatePresence mode="wait" initial={false}>
-            {isForgotNewPassword ? (
+            {isAdminVerify ? (
+              /* ── Admin OTP Verification ── */
+              <motion.div
+                key="admin-verify"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <h2 className="mb-2 text-center font-display text-2xl font-light text-white">
+                  Admin Verification
+                </h2>
+                <p className="mb-6 text-center text-sm text-white/50">
+                  Enter the 6-digit code sent to your email
+                </p>
+
+                <div className="flex flex-col items-center gap-4">
+                  <InputOTP
+                    maxLength={6}
+                    value={adminOtp}
+                    onChange={setAdminOtp}
+                    onComplete={handleAdminVerify}
+                  >
+                    <InputOTPGroup>
+                      {[0, 1, 2, 3, 4, 5].map((i) => (
+                        <InputOTPSlot
+                          key={i}
+                          index={i}
+                          className="border-white/20 bg-white/10 text-white data-[active=true]:border-white/40 data-[active=true]:ring-white/20"
+                        />
+                      ))}
+                    </InputOTPGroup>
+                  </InputOTP>
+
+                  {error && (
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="text-center text-sm text-red-300"
+                    >
+                      {error}
+                    </motion.p>
+                  )}
+
+                  <Button
+                    onClick={() => handleAdminVerify()}
+                    disabled={loading || adminOtp.length !== 6}
+                    className="w-full rounded-full bg-white font-medium text-gray-900 hover:bg-white/90 disabled:opacity-50"
+                  >
+                    {loading ? "Verifying..." : "Verify"}
+                  </Button>
+
+                  <button
+                    onClick={handleAdminResend}
+                    disabled={loading}
+                    className="text-sm text-white/70 underline underline-offset-2 transition-colors hover:text-white disabled:opacity-50"
+                  >
+                    Resend Code
+                  </button>
+                </div>
+              </motion.div>
+            ) : isForgotNewPassword ? (
               /* ── New Password (after OTP verified) ── */
               <motion.div
                 key="forgot-new-password"
@@ -754,71 +815,6 @@ export default function AuthPage() {
                       className={passwordInputClass}
                     />
                   </motion.div>
-
-                  {/* University — sign-up only */}
-                  <AnimatePresence mode="popLayout">
-                    {isSignUp && (
-                      <motion.div
-                        key="university-field"
-                        layout
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.25, ease }}
-                      >
-                        <UniversityPicker
-                          value={university}
-                          onChange={setUniversity}
-                          customValue={customUniversity}
-                          onCustomChange={setCustomUniversity}
-                          variant="auth"
-                          inputClass={inputClass}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Faculty — sign-up only, when university has faculties */}
-                  <AnimatePresence mode="popLayout">
-                    {isSignUp && availableFaculties.length > 0 && (
-                      <motion.div
-                        key="faculty-field"
-                        layout
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.25, ease }}
-                      >
-                        <FacultyPicker
-                          faculties={availableFaculties}
-                          value={facultyId}
-                          onChange={setFacultyId}
-                          variant="auth"
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Program — sign-up only, when faculty has programs */}
-                  <AnimatePresence mode="popLayout">
-                    {isSignUp && availablePrograms.length > 0 && (
-                      <motion.div
-                        key="program-field"
-                        layout
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.25, ease }}
-                      >
-                        <ProgramPicker
-                          programs={availablePrograms}
-                          value={programId}
-                          onChange={setProgramId}
-                          variant="auth"
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
 
                   {/* Gender — sign-up only */}
                   <AnimatePresence mode="popLayout">

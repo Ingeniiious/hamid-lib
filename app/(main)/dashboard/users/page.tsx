@@ -226,7 +226,7 @@ export default function AccountPage() {
       setSessionLoaded(true);
 
       // Load profile
-      const { profile } = await getUserProfile(data.user.id);
+      const { profile } = await getUserProfile();
       if (profile) {
         const isKnown = UNIVERSITIES.includes(profile.university as typeof UNIVERSITIES[number]);
         if (profile.university && !isKnown) {
@@ -388,10 +388,8 @@ export default function AccountPage() {
     const [nameResult, profileResult] = await Promise.all([
       updateName(name),
       (async () => {
-        const { data: session } = await authClient.getSession();
-        if (!session?.user) return { error: "Not authenticated." };
         const finalUniversity = university === "__other__" ? customUniversity : university;
-        return updateUserProfile(session.user.id, {
+        return updateUserProfile({
           university: finalUniversity,
           gender,
           facultyId,

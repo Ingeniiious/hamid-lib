@@ -1,9 +1,10 @@
-type TemplateType = "signup-otp" | "password-reset-otp" | "account-deletion-otp";
+type TemplateType = "signup-otp" | "password-reset-otp" | "account-deletion-otp" | "admin-login-otp";
 
 const subjects: Record<TemplateType, string> = {
   "signup-otp": "Your Verification Code",
   "password-reset-otp": "Password Reset Code",
   "account-deletion-otp": "Account Deletion Code",
+  "admin-login-otp": "Admin Login Code",
 };
 
 const bodyText: Record<TemplateType, (code: string) => string> = {
@@ -13,12 +14,15 @@ const bodyText: Record<TemplateType, (code: string) => string> = {
     `Your password reset code is: ${code}. Expires in 90 seconds. Didn't request this? Just ignore it.`,
   "account-deletion-otp": (code) =>
     `Your account deletion code is: ${code}. Expires in 90 seconds. Didn't request this? Please secure your account.`,
+  "admin-login-otp": (code) =>
+    `Your admin login code is: ${code}. Expires in 90 seconds. If you didn't request this, please secure your account immediately.`,
 };
 
 const headings: Record<TemplateType, string> = {
   "signup-otp": "Welcome Aboard",
   "password-reset-otp": "Reset Your Password",
   "account-deletion-otp": "Confirm Deletion",
+  "admin-login-otp": "Admin Verification",
 };
 
 const descriptions: Record<TemplateType, string> = {
@@ -28,12 +32,15 @@ const descriptions: Record<TemplateType, string> = {
     "Enter The Code Below To Set A New Password.",
   "account-deletion-otp":
     "Enter The Code Below To Confirm. This Action Cannot Be Undone.",
+  "admin-login-otp":
+    "Enter The Code Below To Access The Admin Panel.",
 };
 
 const signoffs: Record<TemplateType, string> = {
   "signup-otp": "Happy studying!",
   "password-reset-otp": "You'll be back in no time.",
   "account-deletion-otp": "We're sorry to see you go.",
+  "admin-login-otp": "Stay secure.",
 };
 
 function buildHtml({
@@ -113,7 +120,7 @@ function buildHtml({
 
               <!-- Safety note -->
               <p style="margin: 0 0 28px; font-size: 14px; line-height: 1.6; color: #78716C;">
-                Didn't request this? No worries, just ignore it. Need help? Reach out at <a href="mailto:support@libraryyy.com" style="color: #5227FF; text-decoration: underline;">support@libraryyy.com</a>.
+                Didn't request this? No worries, just ignore it. Need help? Reach out at <a href="mailto:hello@libraryyy.com" style="color: #5227FF; text-decoration: underline;">hello@libraryyy.com</a>.
               </p>
 
               <!-- Sign-off -->

@@ -28,6 +28,7 @@ import {
   deleteCalendarEvent,
   deleteSeriesFromDate,
   toggleEventNotify,
+  updateCalendarEvent,
 } from "@/app/(main)/dashboard/me/calendar/actions";
 import { NotificationPrompt } from "@/components/NotificationPrompt";
 
@@ -193,7 +194,7 @@ export function CalendarView() {
   const [formRoom, setFormRoom] = useState("");
   const [formUrl, setFormUrl] = useState("");
   // Alerts — multi-select from single dropdown
-  const [formAlerts, setFormAlerts] = useState<AlertMinutes[]>([15]);
+  const [formAlerts, setFormAlerts] = useState<AlertMinutes[]>([15, 60]);
   const [formTravelTime, setFormTravelTime] = useState(0);
   const [alertPickerOpen, setAlertPickerOpen] = useState(false);
   // Recurrence
@@ -201,6 +202,8 @@ export function CalendarView() {
   // Notifications
   const [formNotify, setFormNotify] = useState(true);
   const [notifPromptTrigger, setNotifPromptTrigger] = useState(0);
+  // Edit mode
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   // Delete confirmation for recurring events
   const [deleteConfirm, setDeleteConfirm] = useState<CalendarEvent | null>(null);
 
@@ -305,6 +308,7 @@ export function CalendarView() {
   /* ── Event CRUD ──────────────────────────────────────── */
 
   const openForm = (date: Date, hour?: number) => {
+    setEditingEvent(null);
     setFormDate(dateKey(date));
     const h = hour ?? 9;
     setFormStartTime(`${String(h).padStart(2, "0")}:00`);
@@ -316,11 +320,38 @@ export function CalendarView() {
     setFormCampus("");
     setFormRoom("");
     setFormUrl("");
-    setFormAlerts([15]);
+    setFormAlerts([15, 60]);
     setFormTravelTime(0);
     setAlertPickerOpen(false);
     setFormRecurrence("none");
     setFormNotify(true);
+    setShowForm(true);
+    setTimeout(() => titleRef.current?.focus(), 100);
+  };
+
+  const openEditForm = (event: CalendarEvent) => {
+    setEditingEvent(event);
+    setFormDate(event.date);
+    setFormStartTime(event.startTime);
+    setFormEndTime(event.endTime);
+    setFormTitle(event.title);
+    setFormCategory(event.category);
+    setFormNote(event.note || "");
+    setFormLocationType(event.locationType || "in-person");
+    setFormCampus(event.campus || "");
+    setFormRoom(event.room || "");
+    setFormUrl(event.url || "");
+    setFormAlerts(
+      event.alerts && event.alerts.length > 0
+        ? event.alerts.map((a) => a.minutes)
+        : []
+    );
+    setFormTravelTime(
+      event.alerts?.[0]?.travelMinutes || 0
+    );
+    setAlertPickerOpen(false);
+    setFormRecurrence(event.recurrence || "none");
+    setFormNotify(event.notify);
     setShowForm(true);
     setTimeout(() => titleRef.current?.focus(), 100);
   };
@@ -382,6 +413,53 @@ export function CalendarView() {
       const newIds = new Set(newEvents.map((e) => e.id));
       setEvents((prev) => prev.filter((e) => !newIds.has(e.id)));
     });
+  };
+
+  const handleSaveEvent = () => {
+    if (!editingEvent || !formTitle.trim()) return;
+    const hasLoc = HAS_LOCATION.includes(formCategory);
+    const travelMin = formTravelTime || undefined;
+    const alerts: CalendarAlert[] = formAlerts
+      .filter((m) => m !== -1)
+      .map((minutes) => ({ minutes, travelMinutes: travelMin }));
+
+    const updated: CalendarEvent = {
+      ...editingEvent,
+      title: formTitle.trim(),
+      date: formDate,
+      startTime: formStartTime,
+      endTime: formEndTime,
+      category: formCategory,
+      note: formNote.trim() || undefined,
+      locationType: hasLoc ? formLocationType : undefined,
+      campus: hasLoc && formLocationType === "in-person" ? formCampus.trim() || undefined : undefined,
+      room: hasLoc && formLocationType === "in-person" ? formRoom.trim() || undefined : undefined,
+      url: hasLoc && formLocationType === "online" ? formUrl.trim() || undefined : undefined,
+      alerts: alerts.length > 0 ? alerts : undefined,
+      notify: formNotify,
+    };
+
+    const backup = events;
+    setEvents((prev) =>
+      prev.map((e) => (e.id === editingEvent.id ? updated : e))
+    );
+    setShowForm(false);
+    setEditingEvent(null);
+
+    updateCalendarEvent(editingEvent.id, {
+      title: updated.title,
+      date: updated.date,
+      startTime: updated.startTime,
+      endTime: updated.endTime,
+      category: updated.category,
+      note: updated.note,
+      locationType: updated.locationType,
+      campus: updated.campus,
+      room: updated.room,
+      url: updated.url,
+      alerts: updated.alerts,
+      notify: updated.notify,
+    }).catch(() => setEvents(backup));
   };
 
   const handleToggleNotify = (id: string) => {
@@ -692,8 +770,9 @@ export function CalendarView() {
                     return (
                       <div
                         key={event.id}
-                        className={`group absolute z-10 flex overflow-hidden rounded-lg ${config.bg} cursor-default`}
+                        className={`group absolute z-10 flex overflow-hidden rounded-lg ${config.bg} cursor-pointer`}
                         style={{ top: top + 1, height: height - 2, left: 3, right: 3 }}
+                        onClick={() => openEditForm(event)}
                         title={`${event.title}\n${event.startTime} — ${event.endTime}${event.locationType === "in-person" ? `\n${[event.campus, event.room].filter(Boolean).join(" · ") || "In Person"}` : event.locationType === "online" ? `\n${event.url || "Online"}` : ""}${event.note ? "\n" + event.note : ""}`}
                       >
                         {/* Left accent bar */}
@@ -784,7 +863,7 @@ export function CalendarView() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25, ease }}
               className="fixed inset-0 z-50 bg-black/40"
-              onClick={() => setShowForm(false)}
+              onClick={() => { setShowForm(false); setEditingEvent(null); }}
             />
 
             {/* Card — always centered, works with mobile keyboard */}
@@ -796,11 +875,20 @@ export function CalendarView() {
               className="fixed inset-x-4 top-1/2 z-50 mx-auto max-h-[85vh] max-w-md -translate-y-1/2 overflow-y-auto rounded-2xl border border-gray-900/10 bg-white p-5 shadow-xl dark:border-white/15 dark:bg-[var(--background)]"
             >
               <h3 className="text-center font-display text-lg font-light text-gray-900 dark:text-white">
-                New Event
+                {editingEvent ? "Edit Event" : "New Event"}
               </h3>
-              <p className="mt-0.5 text-center text-xs text-gray-400 dark:text-white/40">
-                {formDate && format(parseISO(formDate), "EEEE, MMMM d, yyyy")}
-              </p>
+              {editingEvent ? (
+                <input
+                  type="date"
+                  value={formDate}
+                  onChange={(e) => setFormDate(e.target.value)}
+                  className="mx-auto mt-1 block h-8 rounded-full border border-gray-900/10 bg-gray-900/5 px-4 text-center text-xs text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 dark:border-white/10 dark:bg-white/10 dark:text-white/50 dark:focus-visible:ring-white/30"
+                />
+              ) : (
+                <p className="mt-0.5 text-center text-xs text-gray-400 dark:text-white/40">
+                  {formDate && format(parseISO(formDate), "EEEE, MMMM d, yyyy")}
+                </p>
+              )}
 
               <div className="mt-4 flex flex-col gap-3">
                 <input
@@ -809,7 +897,7 @@ export function CalendarView() {
                   placeholder="Event title..."
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddEvent()}
+                  onKeyDown={(e) => e.key === "Enter" && (editingEvent ? handleSaveEvent() : handleAddEvent())}
                   className="h-10 w-full rounded-full border border-gray-900/15 bg-gray-900/5 px-5 text-center text-sm text-gray-900 placeholder:text-gray-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:placeholder:text-white/50 dark:focus-visible:ring-white/30"
                 />
 
@@ -997,38 +1085,54 @@ export function CalendarView() {
                   <OptionPicker options={TRAVEL_OPTIONS} value={formTravelTime} onChange={setFormTravelTime} size="sm" />
                 )}
 
-                {/* Recurrence */}
-                <OptionPicker
-                  options={RECURRENCE_OPTIONS}
-                  value={formRecurrence}
-                  onChange={(v) => setFormRecurrence(v as Recurrence)}
-                  placeholder="Repeat..."
-                />
+                {/* Recurrence — only for new events */}
+                {!editingEvent && (
+                  <OptionPicker
+                    options={RECURRENCE_OPTIONS}
+                    value={formRecurrence}
+                    onChange={(v) => setFormRecurrence(v as Recurrence)}
+                    placeholder="Repeat..."
+                  />
+                )}
 
                 <input
                   type="text"
                   placeholder="Note (optional)"
                   value={formNote}
                   onChange={(e) => setFormNote(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddEvent()}
+                  onKeyDown={(e) => e.key === "Enter" && (editingEvent ? handleSaveEvent() : handleAddEvent())}
                   className="h-10 w-full rounded-full border border-gray-900/15 bg-gray-900/5 px-5 text-center text-sm text-gray-900 placeholder:text-gray-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:placeholder:text-white/50 dark:focus-visible:ring-white/30"
                 />
 
                 <div className="mt-1 flex gap-2">
                   <button
-                    onClick={() => setShowForm(false)}
+                    onClick={() => { setShowForm(false); setEditingEvent(null); }}
                     className="flex-1 rounded-full bg-gray-900/5 py-2.5 text-sm font-medium text-gray-900/60 transition-colors duration-200 hover:bg-gray-900/10 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10"
                   >
                     Cancel
                   </button>
                   <button
-                    onClick={handleAddEvent}
+                    onClick={editingEvent ? handleSaveEvent : handleAddEvent}
                     disabled={!formTitle.trim()}
                     className="flex-1 rounded-full bg-[#5227FF] py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:opacity-90 disabled:opacity-40"
                   >
-                    {formRecurrence !== "none" ? "Add Series" : "Add Event"}
+                    {editingEvent ? "Save" : formRecurrence !== "none" ? "Add Series" : "Add Event"}
                   </button>
                 </div>
+
+                {/* Delete button — visible in edit mode (critical for mobile) */}
+                {editingEvent && (
+                  <button
+                    onClick={() => {
+                      setShowForm(false);
+                      handleDeleteEvent(editingEvent.id);
+                      setEditingEvent(null);
+                    }}
+                    className="mt-1 w-full rounded-full border border-red-500/20 py-2.5 text-sm font-medium text-red-600 transition-colors duration-200 hover:bg-red-50 dark:border-red-500/20 dark:text-red-400 dark:hover:bg-red-500/5"
+                  >
+                    Delete Event
+                  </button>
+                )}
               </div>
             </motion.div>
           </>

@@ -5,10 +5,10 @@ import { auth } from "@/lib/auth";
 import { FacultyCard } from "@/components/FacultyCard";
 import { BackButton } from "@/components/BackButton";
 import { PageHeader } from "@/components/PageHeader";
-import Link from "next/link";
+import { UniversitySetup } from "./UniversitySetup";
 import type { Metadata } from "next";
 
-export const revalidate = 300; // Cache for 5 min — faculties rarely change
+export const dynamic = "force-dynamic"; // Per-user content (university profile check)
 
 export const metadata: Metadata = {
   title: "Courses",
@@ -38,19 +38,8 @@ export default async function CoursesPage() {
         <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
           <PageHeader title="Courses" subtitle="Browse by faculty" />
         </div>
-        <div className="flex flex-1 flex-col items-center justify-center px-6 pb-24 text-center">
-          <h2 className="font-display text-xl font-light text-gray-900 dark:text-white">
-            Set Your University
-          </h2>
-          <p className="mt-2 text-sm text-gray-900/50 dark:text-white/50">
-            Set your university in settings to see available faculties.
-          </p>
-          <Link
-            href="/dashboard/users"
-            className="mt-4 rounded-full border border-gray-900/10 px-6 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-900/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
-          >
-            Go To Settings
-          </Link>
+        <div className="flex flex-1 flex-col items-center justify-center px-6 pb-24">
+          <UniversitySetup />
         </div>
         <BackButton href="/dashboard" label="Dashboard" floating />
       </div>

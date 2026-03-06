@@ -23,62 +23,76 @@ export function isPushSupported(): boolean {
 export async function subscribeToPush(): Promise<boolean> {
   if (!isPushSupported()) return false;
 
-  const permission = await Notification.requestPermission();
-  if (permission !== "granted") return false;
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return false;
 
-  const registration = await navigator.serviceWorker.ready;
+    const registration = await navigator.serviceWorker.ready;
 
-  // Check for existing subscription
-  let subscription = await registration.pushManager.getSubscription();
+    // Check for existing subscription
+    let subscription = await registration.pushManager.getSubscription();
 
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+
+    const json = subscription.toJSON();
+    if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return false;
+
+    // Send to server
+    const res = await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        endpoint: json.endpoint,
+        p256dh: json.keys.p256dh,
+        auth: json.keys.auth,
+      }),
     });
+
+    return res.ok;
+  } catch {
+    // Brave and some privacy-focused browsers block the Push API entirely.
+    // pushManager.subscribe() throws AbortError — nothing we can do.
+    return false;
   }
-
-  const json = subscription.toJSON();
-  if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return false;
-
-  // Send to server
-  const res = await fetch("/api/push/subscribe", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      endpoint: json.endpoint,
-      p256dh: json.keys.p256dh,
-      auth: json.keys.auth,
-    }),
-  });
-
-  return res.ok;
 }
 
 export async function unsubscribeFromPush(): Promise<boolean> {
   if (!isPushSupported()) return false;
 
-  const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.getSubscription();
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
 
-  if (!subscription) return true;
+    if (!subscription) return true;
 
-  const json = subscription.toJSON();
+    const json = subscription.toJSON();
 
-  // Remove from server
-  await fetch("/api/push/subscribe", {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ endpoint: json.endpoint }),
-  });
+    // Remove from server
+    await fetch("/api/push/subscribe", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: json.endpoint }),
+    });
 
-  await subscription.unsubscribe();
-  return true;
+    await subscription.unsubscribe();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function isPushSubscribed(): Promise<boolean> {
   if (!isPushSupported()) return false;
-  const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.getSubscription();
-  return !!subscription;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    return !!subscription;
+  } catch {
+    return false;
+  }
 }

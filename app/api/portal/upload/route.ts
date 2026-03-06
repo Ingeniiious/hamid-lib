@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { portalPresentation } from "@/database/schema";
 import { uploadToR2 } from "@/lib/r2";
+import { watermarkFile } from "@/lib/watermark";
 import { eq, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -25,7 +26,6 @@ const ALLOWED_TYPES = new Set([
   "text/plain",
 ]);
 
-// Map MIME type to file extension
 function getExtension(mime: string): string {
   const map: Record<string, string> = {
     "application/pdf": ".pdf",
@@ -89,13 +89,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Watermark the file before uploading (PDFs + images)
+  const rawBuffer = new Uint8Array(await file.arrayBuffer());
+  const { buffer: watermarkedBuffer, mimeType: finalMime } = await watermarkFile(
+    rawBuffer,
+    file.type
+  );
+
   // Hash the object key — no userId or filename in the path
   const hash = randomBytes(32).toString("hex");
-  const ext = getExtension(file.type);
+  const ext = getExtension(finalMime);
   const objectKey = `portal/${hash}${ext}`;
 
-  const buffer = new Uint8Array(await file.arrayBuffer());
-  const result = await uploadToR2(buffer, objectKey, file.type);
+  const result = await uploadToR2(watermarkedBuffer, objectKey, finalMime);
 
   if (!result.success) {
     console.error("R2 upload failed:", result.error);
@@ -109,8 +115,8 @@ export async function POST(request: NextRequest) {
       fileName: file.name,
       fileKey: objectKey,
       fileUrl: result.url,
-      fileSize: file.size,
-      fileType: file.type,
+      fileSize: watermarkedBuffer.length,
+      fileType: finalMime,
     })
     .returning();
 

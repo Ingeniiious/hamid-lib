@@ -10,6 +10,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Rate limit: 10 req/min per user
+  const { rateLimit } = await import("@/lib/rate-limit");
+  const rl = await rateLimit(`push:sub:${session.user.id}`, 10, 60);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const body = await request.json();
   const { endpoint, p256dh, auth: authKey } = body;
 

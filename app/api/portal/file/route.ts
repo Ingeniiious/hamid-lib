@@ -49,9 +49,12 @@ export async function GET(request: NextRequest) {
     const headers = new Headers();
     headers.set("Content-Type", row.presentation.fileType);
     headers.set("Content-Length", row.presentation.fileSize.toString());
+    const safeName = row.presentation.fileName
+      .replace(/[^\w\s.\-()]/g, "_")
+      .slice(0, 200);
     headers.set(
       "Content-Disposition",
-      `inline; filename="${row.presentation.fileName.replace(/"/g, "'")}"`
+      `inline; filename="${safeName}"`
     );
     headers.set("Cache-Control", "private, no-store");
     headers.set("X-Content-Type-Options", "nosniff");

@@ -15,6 +15,7 @@ export default function MainLayout({
 }) {
   const pathname = usePathname();
   const isDashboard = pathname.startsWith("/dashboard");
+  const isAdmin = pathname.startsWith("/admin");
 
   return (
     <main className="relative h-dvh w-full overflow-hidden">
@@ -39,8 +40,8 @@ export default function MainLayout({
         {children}
       </div>
 
-      {/* Theme toggle — top-right, only on non-dashboard pages */}
-      {!isDashboard && (
+      {/* Theme toggle — top-right, only on non-dashboard/admin pages */}
+      {!isDashboard && !isAdmin && (
         <div className="absolute right-6 top-6 z-20 sm:right-8 sm:top-8">
           <ThemeToggle />
         </div>
