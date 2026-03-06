@@ -10,26 +10,7 @@ import {
 import { eq, sql, desc, asc, and, ilike, or } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
-
-const REVIEW_TAGS = [
-  "Clear Lectures",
-  "Tough Grader",
-  "Helpful Office Hours",
-  "Heavy Workload",
-  "Inspiring",
-  "Easy Grader",
-  "Caring",
-  "Group Projects",
-  "Lots Of Homework",
-  "Test Heavy",
-  "Get Ready To Read",
-  "Lecture Heavy",
-  "Accessible Outside Class",
-  "Participation Matters",
-] as const;
-
-export type ReviewTag = (typeof REVIEW_TAGS)[number];
-export { REVIEW_TAGS };
+import { REVIEW_TAGS, type ReviewTag } from "@/lib/professor-constants";
 
 // ── Public queries (no auth needed) ──
 

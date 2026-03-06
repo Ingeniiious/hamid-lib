@@ -4,7 +4,8 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { submitReview, REVIEW_TAGS } from "@/app/(public)/professors/actions";
+import { submitReview } from "@/app/(public)/professors/actions";
+import { REVIEW_TAGS } from "@/lib/professor-constants";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
