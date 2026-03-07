@@ -2,14 +2,65 @@
 
 import { db } from "@/lib/db";
 import { faculty, program, course } from "@/database/schema";
-import { eq, asc, sql } from "drizzle-orm";
+import { eq, asc, sql, count, or, ilike } from "drizzle-orm";
 import { getAdminSession, requirePermission } from "@/lib/admin/auth";
 import { logAdminAction } from "@/lib/admin/audit";
 
-export async function listFaculties() {
-  const session = await getAdminSession();
-  requirePermission(session, "faculties.view");
+// ── Overview stats (single query) ──
 
+export async function getFacultyStats() {
+  const session = await getAdminSession();
+  await requirePermission(session, "faculties.view");
+
+  const [stats] = await db.execute<{
+    total_faculties: string;
+    total_programs: string;
+    total_universities: string;
+    total_courses: string;
+  }>(sql`
+    SELECT
+      (SELECT count(*) FROM faculty) as total_faculties,
+      (SELECT count(*) FROM program) as total_programs,
+      (SELECT count(DISTINCT university) FROM faculty) as total_universities,
+      (SELECT count(*) FROM course WHERE faculty_id IS NOT NULL) as total_courses
+  `);
+
+  return {
+    totalFaculties: parseInt(stats.total_faculties),
+    totalPrograms: parseInt(stats.total_programs),
+    totalUniversities: parseInt(stats.total_universities),
+    totalCourses: parseInt(stats.total_courses),
+  };
+}
+
+// ── Faculties (paginated, single query with window count) ──
+
+interface ListFacultiesParams {
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export async function listFaculties({
+  search,
+  page = 1,
+  limit = 20,
+}: ListFacultiesParams = {}) {
+  const session = await getAdminSession();
+  await requirePermission(session, "faculties.view");
+
+  const safeLimit = Math.min(Math.max(limit, 1), 100);
+  const offset = (page - 1) * safeLimit;
+
+  const searchCondition = search
+    ? or(
+        ilike(faculty.name, `%${search}%`),
+        ilike(faculty.university, `%${search}%`),
+        ilike(faculty.slug, `%${search}%`)
+      )
+    : undefined;
+
+  // Single query: data + counts + total via window function
   const rows = await db
     .select({
       id: faculty.id,
@@ -19,15 +70,82 @@ export async function listFaculties() {
       description: faculty.description,
       displayOrder: faculty.displayOrder,
       createdAt: faculty.createdAt,
+      programCount: sql<number>`(SELECT count(*)::int FROM program WHERE program.faculty_id = "faculty"."id")`,
+      courseCount: sql<number>`(SELECT count(*)::int FROM course WHERE course.faculty_id = "faculty"."id")`,
+      totalCount: sql<number>`count(*) OVER()`,
     })
     .from(faculty)
-    .orderBy(asc(faculty.displayOrder), asc(faculty.name));
+    .where(searchCondition)
+    .orderBy(asc(faculty.displayOrder), asc(faculty.name))
+    .limit(safeLimit)
+    .offset(offset);
 
-  return rows.map((r) => ({
-    ...r,
-    createdAt: r.createdAt.toISOString(),
-  }));
+  const total = rows[0]?.totalCount ?? 0;
+
+  return {
+    faculties: rows.map(({ totalCount: _, ...r }) => ({
+      ...r,
+      createdAt: r.createdAt.toISOString(),
+    })),
+    total,
+    totalPages: Math.ceil(total / safeLimit),
+  };
 }
+
+// ── Programs (paginated, single query with window count) ──
+
+interface ListProgramsParams {
+  facultyId: number;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export async function listPrograms({
+  facultyId,
+  search,
+  page = 1,
+  limit = 20,
+}: ListProgramsParams) {
+  const session = await getAdminSession();
+  await requirePermission(session, "faculties.view");
+
+  const safeLimit = Math.min(Math.max(limit, 1), 100);
+  const offset = (page - 1) * safeLimit;
+
+  const conditions = search
+    ? sql`${program.facultyId} = ${facultyId} AND (${program.name} ILIKE ${`%${search}%`} OR ${program.slug} ILIKE ${`%${search}%`})`
+    : eq(program.facultyId, facultyId);
+
+  const rows = await db
+    .select({
+      id: program.id,
+      name: program.name,
+      slug: program.slug,
+      facultyId: program.facultyId,
+      displayOrder: program.displayOrder,
+      createdAt: program.createdAt,
+      totalCount: sql<number>`count(*) OVER()`,
+    })
+    .from(program)
+    .where(conditions)
+    .orderBy(asc(program.displayOrder), asc(program.name))
+    .limit(safeLimit)
+    .offset(offset);
+
+  const total = rows[0]?.totalCount ?? 0;
+
+  return {
+    programs: rows.map(({ totalCount: _, ...r }) => ({
+      ...r,
+      createdAt: r.createdAt.toISOString(),
+    })),
+    total,
+    totalPages: Math.ceil(total / safeLimit),
+  };
+}
+
+// ── Faculty CRUD ──
 
 export async function createFaculty(data: {
   name: string;
@@ -36,7 +154,7 @@ export async function createFaculty(data: {
   description?: string;
 }) {
   const session = await getAdminSession();
-  requirePermission(session, "faculties.manage");
+  await requirePermission(session, "faculties.manage");
 
   const [row] = await db
     .insert(faculty)
@@ -69,7 +187,7 @@ export async function updateFaculty(
   }
 ) {
   const session = await getAdminSession();
-  requirePermission(session, "faculties.manage");
+  await requirePermission(session, "faculties.manage");
 
   await db
     .update(faculty)
@@ -89,17 +207,16 @@ export async function updateFaculty(
 
 export async function deleteFaculty(id: number) {
   const session = await getAdminSession();
-  requirePermission(session, "faculties.manage");
+  await requirePermission(session, "faculties.manage");
 
-  // Check if faculty has courses
-  const courseCount = await db
-    .select({ count: sql<string>`count(*)` })
+  const [courseCount] = await db
+    .select({ count: count() })
     .from(course)
     .where(eq(course.facultyId, id));
 
-  if (Number(courseCount[0]?.count || 0) > 0) {
+  if (courseCount.count > 0) {
     return {
-      error: `Cannot delete faculty — it has ${courseCount[0].count} course(s). Remove or reassign them first.`,
+      error: `Cannot delete — faculty has ${courseCount.count} course(s). Remove or reassign them first.`,
     };
   }
 
@@ -115,28 +232,7 @@ export async function deleteFaculty(id: number) {
   return { success: true };
 }
 
-export async function listPrograms(facultyId: number) {
-  const session = await getAdminSession();
-  requirePermission(session, "faculties.view");
-
-  const rows = await db
-    .select({
-      id: program.id,
-      name: program.name,
-      slug: program.slug,
-      facultyId: program.facultyId,
-      displayOrder: program.displayOrder,
-      createdAt: program.createdAt,
-    })
-    .from(program)
-    .where(eq(program.facultyId, facultyId))
-    .orderBy(asc(program.displayOrder), asc(program.name));
-
-  return rows.map((r) => ({
-    ...r,
-    createdAt: r.createdAt.toISOString(),
-  }));
-}
+// ── Program CRUD ──
 
 export async function createProgram(data: {
   name: string;
@@ -144,7 +240,7 @@ export async function createProgram(data: {
   facultyId: number;
 }) {
   const session = await getAdminSession();
-  requirePermission(session, "faculties.manage");
+  await requirePermission(session, "faculties.manage");
 
   const [row] = await db
     .insert(program)
@@ -171,7 +267,7 @@ export async function updateProgram(
   data: { name?: string; slug?: string }
 ) {
   const session = await getAdminSession();
-  requirePermission(session, "faculties.manage");
+  await requirePermission(session, "faculties.manage");
 
   await db
     .update(program)
@@ -191,7 +287,7 @@ export async function updateProgram(
 
 export async function deleteProgram(id: number) {
   const session = await getAdminSession();
-  requirePermission(session, "faculties.manage");
+  await requirePermission(session, "faculties.manage");
 
   await db.delete(program).where(eq(program.id, id));
 
@@ -200,34 +296,6 @@ export async function deleteProgram(id: number) {
     action: "delete_program",
     entityType: "program",
     entityId: String(id),
-  });
-
-  return { success: true };
-}
-
-export async function reorderFaculties(orderedIds: number[]) {
-  const session = await getAdminSession();
-  requirePermission(session, "faculties.manage");
-
-  if (orderedIds.length > 500) {
-    return { error: "Too many items to reorder." };
-  }
-
-  // Update displayOrder for all faculties in a single query
-  if (orderedIds.length > 0) {
-    const cases = orderedIds
-      .map((id, i) => sql`WHEN ${id} THEN ${i}`)
-      .reduce((acc, cur) => sql`${acc} ${cur}`);
-    await db.execute(
-      sql`UPDATE faculty SET display_order = CASE id ${cases} END, updated_at = NOW() WHERE id = ANY(${orderedIds})`
-    );
-  }
-
-  await logAdminAction({
-    adminUserId: session.user.id,
-    action: "reorder_faculties",
-    entityType: "faculty",
-    details: { orderedIds },
   });
 
   return { success: true };

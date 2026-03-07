@@ -62,7 +62,7 @@ export function DataTable<T extends object>({
             value={searchValue ?? ""}
             onChange={(e) => onSearch(e.target.value)}
             placeholder={searchPlaceholder}
-            className="max-w-sm rounded-xl border-gray-900/10 bg-white/50 backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
+            className="max-w-sm border-gray-900/10 bg-white/50 backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
           />
         </div>
       )}

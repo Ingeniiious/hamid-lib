@@ -29,7 +29,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: `${fac.name} | Libraryyy`,
       description: `Browse ${fac.name} courses`,
     },
-    robots: { index: false },
+    twitter: {
+      card: "summary",
+      title: `${fac.name} | Libraryyy`,
+      description: `Browse ${fac.name} courses`,
+    },
   };
 }
 

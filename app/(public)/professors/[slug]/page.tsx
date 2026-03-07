@@ -19,6 +19,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: `${prof.name} — ${prof.university} | Libraryyy`,
       description,
     },
+    twitter: {
+      card: "summary",
+      title: `${prof.name} — ${prof.university} | Libraryyy`,
+      description,
+    },
   };
 }
 

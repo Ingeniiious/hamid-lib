@@ -8,7 +8,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "My Contributions",
-  robots: { index: false },
+  description: "View and track the status of your submitted contributions.",
 };
 
 export default async function MyContributionsPage({

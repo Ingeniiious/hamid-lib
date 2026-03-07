@@ -72,10 +72,15 @@ interface UserContext {
   facultyName: string | null;
   programName: string | null;
   timezone: string;
+  language: string;
   eventsToday: number;
   eventsWeek: number;
   // For exam_done trigger: exams that ended today
   completedExams: { title: string; endTime: string }[];
+}
+
+interface TemplateTranslations {
+  [lang: string]: { title: string; body: string };
 }
 
 interface AutomationRow {
@@ -88,6 +93,20 @@ interface AutomationRow {
   templateTitle: string;
   templateBody: string;
   templateUrl: string | null;
+  templateTranslations: TemplateTranslations | null;
+}
+
+// ── i18n helper ──────────────────────────────────────────────
+
+function getLocalizedTemplate(
+  auto: AutomationRow,
+  lang: string
+): { title: string; body: string } {
+  if (lang !== "en" && auto.templateTranslations) {
+    const t = auto.templateTranslations[lang];
+    if (t?.title && t?.body) return { title: t.title, body: t.body };
+  }
+  return { title: auto.templateTitle, body: auto.templateBody };
 }
 
 // ── Variable resolution ──────────────────────────────────────
@@ -160,10 +179,11 @@ export async function processAutomations(triggerFilter?: string): Promise<{
       templateTitle: notificationTemplate.title,
       templateBody: notificationTemplate.body,
       templateUrl: notificationTemplate.url,
+      templateTranslations: notificationTemplate.translations,
     })
     .from(notificationAutomation)
     .innerJoin(notificationTemplate, eq(notificationAutomation.templateId, notificationTemplate.id))
-    .where(and(...conditions));
+    .where(and(...conditions)) as unknown as AutomationRow[];
 
   if (automations.length === 0) return { processed: 0, sent: 0, skipped: 0 };
 
@@ -206,8 +226,8 @@ export async function processAutomations(triggerFilter?: string): Promise<{
     .from(notificationAutomationLog)
     .where(
       and(
-        sql`${notificationAutomationLog.automationId} = ANY(${autoIds})`,
-        sql`${notificationAutomationLog.period} = ANY(${allPeriods})`
+        sql`${notificationAutomationLog.automationId} = ANY(${autoIds}::int[])`,
+        sql`${notificationAutomationLog.period} = ANY(${allPeriods}::text[])`
       )
     );
   const dedupSet = new Set(
@@ -242,10 +262,11 @@ export async function processAutomations(triggerFilter?: string): Promise<{
         continue;
       }
 
-      // Resolve variables and send
+      // Resolve variables and send (pick user's language)
       const ctx = usersMap.get(userId)!;
-      const title = resolveVars(auto.templateTitle, ctx);
-      const body = resolveVars(auto.templateBody, ctx);
+      const localized = getLocalizedTemplate(auto, ctx.language);
+      const title = resolveVars(localized.title, ctx);
+      const body = resolveVars(localized.body, ctx);
       const url = auto.templateUrl ? resolveVars(auto.templateUrl, ctx) : "/dashboard";
 
       const userSubs = (subsMap.get(userId) || []).filter((s) => s.p256dh && s.auth);
@@ -279,7 +300,7 @@ export async function processAutomations(triggerFilter?: string): Promise<{
   if (expiredSubIds.length > 0) {
     await db
       .delete(pushSubscription)
-      .where(sql`${pushSubscription.id} = ANY(${expiredSubIds})`);
+      .where(sql`${pushSubscription.id} = ANY(${expiredSubIds}::int[])`);
   }
 
   return { processed: automations.length, sent, skipped };
@@ -398,7 +419,7 @@ async function buildUserContextMap(
 
   // Fetch auth user data
   const authRows = (await db.execute(
-    sql`SELECT id::text, name, email, "createdAt" FROM neon_auth."user" WHERE id = ANY(${userIds})`
+    sql`SELECT id::text, name, email, "createdAt" FROM neon_auth."user" WHERE id = ANY(${userIds}::text[])`
   )) as any[];
 
   // Fetch profiles with faculty/program names + timezone
@@ -409,13 +430,14 @@ async function buildUserContextMap(
       birthday: userProfile.birthday,
       lastActiveAt: userProfile.lastActiveAt,
       timezone: userProfile.timezone,
+      language: userProfile.language,
       facultyName: faculty.name,
       programName: program.name,
     })
     .from(userProfile)
     .leftJoin(faculty, eq(userProfile.facultyId, faculty.id))
     .leftJoin(program, eq(userProfile.programId, program.id))
-    .where(sql`${userProfile.userId} = ANY(${userIds})`);
+    .where(sql`${userProfile.userId} = ANY(${userIds}::text[])`);
 
   const profileMap = new Map(profiles.map((p) => [p.userId, p]));
 
@@ -494,6 +516,7 @@ async function buildUserContextMap(
       facultyName: profile?.facultyName || null,
       programName: profile?.programName || null,
       timezone: profile?.timezone || DEFAULT_TZ,
+      language: profile?.language || "en",
       eventsToday: todayEventMap.get(row.id) || 0,
       eventsWeek: weekEventMap.get(row.id) || 0,
       completedExams: completedExamsMap.get(row.id) || [],

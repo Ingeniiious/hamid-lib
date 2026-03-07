@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import {
   pushSubscription,
   notificationCampaign,
+  notificationTemplate,
   userProfile,
   faculty,
   program,
@@ -20,6 +21,7 @@ interface FullUserContext {
   university: string | null;
   facultyName: string | null;
   programName: string | null;
+  language: string;
   eventsToday: number;
   eventsWeek: number;
 }
@@ -33,7 +35,7 @@ async function buildFullUserContext(
   const todayStr = new Date().toISOString().slice(0, 10);
 
   const authRows = (await db.execute(
-    sql`SELECT id::text, name, email, "createdAt" FROM neon_auth."user" WHERE id = ANY(${userIds})`
+    sql`SELECT id::text, name, email, "createdAt" FROM neon_auth."user" WHERE id = ANY(${userIds}::text[])`
   )) as any[];
 
   const profiles = await db
@@ -41,13 +43,14 @@ async function buildFullUserContext(
       userId: userProfile.userId,
       university: userProfile.university,
       birthday: userProfile.birthday,
+      language: userProfile.language,
       facultyName: faculty.name,
       programName: program.name,
     })
     .from(userProfile)
     .leftJoin(faculty, eq(userProfile.facultyId, faculty.id))
     .leftJoin(program, eq(userProfile.programId, program.id))
-    .where(sql`${userProfile.userId} = ANY(${userIds})`);
+    .where(sql`${userProfile.userId} = ANY(${userIds}::text[])`);
 
   const profileMap = new Map(profiles.map((p) => [p.userId, p]));
 
@@ -60,7 +63,7 @@ async function buildFullUserContext(
     .where(
       and(
         eq(calendarEvent.date, todayStr),
-        sql`${calendarEvent.userId} = ANY(${userIds})`
+        sql`${calendarEvent.userId} = ANY(${userIds}::text[])`
       )
     )
     .groupBy(calendarEvent.userId);
@@ -83,7 +86,7 @@ async function buildFullUserContext(
       and(
         gte(calendarEvent.date, weekStart.toISOString().slice(0, 10)),
         lte(calendarEvent.date, weekEnd.toISOString().slice(0, 10)),
-        sql`${calendarEvent.userId} = ANY(${userIds})`
+        sql`${calendarEvent.userId} = ANY(${userIds}::text[])`
       )
     )
     .groupBy(calendarEvent.userId);
@@ -99,6 +102,7 @@ async function buildFullUserContext(
       university: profile?.university || null,
       facultyName: profile?.facultyName || null,
       programName: profile?.programName || null,
+      language: profile?.language || "en",
       eventsToday: todayEventMap.get(row.id) || 0,
       eventsWeek: weekEventMap.get(row.id) || 0,
     };
@@ -163,7 +167,7 @@ async function getTargetSubscriptions(campaign: {
       return db
         .select()
         .from(pushSubscription)
-        .where(sql`${pushSubscription.userId} = ANY(${uids})`);
+        .where(sql`${pushSubscription.userId} = ANY(${uids}::text[])`);
     }
 
     case "faculty": {
@@ -179,7 +183,7 @@ async function getTargetSubscriptions(campaign: {
       return db
         .select()
         .from(pushSubscription)
-        .where(sql`${pushSubscription.userId} = ANY(${uids})`);
+        .where(sql`${pushSubscription.userId} = ANY(${uids}::text[])`);
     }
 
     case "program": {
@@ -195,7 +199,7 @@ async function getTargetSubscriptions(campaign: {
       return db
         .select()
         .from(pushSubscription)
-        .where(sql`${pushSubscription.userId} = ANY(${uids})`);
+        .where(sql`${pushSubscription.userId} = ANY(${uids}::text[])`);
     }
 
     case "all":
@@ -236,6 +240,18 @@ export async function executeCampaignInternal(campaignId: number) {
     const userIds = [...new Set(validSubs.map((s) => s.userId))];
     const userData = await buildFullUserContext(userIds);
 
+    // Load template translations if campaign was created from a template
+    let translations: Record<string, { title: string; body: string }> | null = null;
+    if (campaign.templateId) {
+      const [tmpl] = await db
+        .select({ translations: notificationTemplate.translations })
+        .from(notificationTemplate)
+        .where(eq(notificationTemplate.id, campaign.templateId));
+      if (tmpl?.translations) {
+        translations = tmpl.translations as Record<string, { title: string; body: string }>;
+      }
+    }
+
     let sent = 0;
     let failed = 0;
     const expired: number[] = [];
@@ -252,11 +268,22 @@ export async function executeCampaignInternal(campaignId: number) {
             university: null,
             facultyName: null,
             programName: null,
+            language: "en",
             eventsToday: 0,
             eventsWeek: 0,
           };
-          const title = resolveVariables(campaign.title, user);
-          const body = resolveVariables(campaign.body, user);
+          // Use translated title/body if available for user's language
+          let rawTitle = campaign.title;
+          let rawBody = campaign.body;
+          if (user.language !== "en" && translations?.[user.language]) {
+            const t = translations[user.language];
+            if (t.title && t.body) {
+              rawTitle = t.title;
+              rawBody = t.body;
+            }
+          }
+          const title = resolveVariables(rawTitle, user);
+          const body = resolveVariables(rawBody, user);
           const url = campaign.url
             ? resolveVariables(campaign.url, user)
             : "/dashboard";
@@ -291,7 +318,7 @@ export async function executeCampaignInternal(campaignId: number) {
     if (expired.length > 0) {
       await db
         .delete(pushSubscription)
-        .where(sql`${pushSubscription.id} = ANY(${expired})`);
+        .where(sql`${pushSubscription.id} = ANY(${expired}::int[])`);
     }
 
     await db

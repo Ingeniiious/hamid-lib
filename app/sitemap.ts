@@ -21,6 +21,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily",
       priority: 0.9,
     },
+    {
+      url: "https://libraryyy.com/privacy",
+      lastModified: new Date("2026-03-05"),
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
+      url: "https://libraryyy.com/terms",
+      lastModified: new Date("2026-03-05"),
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
     ...professors.map((p) => ({
       url: `https://libraryyy.com/professors/${p.slug}`,
       lastModified: p.updatedAt,

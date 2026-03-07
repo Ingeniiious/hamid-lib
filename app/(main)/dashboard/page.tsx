@@ -7,7 +7,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Dashboard",
-  robots: { index: false },
+  description: "Your personal study dashboard on Libraryyy.",
 };
 
 const R2_BASE = "https://lib.thevibecodedcompany.com";
@@ -32,7 +32,7 @@ export default async function DashboardPage() {
         }}
       >
         <DashboardNotificationPrompt />
-        <div className="mx-auto grid w-full max-w-[340px] grid-cols-1 gap-3 sm:max-w-4xl sm:grid-cols-3 sm:gap-6">
+        <div className="mx-auto grid w-full max-w-[340px] grid-cols-1 gap-3 sm:max-w-3xl sm:grid-cols-2 sm:gap-6">
           <DashboardCard
             title="My Studies"
             description="Track your progress"
@@ -47,14 +47,6 @@ export default async function DashboardPage() {
             image={`${R2_BASE}/images/courses.webp`}
             imageClassName="max-h-full w-full object-contain scale-110"
             index={1}
-          />
-          <DashboardCard
-            title="Contribute"
-            description="Share course materials"
-            href="/dashboard/contribute"
-            image={`${R2_BASE}/images/courses.webp`}
-            imageClassName="max-h-full w-full object-contain scale-110 opacity-70"
-            index={2}
           />
         </div>
       </div>

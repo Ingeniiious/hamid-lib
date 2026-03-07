@@ -16,7 +16,7 @@ export async function listPresentations({
   limit?: number;
 }) {
   const session = await getAdminSession();
-  requirePermission(session, "presentations.view");
+  await requirePermission(session, "presentations.view");
 
   const safeLimit = Math.min(Math.max(limit, 1), 100);
   const offset = (page - 1) * safeLimit;
@@ -95,7 +95,7 @@ export async function listPresentations({
 
 export async function deletePresentation(id: number) {
   const session = await getAdminSession();
-  requirePermission(session, "presentations.manage");
+  await requirePermission(session, "presentations.manage");
 
   // Get presentation info for audit log
   const [presentation] = await db

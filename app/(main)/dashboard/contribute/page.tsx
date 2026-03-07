@@ -9,7 +9,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Contribute",
-  robots: { index: false },
+  description: "Submit your course documents to help build the Libraryyy community.",
 };
 
 export default async function ContributePage() {

@@ -19,6 +19,11 @@ export const PERMISSIONS = {
   "presentations.manage": "Manage presentations",
   // Calendar
   "calendar.view": "View all calendar events",
+  "calendar.manage": "Manage calendar events",
+  // Notifications
+  "notifications.view": "View notifications",
+  "notifications.send": "Send notifications",
+  "notifications.manage": "Manage templates & automations",
   // Analytics
   "analytics.view": "View analytics",
   // Team
@@ -61,6 +66,7 @@ export const ROLE_PRESETS = {
       "presentations.view",
       "presentations.manage",
       "calendar.view",
+      "calendar.manage",
     ] as Permission[],
   },
   editor: {

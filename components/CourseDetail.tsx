@@ -24,7 +24,6 @@ export function CourseDetail({ course, isContributor }: CourseDetailProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.6, ease }}
-      className=""
     >
       <div className="mx-auto flex flex-wrap items-center justify-center gap-4 text-sm text-gray-900/50 dark:text-white/50">
         {course.professor && <span>{course.professor}</span>}
@@ -49,23 +48,30 @@ export function CourseDetail({ course, isContributor }: CourseDetailProps) {
                 {tab}
               </h3>
               <p className="mt-1 text-xs text-gray-900/40 dark:text-white/40">
-                Coming Soon
+                No Content Yet
               </p>
             </div>
           </motion.div>
         ))}
       </div>
 
-      {/* Contribute CTA */}
+      {/* Empty state — encourage contribution */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6, ease, delay: 0.6 }}
-        className="mt-8 text-center"
+        className="mx-auto mt-10 max-w-md text-center"
       >
+        <p className="text-sm text-gray-900/50 dark:text-white/50">
+          This course doesn&apos;t have any content yet.{" "}
+          <span className="text-gray-900/70 dark:text-white/70">
+            Be the first to contribute
+          </span>{" "}
+          and help future students who visit this page.
+        </p>
         <Link
           href={`/dashboard/contribute?courseId=${course.id}`}
-          className="inline-flex items-center gap-2 rounded-xl border border-gray-900/10 bg-white/50 px-5 py-2.5 text-sm font-medium text-gray-900/70 transition-colors hover:bg-gray-900/5 dark:border-white/10 dark:bg-white/5 dark:text-white/70 dark:hover:bg-white/10"
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-gray-900/10 bg-white/50 px-6 py-2.5 text-sm font-medium text-gray-900/70 transition-colors hover:bg-gray-900/5 dark:border-white/10 dark:bg-white/5 dark:text-white/70 dark:hover:bg-white/10"
         >
           {isContributor
             ? "Contribute To This Course"

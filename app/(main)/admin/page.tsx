@@ -8,6 +8,11 @@ import {
 } from "@/database/schema";
 import { sql, eq, desc } from "drizzle-orm";
 import { AdminOverviewClient } from "./AdminOverviewClient";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Overview",
+};
 
 export default async function AdminOverviewPage() {
   const session = await getAdminSession();

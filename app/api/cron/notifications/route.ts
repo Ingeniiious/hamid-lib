@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
     const profiles = await db
       .select({ userId: userProfile.userId, timezone: userProfile.timezone })
       .from(userProfile)
-      .where(sql`${userProfile.userId} = ANY(${eventUserIds})`);
+      .where(sql`${userProfile.userId} = ANY(${eventUserIds}::text[])`);
 
     for (const p of profiles) {
       userTzMap.set(p.userId, p.timezone || DEFAULT_TZ);
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
     const allSubs = await db
       .select()
       .from(pushSubscription)
-      .where(sql`${pushSubscription.userId} = ANY(${eventUserIds})`);
+      .where(sql`${pushSubscription.userId} = ANY(${eventUserIds}::text[])`);
     for (const sub of allSubs) {
       const list = subsMap.get(sub.userId) || [];
       list.push(sub);
@@ -282,7 +282,7 @@ export async function GET(request: NextRequest) {
       if (examUserIds.length > 0) {
         try {
           const userRows = (await db.execute(
-            sql`SELECT id::text, name FROM neon_auth."user" WHERE id::text = ANY(${examUserIds})`
+            sql`SELECT id::text, name FROM neon_auth."user" WHERE id::text = ANY(${examUserIds}::text[])`
           )) as any[];
           for (const row of userRows) {
             userNameMap.set(row.id, row.name || "there");

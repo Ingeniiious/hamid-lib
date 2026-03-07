@@ -21,9 +21,12 @@ const neonMiddleware = auth.middleware({
 });
 
 /**
- * Ensures session_token cookies have Max-Age so they persist across PWA restarts.
- * Neon Auth's upstream Better Auth sets session_token as a session cookie (no Max-Age),
- * which gets cleared when a standalone PWA is closed.
+ * Ensures session_token cookies persist across PWA restarts by forcing
+ * Max-Age=30days AND Expires. The upstream may set a shorter Max-Age or omit
+ * it entirely. We always override to 30 days.
+ *
+ * iOS standalone PWAs (WebKit) need BOTH Max-Age AND Expires for reliable
+ * cookie persistence.
  */
 function persistSessionCookies(response: NextResponse): NextResponse {
   const setCookieHeaders = response.headers.getSetCookie();
@@ -31,13 +34,15 @@ function persistSessionCookies(response: NextResponse): NextResponse {
 
   let modified = false;
   const newCookies: string[] = [];
+  const expires = new Date(Date.now() + SESSION_MAX_AGE * 1000).toUTCString();
 
   for (const header of setCookieHeaders) {
-    if (
-      header.includes(SESSION_COOKIE_MARKER) &&
-      !header.toLowerCase().includes("max-age")
-    ) {
-      newCookies.push(`${header}; Max-Age=${SESSION_MAX_AGE}`);
+    if (header.includes(SESSION_COOKIE_MARKER)) {
+      let cleaned = header
+        .replace(/;\s*Max-Age=[^;]*/gi, "")
+        .replace(/;\s*Expires=[^;]*/gi, "");
+      cleaned += `; Max-Age=${SESSION_MAX_AGE}; Expires=${expires}`;
+      newCookies.push(cleaned);
       modified = true;
     } else {
       newCookies.push(header);

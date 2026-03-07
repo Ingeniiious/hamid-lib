@@ -31,7 +31,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: `${c.title} | Libraryyy`,
       description: c.description || `${c.title} on Libraryyy`,
     },
-    robots: { index: false },
+    twitter: {
+      card: "summary",
+      title: `${c.title} | Libraryyy`,
+      description: c.description || `${c.title} on Libraryyy`,
+    },
   };
 }
 

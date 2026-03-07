@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "My Studies",
-  robots: { index: false },
+  description: "Track your study progress, exam scores, and course history.",
 };
 
 const R2_BASE = "https://lib.thevibecodedcompany.com";

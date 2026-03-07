@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { userProfile } from "@/database/schema";
+import { userProfile, contributorVerification } from "@/database/schema";
 import { sendOTP, verifyOTP, type OTPType } from "@/app/(main)/auth/actions";
 
 async function getSession() {
@@ -131,7 +131,7 @@ export async function getUserProfile() {
 }
 
 export async function updateUserProfile(
-  data: { university?: string; gender?: string; facultyId?: number | null; programId?: number | null }
+  data: { university?: string; gender?: string; facultyId?: number | null; programId?: number | null; language?: string }
 ) {
   const session = await getSession();
   const userId = session.user.id;
@@ -156,6 +156,32 @@ export async function updateUserProfile(
     return { success: true };
   } catch {
     return { error: "Failed to update profile." };
+  }
+}
+
+export async function getContributorInfo() {
+  const session = await getSession();
+  try {
+    const rows = await db
+      .select({
+        universityEmail: contributorVerification.universityEmail,
+        universityName: contributorVerification.universityName,
+        verifiedAt: contributorVerification.verifiedAt,
+      })
+      .from(contributorVerification)
+      .where(eq(contributorVerification.userId, session.user.id))
+      .limit(1);
+
+    if (!rows[0]) return { contributor: null };
+    return {
+      contributor: {
+        universityEmail: rows[0].universityEmail,
+        universityName: rows[0].universityName,
+        verifiedAt: rows[0].verifiedAt.toISOString(),
+      },
+    };
+  } catch {
+    return { contributor: null };
   }
 }
 

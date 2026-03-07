@@ -9,7 +9,7 @@ import { eq, and, gt, sql, asc } from "drizzle-orm";
 import { sendEmail } from "@/lib/email";
 import { getEmailTemplate } from "@/lib/email-templates";
 
-export type OTPType = "signup" | "password-reset" | "account-deletion" | "admin-login" | "contributor-verification";
+export type OTPType = "signup" | "password-reset" | "account-deletion" | "admin-login" | "admin-action" | "contributor-verification";
 
 export async function sendOTP(email: string, type: OTPType = "signup") {
   // Rate limit: 3 OTP requests per 5 minutes per email+type
@@ -40,9 +40,9 @@ export async function sendOTP(email: string, type: OTPType = "signup") {
     expiresAt,
   });
 
-  // Look up user name for personalized greeting (password resets)
+  // Look up user name for personalized greeting
   let recipientName: string | undefined;
-  if (type === "password-reset") {
+  if (type !== "signup") {
     try {
       const rows = await db.execute<{ name: string }>(
         sql`SELECT name FROM neon_auth."user" WHERE email = ${email} LIMIT 1`
@@ -58,6 +58,7 @@ export async function sendOTP(email: string, type: OTPType = "signup") {
     "password-reset": "password-reset-otp",
     "account-deletion": "account-deletion-otp",
     "admin-login": "admin-login-otp",
+    "admin-action": "admin-action-otp",
     "contributor-verification": "contributor-verification-otp",
   } as const;
   const templateType = templateMap[type];

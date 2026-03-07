@@ -1,11 +1,9 @@
 "use server";
 
-import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { getAdminSession, requirePermission } from "@/lib/admin/auth";
 import { db } from "@/lib/db";
 import {
   pushSubscription,
-  adminUser,
   notificationTemplate,
   notificationCampaign,
   notificationAutomation,
@@ -15,43 +13,38 @@ import {
 } from "@/database/schema";
 import { eq, sql, desc } from "drizzle-orm";
 
-async function requireAdmin() {
-  const { data: session } = await auth.getSession();
-  if (!session?.user) redirect("/auth");
-  const rows = await db
-    .select()
-    .from(adminUser)
-    .where(eq(adminUser.userId, session.user.id))
-    .limit(1);
-  if (!rows[0]) redirect("/dashboard");
-  return session;
-}
-
 // ── Stats ───────────────────────────────────────────────────
 
 export async function getNotificationStats() {
-  await requireAdmin();
-  const subs = await db
-    .select({ userId: pushSubscription.userId })
-    .from(pushSubscription);
-  const uniqueUsers = new Set(subs.map((s) => s.userId)).size;
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.view");
 
-  const automationCount = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(notificationAutomation)
-    .where(eq(notificationAutomation.enabled, true));
+  const [stats] = await db.execute<{
+    total_subscriptions: string;
+    unique_users: string;
+    active_automations: string;
+    total_templates: string;
+  }>(sql`
+    SELECT
+      (SELECT count(*) FROM push_subscription) as total_subscriptions,
+      (SELECT count(DISTINCT user_id) FROM push_subscription) as unique_users,
+      (SELECT count(*) FROM notification_automation WHERE enabled = true) as active_automations,
+      (SELECT count(*) FROM notification_template) as total_templates
+  `);
 
   return {
-    totalSubscriptions: subs.length,
-    uniqueUsers,
-    activeAutomations: automationCount[0]?.count || 0,
+    totalSubscriptions: parseInt(stats.total_subscriptions),
+    uniqueUsers: parseInt(stats.unique_users),
+    activeAutomations: parseInt(stats.active_automations),
+    totalTemplates: parseInt(stats.total_templates),
   };
 }
 
 // ── Templates CRUD ──────────────────────────────────────────
 
 export async function getTemplates() {
-  await requireAdmin();
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.view");
   return db
     .select()
     .from(notificationTemplate)
@@ -63,8 +56,10 @@ export async function createTemplate(data: {
   title: string;
   body: string;
   url?: string;
+  translations?: Record<string, { title: string; body: string }>;
 }) {
-  await requireAdmin();
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.manage");
   const [row] = await db
     .insert(notificationTemplate)
     .values({
@@ -72,6 +67,7 @@ export async function createTemplate(data: {
       title: data.title,
       body: data.body,
       url: data.url || null,
+      translations: data.translations || null,
     })
     .returning();
   return row;
@@ -79,9 +75,10 @@ export async function createTemplate(data: {
 
 export async function updateTemplate(
   id: number,
-  data: { name: string; title: string; body: string; url?: string }
+  data: { name: string; title: string; body: string; url?: string; translations?: Record<string, { title: string; body: string }> }
 ) {
-  await requireAdmin();
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.manage");
   await db
     .update(notificationTemplate)
     .set({
@@ -89,13 +86,15 @@ export async function updateTemplate(
       title: data.title,
       body: data.body,
       url: data.url || null,
+      translations: data.translations || null,
       updatedAt: new Date(),
     })
     .where(eq(notificationTemplate.id, id));
 }
 
 export async function deleteTemplate(id: number) {
-  await requireAdmin();
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.manage");
   await db
     .delete(notificationTemplate)
     .where(eq(notificationTemplate.id, id));
@@ -103,13 +102,57 @@ export async function deleteTemplate(id: number) {
 
 // ── Campaigns ───────────────────────────────────────────────
 
-export async function getCampaigns() {
-  await requireAdmin();
-  return db
-    .select()
-    .from(notificationCampaign)
-    .orderBy(desc(notificationCampaign.createdAt))
-    .limit(50);
+export async function listCampaigns({
+  page = 1,
+  limit = 25,
+}: {
+  page?: number;
+  limit?: number;
+} = {}) {
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.view");
+
+  const offset = (page - 1) * limit;
+
+  const rows = await db.execute<{
+    id: number;
+    title: string;
+    body: string;
+    target: string;
+    targetUserId: string | null;
+    scheduledAt: string | null;
+    sentAt: string | null;
+    status: string;
+    statsSent: number;
+    statsFailed: number;
+    createdAt: string;
+    totalCount: string;
+  }>(sql`
+    SELECT
+      id,
+      title,
+      body,
+      target,
+      target_user_id as "targetUserId",
+      scheduled_at as "scheduledAt",
+      sent_at as "sentAt",
+      status,
+      stats_sent as "statsSent",
+      stats_failed as "statsFailed",
+      created_at as "createdAt",
+      count(*) OVER() as "totalCount"
+    FROM notification_campaign
+    ORDER BY created_at DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `);
+
+  const total = Number(rows[0]?.totalCount ?? 0);
+
+  return {
+    campaigns: rows.map(({ totalCount: _, ...r }) => r),
+    total,
+    totalPages: Math.ceil(total / limit),
+  };
 }
 
 export async function createCampaign(data: {
@@ -117,11 +160,12 @@ export async function createCampaign(data: {
   title: string;
   body: string;
   url?: string;
-  target: string; // "all" | "user" | "university" | "faculty" | "program"
-  targetUserId?: string; // userId, university name, facultyId, or programId
+  target: string;
+  targetUserId?: string;
   scheduledAt?: string;
 }) {
-  await requireAdmin();
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.send");
 
   const scheduledAt = data.scheduledAt ? new Date(data.scheduledAt) : null;
   const status = scheduledAt ? "scheduled" : "draft";
@@ -152,14 +196,16 @@ export async function createCampaign(data: {
 import { executeCampaignInternal } from "@/lib/campaign-scheduler";
 
 export async function executeCampaign(campaignId: number) {
-  await requireAdmin();
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.send");
   return executeCampaignInternal(campaignId);
 }
 
 // ── Automations CRUD ────────────────────────────────────────
 
 export async function getAutomations() {
-  await requireAdmin();
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.view");
   return db
     .select({
       id: notificationAutomation.id,
@@ -170,6 +216,8 @@ export async function getAutomations() {
       enabled: notificationAutomation.enabled,
       createdAt: notificationAutomation.createdAt,
       templateName: notificationTemplate.name,
+      templateTitle: notificationTemplate.title,
+      templateBody: notificationTemplate.body,
     })
     .from(notificationAutomation)
     .innerJoin(
@@ -186,7 +234,8 @@ export async function createAutomation(data: {
   templateId: number;
   enabled?: boolean;
 }) {
-  await requireAdmin();
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.manage");
   const [row] = await db
     .insert(notificationAutomation)
     .values({
@@ -210,7 +259,8 @@ export async function updateAutomation(
     enabled?: boolean;
   }
 ) {
-  await requireAdmin();
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.manage");
   await db
     .update(notificationAutomation)
     .set({
@@ -224,15 +274,16 @@ export async function updateAutomation(
 }
 
 export async function deleteAutomation(id: number) {
-  await requireAdmin();
-  // Logs are cascade-deleted by the DB foreign key constraint
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.manage");
   await db
     .delete(notificationAutomation)
     .where(eq(notificationAutomation.id, id));
 }
 
 export async function toggleAutomation(id: number, enabled: boolean) {
-  await requireAdmin();
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.manage");
   await db
     .update(notificationAutomation)
     .set({ enabled })
@@ -242,7 +293,8 @@ export async function toggleAutomation(id: number, enabled: boolean) {
 // ── Audience data for segmentation ──────────────────────────
 
 export async function getUniversities() {
-  await requireAdmin();
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.view");
   const rows = await db
     .select({ university: userProfile.university })
     .from(userProfile)
@@ -252,12 +304,14 @@ export async function getUniversities() {
 }
 
 export async function getFaculties() {
-  await requireAdmin();
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.view");
   return db.select({ id: faculty.id, name: faculty.name }).from(faculty).orderBy(faculty.name);
 }
 
 export async function getPrograms(facultyId: number) {
-  await requireAdmin();
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.view");
   return db
     .select({ id: program.id, name: program.name })
     .from(program)
@@ -268,16 +322,21 @@ export async function getPrograms(facultyId: number) {
 // ── Search users for targeting ──────────────────────────────
 
 export async function searchUsers(query: string) {
-  await requireAdmin();
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.send");
   if (!query || query.length < 2) return [];
 
-  const rows = await db.execute(
+  const rows = await db.execute<{
+    id: string;
+    name: string;
+    email: string;
+  }>(
     sql`SELECT id::text, name, email FROM neon_auth."user"
         WHERE name ILIKE ${`%${query}%`} OR email ILIKE ${`%${query}%`}
         LIMIT 10`
   );
 
-  return (rows as any[]).map((r) => ({
+  return rows.map((r) => ({
     id: r.id,
     name: r.name,
     email: r.email,

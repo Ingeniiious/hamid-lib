@@ -67,7 +67,7 @@ export async function searchProfessors(query: string, page = 1, limit = 20) {
              COUNT(*)::text as review_count,
              ROUND(100.0 * SUM(CASE WHEN would_take_again THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0))::text as would_take_again_pct
            FROM professor_review
-           WHERE status = 'approved' AND professor_id = ANY(${profIds})
+           WHERE status = 'approved' AND professor_id = ANY(${profIds}::int[])
            GROUP BY professor_id`
     );
     for (const r of ratings) {

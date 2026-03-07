@@ -31,7 +31,7 @@ function slugify(text: string): string {
 export async function listContributions({
   status,
   page = 1,
-  limit = 20,
+  limit = 25,
 }: {
   status?: string;
   page?: number;
@@ -42,14 +42,7 @@ export async function listContributions({
 
   const offset = (page - 1) * limit;
 
-  const conditions = status
-    ? and(eq(contribution.status, status))
-    : undefined;
-
-  const [countResult] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(contribution)
-    .where(conditions);
+  const conditions = status ? eq(contribution.status, status) : undefined;
 
   const rows = await db
     .select({
@@ -59,12 +52,13 @@ export async function listContributions({
       status: contribution.status,
       fileName: contribution.fileName,
       fileUrl: contribution.fileUrl,
-      textContent: contribution.textContent,
+      textContent: sql<string | null>`LEFT(${contribution.textContent}, 300)`.as("text_content"),
       reportCount: contribution.reportCount,
       reviewNote: contribution.reviewNote,
       createdAt: contribution.createdAt,
       userId: contribution.userId,
       courseTitle: course.title,
+      totalCount: sql<number>`count(*) OVER()`,
     })
     .from(contribution)
     .leftJoin(course, eq(contribution.courseId, course.id))
@@ -72,6 +66,8 @@ export async function listContributions({
     .orderBy(desc(contribution.createdAt))
     .limit(limit)
     .offset(offset);
+
+  const total = rows[0]?.totalCount ?? 0;
 
   // Get contributor names
   const userIds = [...new Set(rows.map((r) => r.userId))];
@@ -84,12 +80,12 @@ export async function listContributions({
   }
 
   return {
-    contributions: rows.map((r) => ({
+    contributions: rows.map(({ totalCount: _, ...r }) => ({
       ...r,
       contributorName: userNames[r.userId] || "Unknown",
     })),
-    total: countResult.count,
-    totalPages: Math.ceil(countResult.count / limit),
+    total,
+    totalPages: Math.ceil(total / limit),
   };
 }
 
@@ -150,7 +146,7 @@ export async function reviewContribution(
 export async function listContentRequests({
   status,
   page = 1,
-  limit = 20,
+  limit = 25,
 }: {
   status?: string;
   page?: number;
@@ -161,11 +157,6 @@ export async function listContentRequests({
 
   const offset = (page - 1) * limit;
   const conditions = status ? eq(contentRequest.status, status) : undefined;
-
-  const [countResult] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(contentRequest)
-    .where(conditions);
 
   const rows = await db
     .select({
@@ -181,12 +172,15 @@ export async function listContentRequests({
       createdAt: contentRequest.createdAt,
       userId: contentRequest.userId,
       existingFacultyId: contentRequest.existingFacultyId,
+      totalCount: sql<number>`count(*) OVER()`,
     })
     .from(contentRequest)
     .where(conditions)
     .orderBy(desc(contentRequest.createdAt))
     .limit(limit)
     .offset(offset);
+
+  const total = rows[0]?.totalCount ?? 0;
 
   // Get requester names
   const userIds = [...new Set(rows.map((r) => r.userId))];
@@ -199,12 +193,12 @@ export async function listContentRequests({
   }
 
   return {
-    requests: rows.map((r) => ({
+    requests: rows.map(({ totalCount: _, ...r }) => ({
       ...r,
       requesterName: userNames[r.userId] || "Unknown",
     })),
-    total: countResult.count,
-    totalPages: Math.ceil(countResult.count / limit),
+    total,
+    totalPages: Math.ceil(total / limit),
   };
 }
 
@@ -279,7 +273,7 @@ export async function reviewContentRequest(
 
 export async function listUniversityDomains({
   page = 1,
-  limit = 50,
+  limit = 25,
   search,
 }: {
   page?: number;
@@ -295,23 +289,27 @@ export async function listUniversityDomains({
     ? sql`${universityDomain.domain} ILIKE ${"%" + search + "%"} OR ${universityDomain.universityName} ILIKE ${"%" + search + "%"}`
     : undefined;
 
-  const [countResult] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(universityDomain)
-    .where(conditions);
-
   const rows = await db
-    .select()
+    .select({
+      id: universityDomain.id,
+      universityName: universityDomain.universityName,
+      domain: universityDomain.domain,
+      country: universityDomain.country,
+      createdAt: universityDomain.createdAt,
+      totalCount: sql<number>`count(*) OVER()`,
+    })
     .from(universityDomain)
     .where(conditions)
     .orderBy(asc(universityDomain.universityName))
     .limit(limit)
     .offset(offset);
 
+  const total = rows[0]?.totalCount ?? 0;
+
   return {
-    domains: rows,
-    total: countResult.count,
-    totalPages: Math.ceil(countResult.count / limit),
+    domains: rows.map(({ totalCount: _, ...r }) => r),
+    total,
+    totalPages: Math.ceil(total / limit),
   };
 }
 
@@ -412,58 +410,50 @@ export async function lookupDomainRDAP(domain: string) {
 }
 
 // ==================
-// Overview / Counts
+// Overview / Counts (single query)
 // ==================
 
 export async function getContributionOverview() {
   const session = await getAdminSession();
   await requirePermission(session, "contributions.view");
 
-  const [contribCounts] = await db.execute<{
-    pending: string;
-    under_review: string;
-    total: string;
+  const [stats] = await db.execute<{
+    contrib_pending: string;
+    contrib_under_review: string;
+    contrib_total: string;
+    requests_pending: string;
+    requests_total: string;
+    reports_pending: string;
+    reports_total: string;
+    domains_total: string;
   }>(sql`
     SELECT
-      count(*) FILTER (WHERE status = 'pending') as pending,
-      count(*) FILTER (WHERE status = 'under_review') as under_review,
-      count(*) as total
-    FROM contribution
-  `);
-
-  const [requestCounts] = await db.execute<{
-    pending: string;
-    total: string;
-  }>(sql`
-    SELECT
-      count(*) FILTER (WHERE status = 'pending') as pending,
-      count(*) as total
-    FROM content_request
-  `);
-
-  const [reportCounts] = await db.execute<{
-    pending: string;
-    total: string;
-  }>(sql`
-    SELECT
-      count(*) FILTER (WHERE status = 'pending') as pending,
-      count(*) as total
-    FROM content_report
+      (SELECT count(*) FILTER (WHERE status = 'pending') FROM contribution) as contrib_pending,
+      (SELECT count(*) FILTER (WHERE status = 'under_review') FROM contribution) as contrib_under_review,
+      (SELECT count(*) FROM contribution) as contrib_total,
+      (SELECT count(*) FILTER (WHERE status = 'pending') FROM content_request) as requests_pending,
+      (SELECT count(*) FROM content_request) as requests_total,
+      (SELECT count(*) FILTER (WHERE status = 'pending') FROM content_report) as reports_pending,
+      (SELECT count(*) FROM content_report) as reports_total,
+      (SELECT count(*) FROM university_domain) as domains_total
   `);
 
   return {
     contributions: {
-      pending: parseInt(contribCounts?.pending || "0"),
-      underReview: parseInt(contribCounts?.under_review || "0"),
-      total: parseInt(contribCounts?.total || "0"),
+      pending: parseInt(stats.contrib_pending),
+      underReview: parseInt(stats.contrib_under_review),
+      total: parseInt(stats.contrib_total),
     },
     requests: {
-      pending: parseInt(requestCounts?.pending || "0"),
-      total: parseInt(requestCounts?.total || "0"),
+      pending: parseInt(stats.requests_pending),
+      total: parseInt(stats.requests_total),
     },
     reports: {
-      pending: parseInt(reportCounts?.pending || "0"),
-      total: parseInt(reportCounts?.total || "0"),
+      pending: parseInt(stats.reports_pending),
+      total: parseInt(stats.reports_total),
+    },
+    domains: {
+      total: parseInt(stats.domains_total),
     },
   };
 }
@@ -476,7 +466,7 @@ export async function listReports({
   contributionId,
   status,
   page = 1,
-  limit = 20,
+  limit = 25,
 }: {
   contributionId?: number;
   status?: string;
@@ -493,11 +483,6 @@ export async function listReports({
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [countResult] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(contentReport)
-    .where(where);
-
   const rows = await db
     .select({
       id: contentReport.id,
@@ -511,6 +496,7 @@ export async function listReports({
       createdAt: contentReport.createdAt,
       reporterId: contentReport.reporterId,
       contributionTitle: contribution.title,
+      totalCount: sql<number>`count(*) OVER()`,
     })
     .from(contentReport)
     .leftJoin(contribution, eq(contentReport.contributionId, contribution.id))
@@ -519,10 +505,12 @@ export async function listReports({
     .limit(limit)
     .offset(offset);
 
+  const total = rows[0]?.totalCount ?? 0;
+
   return {
-    reports: rows,
-    total: countResult.count,
-    totalPages: Math.ceil(countResult.count / limit),
+    reports: rows.map(({ totalCount: _, ...r }) => r),
+    total,
+    totalPages: Math.ceil(total / limit),
   };
 }
 

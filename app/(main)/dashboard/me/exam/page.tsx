@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Exam Results",
-  robots: { index: false },
+  description: "View your exam scores and practice history.",
 };
 
 export default function ExamResultsPage() {

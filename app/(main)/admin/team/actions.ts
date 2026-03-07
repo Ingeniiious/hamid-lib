@@ -8,9 +8,18 @@ import { getAdminSession, requirePermission } from "@/lib/admin/auth";
 import { logAdminAction } from "@/lib/admin/audit";
 import { sendEmail } from "@/lib/email";
 
+export async function getTeamContext() {
+  const session = await getAdminSession();
+  await requirePermission(session, "team.view");
+  return {
+    currentUserId: session.user.id,
+    currentRoleSlug: session.admin.roleSlug,
+  };
+}
+
 export async function getAdminTeam() {
   const session = await getAdminSession();
-  requirePermission(session, "team.view");
+  await requirePermission(session, "team.view");
 
   const rows = await db
     .select({
@@ -30,7 +39,7 @@ export async function getAdminTeam() {
   if (userIds.length === 0) return [];
 
   const users = await db.execute<{ id: string; name: string; email: string; image: string | null }>(
-    sql`SELECT id, name, email, image FROM neon_auth."user" WHERE id = ANY(${userIds})`
+    sql`SELECT id::text, name, email, image FROM neon_auth."user" WHERE id::text IN (${sql.join(userIds.map(id => sql`${id}`), sql`, `)})`
   );
 
   const userMap = new Map(users.map((u) => [u.id, u]));
@@ -49,7 +58,18 @@ export async function getAdminTeam() {
 
 export async function inviteAdmin(email: string, roleId: number) {
   const session = await getAdminSession();
-  requirePermission(session, "team.manage");
+  await requirePermission(session, "team.manage");
+
+  // Only super-admins can invite as super-admin
+  const targetRole = await db
+    .select({ slug: adminRole.slug })
+    .from(adminRole)
+    .where(eq(adminRole.id, roleId))
+    .limit(1);
+
+  if (targetRole[0]?.slug === "super-admin" && session.admin.roleSlug !== "super-admin") {
+    return { error: "Only super admins can invite as super admin." };
+  }
 
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -83,27 +103,36 @@ export async function inviteAdmin(email: string, roleId: number) {
 
 export async function removeAdmin(userId: string) {
   const session = await getAdminSession();
-  requirePermission(session, "team.manage");
+  await requirePermission(session, "team.manage");
 
   if (userId === session.user.id) {
     return { error: "Cannot remove yourself." };
   }
 
-  // Prevent removing last super-admin
-  const superAdminRole = await db
-    .select({ id: adminRole.id })
-    .from(adminRole)
-    .where(eq(adminRole.slug, "super-admin"))
+  // Get target's role
+  const targetAdmin = await db
+    .select({ roleId: adminUser.roleId, roleSlug: adminRole.slug })
+    .from(adminUser)
+    .innerJoin(adminRole, eq(adminUser.roleId, adminRole.id))
+    .where(eq(adminUser.userId, userId))
     .limit(1);
 
-  if (superAdminRole[0]) {
-    const targetAdmin = await db
-      .select({ roleId: adminUser.roleId })
-      .from(adminUser)
-      .where(eq(adminUser.userId, userId))
+  if (!targetAdmin[0]) return { error: "User not found." };
+
+  // Only super-admins can remove other super-admins
+  if (targetAdmin[0].roleSlug === "super-admin" && session.admin.roleSlug !== "super-admin") {
+    return { error: "Only super admins can remove other super admins." };
+  }
+
+  // Prevent removing last super-admin
+  if (targetAdmin[0].roleSlug === "super-admin") {
+    const superAdminRole = await db
+      .select({ id: adminRole.id })
+      .from(adminRole)
+      .where(eq(adminRole.slug, "super-admin"))
       .limit(1);
 
-    if (targetAdmin[0]?.roleId === superAdminRole[0].id) {
+    if (superAdminRole[0]) {
       const superAdminCount = await db
         .select({ count: sql<string>`count(*)` })
         .from(adminUser)
@@ -129,7 +158,58 @@ export async function removeAdmin(userId: string) {
 
 export async function changeAdminRole(userId: string, roleId: number) {
   const session = await getAdminSession();
-  requirePermission(session, "team.manage");
+  await requirePermission(session, "team.manage");
+
+  // Cannot change your own role
+  if (userId === session.user.id) {
+    return { error: "Cannot change your own role." };
+  }
+
+  // Get the target user's current role
+  const targetAdmin = await db
+    .select({ roleId: adminUser.roleId, roleSlug: adminRole.slug })
+    .from(adminUser)
+    .innerJoin(adminRole, eq(adminUser.roleId, adminRole.id))
+    .where(eq(adminUser.userId, userId))
+    .limit(1);
+
+  if (!targetAdmin[0]) return { error: "User not found." };
+
+  // Only super-admins can modify other super-admins
+  if (targetAdmin[0].roleSlug === "super-admin" && session.admin.roleSlug !== "super-admin") {
+    return { error: "Only super admins can modify other super admins." };
+  }
+
+  // Only super-admins can promote someone to super-admin
+  const newRole = await db
+    .select({ slug: adminRole.slug })
+    .from(adminRole)
+    .where(eq(adminRole.id, roleId))
+    .limit(1);
+
+  if (newRole[0]?.slug === "super-admin" && session.admin.roleSlug !== "super-admin") {
+    return { error: "Only super admins can promote to super admin." };
+  }
+
+  // Prevent demoting the last super-admin
+  if (targetAdmin[0].roleSlug === "super-admin" && newRole[0]?.slug !== "super-admin") {
+    const superAdminRole = await db
+      .select({ id: adminRole.id })
+      .from(adminRole)
+      .where(eq(adminRole.slug, "super-admin"))
+      .limit(1);
+
+    if (superAdminRole[0]) {
+      const superAdminCount = await db
+        .select({ count: sql<string>`count(*)` })
+        .from(adminUser)
+        .where(eq(adminUser.roleId, superAdminRole[0].id));
+
+      if (Number(superAdminCount[0]?.count || 0) <= 1) {
+        return { error: "Cannot demote the last super admin." };
+      }
+    }
+  }
 
   await db
     .update(adminUser)

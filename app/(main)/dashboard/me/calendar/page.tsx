@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Calendar",
-  robots: { index: false },
+  description: "Your study calendar and upcoming events.",
 };
 
 export default function CalendarPage() {

@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Subscription",
-  robots: { index: false },
+  description: "Manage your Libraryyy subscription plan and billing.",
 };
 
 export default function SubscriptionPage() {

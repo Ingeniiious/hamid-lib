@@ -8,14 +8,14 @@ import {
 } from "@/database/schema";
 import { getAdminSession, requirePermission } from "@/lib/admin/auth";
 import { logAdminAction } from "@/lib/admin/audit";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 
 // ── Professor Reviews ──
 
 export async function listProfessorReviews({
   status,
   page = 1,
-  limit = 20,
+  limit = 25,
 }: {
   status?: string;
   page?: number;
@@ -26,11 +26,6 @@ export async function listProfessorReviews({
 
   const offset = (page - 1) * limit;
   const conditions = status ? eq(professorReview.status, status) : undefined;
-
-  const [countResult] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(professorReview)
-    .where(conditions);
 
   const rows = await db
     .select({
@@ -46,6 +41,7 @@ export async function listProfessorReviews({
       userId: professorReview.userId,
       professorName: professor.name,
       professorUniversity: professor.university,
+      totalCount: sql<number>`count(*) OVER()`,
     })
     .from(professorReview)
     .innerJoin(professor, eq(professorReview.professorId, professor.id))
@@ -53,6 +49,8 @@ export async function listProfessorReviews({
     .orderBy(desc(professorReview.createdAt))
     .limit(limit)
     .offset(offset);
+
+  const total = rows[0]?.totalCount ?? 0;
 
   // Get reviewer names
   const userIds = [...new Set(rows.map((r) => r.userId))];
@@ -65,12 +63,12 @@ export async function listProfessorReviews({
   }
 
   return {
-    reviews: rows.map((r) => ({
+    reviews: rows.map(({ totalCount: _, ...r }) => ({
       ...r,
       reviewerName: userNames[r.userId] || "Unknown",
     })),
-    total: countResult.count,
-    totalPages: Math.ceil(countResult.count / limit),
+    total,
+    totalPages: Math.ceil(total / limit),
   };
 }
 
@@ -107,7 +105,7 @@ export async function moderateReview(
 export async function listEnrollmentVerifications({
   status,
   page = 1,
-  limit = 20,
+  limit = 25,
 }: {
   status?: string;
   page?: number;
@@ -118,11 +116,6 @@ export async function listEnrollmentVerifications({
 
   const offset = (page - 1) * limit;
   const conditions = status ? eq(enrollmentVerification.status, status) : undefined;
-
-  const [countResult] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(enrollmentVerification)
-    .where(conditions);
 
   const rows = await db
     .select({
@@ -137,6 +130,7 @@ export async function listEnrollmentVerifications({
       createdAt: enrollmentVerification.createdAt,
       professorName: professor.name,
       professorUniversity: professor.university,
+      totalCount: sql<number>`count(*) OVER()`,
     })
     .from(enrollmentVerification)
     .innerJoin(professor, eq(enrollmentVerification.professorId, professor.id))
@@ -144,6 +138,8 @@ export async function listEnrollmentVerifications({
     .orderBy(desc(enrollmentVerification.createdAt))
     .limit(limit)
     .offset(offset);
+
+  const total = rows[0]?.totalCount ?? 0;
 
   // Get user names
   const userIds = [...new Set(rows.map((r) => r.userId))];
@@ -156,12 +152,12 @@ export async function listEnrollmentVerifications({
   }
 
   return {
-    verifications: rows.map((r) => ({
+    verifications: rows.map(({ totalCount: _, ...r }) => ({
       ...r,
       studentName: userNames[r.userId] || "Unknown",
     })),
-    total: countResult.count,
-    totalPages: Math.ceil(countResult.count / limit),
+    total,
+    totalPages: Math.ceil(total / limit),
   };
 }
 
@@ -194,52 +190,45 @@ export async function moderateEnrollment(
   return { success: true };
 }
 
-// ── Overview ──
+// ── Overview (single query) ──
 
 export async function getReviewsOverview() {
   const session = await getAdminSession();
   await requirePermission(session, "contributions.view");
 
-  const [reviewCounts] = await db.execute<{
-    pending: string;
-    approved: string;
-    rejected: string;
-    total: string;
+  const [stats] = await db.execute<{
+    rev_pending: string;
+    rev_approved: string;
+    rev_rejected: string;
+    rev_total: string;
+    enr_pending: string;
+    enr_approved: string;
+    enr_rejected: string;
+    enr_total: string;
   }>(sql`
     SELECT
-      count(*) FILTER (WHERE status = 'pending') as pending,
-      count(*) FILTER (WHERE status = 'approved') as approved,
-      count(*) FILTER (WHERE status = 'rejected') as rejected,
-      count(*) as total
-    FROM professor_review
-  `);
-
-  const [enrollmentCounts] = await db.execute<{
-    pending: string;
-    approved: string;
-    rejected: string;
-    total: string;
-  }>(sql`
-    SELECT
-      count(*) FILTER (WHERE status = 'pending') as pending,
-      count(*) FILTER (WHERE status = 'approved') as approved,
-      count(*) FILTER (WHERE status = 'rejected') as rejected,
-      count(*) as total
-    FROM enrollment_verification
+      (SELECT count(*) FILTER (WHERE status = 'pending') FROM professor_review) as rev_pending,
+      (SELECT count(*) FILTER (WHERE status = 'approved') FROM professor_review) as rev_approved,
+      (SELECT count(*) FILTER (WHERE status = 'rejected') FROM professor_review) as rev_rejected,
+      (SELECT count(*) FROM professor_review) as rev_total,
+      (SELECT count(*) FILTER (WHERE status = 'pending') FROM enrollment_verification) as enr_pending,
+      (SELECT count(*) FILTER (WHERE status = 'approved') FROM enrollment_verification) as enr_approved,
+      (SELECT count(*) FILTER (WHERE status = 'rejected') FROM enrollment_verification) as enr_rejected,
+      (SELECT count(*) FROM enrollment_verification) as enr_total
   `);
 
   return {
     reviews: {
-      pending: parseInt(reviewCounts?.pending || "0"),
-      approved: parseInt(reviewCounts?.approved || "0"),
-      rejected: parseInt(reviewCounts?.rejected || "0"),
-      total: parseInt(reviewCounts?.total || "0"),
+      pending: parseInt(stats?.rev_pending || "0"),
+      approved: parseInt(stats?.rev_approved || "0"),
+      rejected: parseInt(stats?.rev_rejected || "0"),
+      total: parseInt(stats?.rev_total || "0"),
     },
     enrollments: {
-      pending: parseInt(enrollmentCounts?.pending || "0"),
-      approved: parseInt(enrollmentCounts?.approved || "0"),
-      rejected: parseInt(enrollmentCounts?.rejected || "0"),
-      total: parseInt(enrollmentCounts?.total || "0"),
+      pending: parseInt(stats?.enr_pending || "0"),
+      approved: parseInt(stats?.enr_approved || "0"),
+      rejected: parseInt(stats?.enr_rejected || "0"),
+      total: parseInt(stats?.enr_total || "0"),
     },
   };
 }

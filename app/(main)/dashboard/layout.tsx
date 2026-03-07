@@ -6,6 +6,11 @@ import { userProfile } from "@/database/schema";
 import { getAvatarUrl } from "@/lib/avatar";
 import { DashboardTopBar } from "@/components/DashboardTopBar";
 import { DashboardShell } from "@/components/DashboardShell";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export const dynamic = "force-dynamic";
 

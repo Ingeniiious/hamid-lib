@@ -5,6 +5,15 @@ import { db } from "@/lib/db";
 import { adminUser, adminRole, userProfile } from "@/database/schema";
 import { getAvatarUrl } from "@/lib/avatar";
 import { AdminLayoutClient } from "./AdminLayoutClient";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: {
+    default: "Admin",
+    template: "%s — Admin | Libraryyy",
+  },
+  robots: { index: false, follow: false },
+};
 
 export const dynamic = "force-dynamic";
 

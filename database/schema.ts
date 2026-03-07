@@ -15,7 +15,10 @@ export const faculty = pgTable("faculty", {
   displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => [
+  index("faculty_name_idx").on(table.name),
+  index("faculty_university_idx").on(table.university),
+]);
 
 export const program = pgTable("program", {
   id: serial("id").primaryKey(),
@@ -27,7 +30,9 @@ export const program = pgTable("program", {
   displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => [
+  index("program_faculty_id_idx").on(table.facultyId),
+]);
 
 export const course = pgTable("course", {
   id: text("id").primaryKey(),
@@ -67,6 +72,7 @@ export const userProfile = pgTable("user_profile", {
   timezone: text("timezone"),             // IANA timezone e.g. "Europe/Istanbul", "America/New_York"
   avatarUrl: text("avatar_url"),
   avatarKey: text("avatar_key"),
+  language: text("language").notNull().default("en"), // "en" | "fa" | "tr"
   contributorVerifiedAt: timestamp("contributor_verified_at"),
   lastActiveAt: timestamp("last_active_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -170,6 +176,7 @@ export const notificationTemplate = pgTable("notification_template", {
   title: text("title").notNull(),    // supports {{name}}, {{days}}, etc.
   body: text("body").notNull(),       // supports {{name}}, {{days}}, etc.
   url: text("url"),                   // click target, supports variables too
+  translations: jsonb("translations"),  // { fa: { title, body }, tr: { title, body } }
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -371,6 +378,7 @@ export const enrollmentVerification = pgTable("enrollment_verification", {
   index("enrollment_verif_user_id_idx").on(table.userId),
   index("enrollment_verif_professor_id_idx").on(table.professorId),
   index("enrollment_verif_status_idx").on(table.status),
+  index("enrollment_verif_created_at_idx").on(table.createdAt),
   unique("enrollment_verif_user_professor").on(table.userId, table.professorId),
 ]);
 
@@ -404,7 +412,9 @@ export const universityDomain = pgTable("university_domain", {
   domain: text("domain").notNull().unique(),
   country: text("country"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => [
+  index("university_domain_name_idx").on(table.universityName),
+]);
 
 export const contributorVerification = pgTable("contributor_verification", {
   userId: text("user_id").primaryKey(),
@@ -464,6 +474,7 @@ export const contentRequest = pgTable("content_request", {
 }, (table) => [
   index("content_request_user_id_idx").on(table.userId),
   index("content_request_status_idx").on(table.status),
+  index("content_request_created_at_idx").on(table.createdAt),
 ]);
 
 export const contributorStats = pgTable("contributor_stats", {

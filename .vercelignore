@@ -9,4 +9,5 @@ database/seed*.ts
 
 # Landing page sandbox (WIP)
 app/landing-clone/
+app/landing-react/
 public/clones/

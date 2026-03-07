@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Presentations",
-  robots: { index: false },
+  description: "Browse and access your course presentations.",
 };
 
 export default function PresentationsPage() {

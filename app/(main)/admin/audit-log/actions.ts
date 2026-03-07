@@ -23,7 +23,7 @@ export async function getAuditLogs({
   limit?: number;
 }) {
   const session = await getAdminSession();
-  requirePermission(session, "audit.view");
+  await requirePermission(session, "audit.view");
 
   const conditions = [];
   if (adminUserId) conditions.push(eq(auditLog.adminUserId, adminUserId));
@@ -65,7 +65,7 @@ export async function getAuditLogs({
   let adminMap = new Map<string, string>();
   if (adminIds.length > 0) {
     const admins = await db.execute<{ id: string; name: string }>(
-      sql`SELECT id, name FROM neon_auth."user" WHERE id = ANY(${adminIds})`
+      sql`SELECT id, name FROM neon_auth."user" WHERE id = ANY(${adminIds}::text[])`
     );
     adminMap = new Map(admins.map((a) => [a.id, a.name]));
   }

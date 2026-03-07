@@ -41,10 +41,22 @@
   to { opacity: 1; }
 }
 
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.landing-marquee-mask {
+  --fade: clamp(120px, 22vw, 240px);
+  mask-image: linear-gradient(to right, transparent 0%, black var(--fade), black calc(100% - var(--fade)), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black var(--fade), black calc(100% - var(--fade)), transparent 100%);
+}
+
 @theme {
   --font-sans: var(--font-geist), "SGKara", ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --font-display: "Cooper BT", "SGKara", Georgia, "Times New Roman", serif;
+  --font-gochi: "Gochi Hand", "SGKara", cursive;
 }
 
 @theme inline {

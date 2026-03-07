@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic"; // Per-user content (university profile 
 
 export const metadata: Metadata = {
   title: "Courses",
-  robots: { index: false },
+  description: "Browse university courses and study materials.",
 };
 
 export default async function CoursesPage() {

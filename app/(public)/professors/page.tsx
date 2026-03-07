@@ -11,6 +11,12 @@ export const metadata: Metadata = {
     description:
       "Search and rate university professors. Read student reviews, see ratings, and share your experience.",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Rate My Professor | Libraryyy",
+    description:
+      "Search and rate university professors. Read student reviews, see ratings, and share your experience.",
+  },
 };
 
 export default async function ProfessorsPage({

@@ -29,6 +29,20 @@
       "when": 1772717957968,
       "tag": "0003_known_romulus",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1772878669978,
+      "tag": "0004_flat_doorman",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1772881625719,
+      "tag": "0005_wealthy_mordo",
+      "breakpoints": true
     }
   ]
 }

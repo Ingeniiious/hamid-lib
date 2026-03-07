@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ServiceWorkerProvider } from "@/components/ServiceWorkerProvider";
 import { AnalyticsTracker } from "@/components/AnalyticsTracker";
@@ -67,6 +68,7 @@ export default function RootLayout({
           <CookieConsent />
         </ThemeProvider>
         <ServiceWorkerProvider />
+        <Analytics />
       </body>
     </html>
   );

@@ -4,9 +4,13 @@ const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days in seconds
 const SESSION_COOKIE_MARKER = "session_token";
 
 /**
- * Neon Auth's upstream Better Auth server sets session_token as a session cookie
- * (no Max-Age), which gets cleared when a PWA is closed. This wrapper injects
- * Max-Age on session_token cookies so sessions persist across app restarts.
+ * Ensures session_token cookies persist across PWA restarts by forcing
+ * Max-Age=30days AND Expires on every session cookie. The upstream Neon Auth
+ * server (Better Auth) may set a shorter Max-Age (7 days) or omit it entirely
+ * (session cookie). Either way, we override to 30 days for PWA reliability.
+ *
+ * iOS standalone PWAs (WebKit) need BOTH Max-Age AND Expires for reliable
+ * cookie persistence — Max-Age alone is not always respected.
  */
 function persistSessionCookies(response: Response): Response {
   const setCookieHeaders = response.headers.getSetCookie();
@@ -15,13 +19,16 @@ function persistSessionCookies(response: Response): Response {
   const newHeaders = new Headers(response.headers);
   newHeaders.delete("set-cookie");
 
+  const expires = new Date(Date.now() + SESSION_MAX_AGE * 1000).toUTCString();
+
   for (const header of setCookieHeaders) {
-    if (
-      header.includes(SESSION_COOKIE_MARKER) &&
-      !header.toLowerCase().includes("max-age")
-    ) {
-      // Append Max-Age to persist the session cookie
-      newHeaders.append("set-cookie", `${header}; Max-Age=${SESSION_MAX_AGE}`);
+    if (header.includes(SESSION_COOKIE_MARKER)) {
+      // Strip any existing Max-Age/Expires so we can set our own
+      let cleaned = header
+        .replace(/;\s*Max-Age=[^;]*/gi, "")
+        .replace(/;\s*Expires=[^;]*/gi, "");
+      cleaned += `; Max-Age=${SESSION_MAX_AGE}; Expires=${expires}`;
+      newHeaders.append("set-cookie", cleaned);
     } else {
       newHeaders.append("set-cookie", header);
     }
@@ -47,3 +54,6 @@ const handlers = auth.handler();
 
 export const GET = wrapHandler(handlers.GET);
 export const POST = wrapHandler(handlers.POST);
+export const PUT = wrapHandler(handlers.PUT);
+export const DELETE = wrapHandler(handlers.DELETE);
+export const PATCH = wrapHandler(handlers.PATCH);

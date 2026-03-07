@@ -18,7 +18,7 @@ export async function listCourses({
   limit?: number;
 }) {
   const session = await getAdminSession();
-  requirePermission(session, "courses.view");
+  await requirePermission(session, "courses.view");
 
   const safeLimit = Math.min(Math.max(limit, 1), 100);
   const offset = (page - 1) * safeLimit;
@@ -106,7 +106,7 @@ export async function listCourses({
 
 export async function getCourse(id: string) {
   const session = await getAdminSession();
-  requirePermission(session, "courses.view");
+  await requirePermission(session, "courses.view");
 
   const rows = await db
     .select({
@@ -165,7 +165,7 @@ export async function createCourse(data: {
   professor?: string;
 }) {
   const session = await getAdminSession();
-  requirePermission(session, "courses.create");
+  await requirePermission(session, "courses.create");
 
   const id = crypto.randomUUID();
 
@@ -203,7 +203,7 @@ export async function updateCourse(
   }
 ) {
   const session = await getAdminSession();
-  requirePermission(session, "courses.edit");
+  await requirePermission(session, "courses.edit");
 
   await db
     .update(course)
@@ -226,7 +226,7 @@ export async function updateCourse(
 
 export async function deleteCourse(id: string) {
   const session = await getAdminSession();
-  requirePermission(session, "courses.delete");
+  await requirePermission(session, "courses.delete");
 
   // Materials cascade on delete via schema FK
   await db.delete(course).where(eq(course.id, id));
@@ -243,7 +243,7 @@ export async function deleteCourse(id: string) {
 
 export async function getAllFaculties() {
   const session = await getAdminSession();
-  requirePermission(session, "courses.view");
+  await requirePermission(session, "courses.view");
 
   const rows = await db
     .select({

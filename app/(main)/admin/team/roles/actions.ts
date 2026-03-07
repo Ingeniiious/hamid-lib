@@ -8,7 +8,7 @@ import { logAdminAction } from "@/lib/admin/audit";
 
 export async function getRoles() {
   const session = await getAdminSession();
-  requirePermission(session, "team.view");
+  await requirePermission(session, "team.view");
 
   const rows = await db
     .select({
@@ -30,7 +30,7 @@ export async function createRole(
   description?: string
 ) {
   const session = await getAdminSession();
-  requirePermission(session, "team.manage");
+  await requirePermission(session, "team.manage");
 
   const [row] = await db
     .insert(adminRole)
@@ -55,7 +55,7 @@ export async function updateRole(
   description?: string
 ) {
   const session = await getAdminSession();
-  requirePermission(session, "team.manage");
+  await requirePermission(session, "team.manage");
 
   const updates: Record<string, unknown> = { permissions };
   if (name) updates.name = name;
@@ -76,7 +76,7 @@ export async function updateRole(
 
 export async function deleteRole(id: number) {
   const session = await getAdminSession();
-  requirePermission(session, "team.manage");
+  await requirePermission(session, "team.manage");
 
   // Check if any admin users have this role
   const usersWithRole = await db

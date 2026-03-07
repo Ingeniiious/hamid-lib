@@ -3,11 +3,26 @@
 import { useState, useEffect, useTransition, use } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, CalendarDots, PresentationChart } from "@phosphor-icons/react";
+import {
+  ArrowLeft,
+  CalendarDots,
+  PresentationChart,
+  SignOut,
+  Trash,
+} from "@phosphor-icons/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Tabs,
   TabsContent,
@@ -19,9 +34,16 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { getUserDetail, banUser, unbanUser } from "../actions";
+import { DestructiveConfirmDialog } from "@/components/admin/DestructiveConfirmDialog";
+import {
+  getUserDetail,
+  banUser,
+  unbanUser,
+  getUserSessions,
+  revokeUserSession,
+  revokeAllUserSessions,
+} from "../actions";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -31,6 +53,8 @@ interface UserDetail {
   email: string;
   image: string | null;
   banned: boolean;
+  banReason: string | null;
+  banExpires: string | null;
   emailVerified: boolean;
   createdAt: string;
   university: string;
@@ -42,6 +66,18 @@ interface UserDetail {
   programName: string;
   calendarEventsCount: number;
   presentationsCount: number;
+  contributorEmail: string | null;
+  contributorUniversity: string | null;
+  contributorVerifiedAt: string | null;
+}
+
+interface SessionInfo {
+  id: string;
+  token: string;
+  userAgent: string | null;
+  ipAddress: string | null;
+  createdAt: string;
+  expiresAt: string;
 }
 
 export default function UserDetailPage({
@@ -52,9 +88,20 @@ export default function UserDetailPage({
   const { id } = use(params);
   const router = useRouter();
   const [user, setUser] = useState<UserDetail | null>(null);
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [notFound, setNotFound] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  // Ban dialog
+  const [banDialogOpen, setBanDialogOpen] = useState(false);
+  const [banReason, setBanReason] = useState("");
+  const [banDuration, setBanDuration] = useState("permanent");
+
+  // Unban confirm
+  const [unbanDialogOpen, setUnbanDialogOpen] = useState(false);
+
+  // Revoke all sessions confirm
+  const [revokeAllDialogOpen, setRevokeAllDialogOpen] = useState(false);
 
   useEffect(() => {
     startTransition(async () => {
@@ -67,16 +114,61 @@ export default function UserDetailPage({
     });
   }, [id]);
 
-  const handleBanToggle = () => {
+  const loadSessions = () => {
+    startTransition(async () => {
+      const data = await getUserSessions(id);
+      setSessions(data as SessionInfo[]);
+    });
+  };
+
+  const handleBan = () => {
+    if (!user) return;
+    const daysMap: Record<string, number | undefined> = {
+      permanent: undefined,
+      "1": 1,
+      "7": 7,
+      "30": 30,
+      "90": 90,
+    };
+    startTransition(async () => {
+      await banUser(user.id, banReason || undefined, daysMap[banDuration]);
+      setUser({
+        ...user,
+        banned: true,
+        banReason: banReason || null,
+        banExpires: daysMap[banDuration]
+          ? new Date(
+              Date.now() + daysMap[banDuration]! * 24 * 60 * 60 * 1000
+            ).toISOString()
+          : null,
+      });
+      setBanDialogOpen(false);
+      setBanReason("");
+      setBanDuration("permanent");
+      setSessions([]);
+    });
+  };
+
+  const handleUnban = () => {
     if (!user) return;
     startTransition(async () => {
-      if (user.banned) {
-        await unbanUser(user.id);
-      } else {
-        await banUser(user.id);
-      }
-      setUser({ ...user, banned: !user.banned });
-      setConfirmOpen(false);
+      await unbanUser(user.id);
+      setUser({ ...user, banned: false, banReason: null, banExpires: null });
+    });
+  };
+
+  const handleRevokeSession = (token: string) => {
+    startTransition(async () => {
+      await revokeUserSession(token);
+      setSessions((prev) => prev.filter((s) => s.token !== token));
+    });
+  };
+
+  const handleRevokeAll = () => {
+    if (!user) return;
+    startTransition(async () => {
+      await revokeAllUserSessions(user.id);
+      setSessions([]);
     });
   };
 
@@ -159,60 +251,44 @@ export default function UserDetailPage({
                   Email Verified
                 </p>
               )}
+              {user.banned && user.banReason && (
+                <p className="text-xs text-red-600 dark:text-red-400">
+                  Reason: {user.banReason}
+                </p>
+              )}
+              {user.banned && user.banExpires && (
+                <p className="text-xs text-red-600/70 dark:text-red-400/70">
+                  Expires:{" "}
+                  {new Date(user.banExpires).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Ban / Unban */}
-          <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-            <DialogTrigger asChild>
+          {/* Actions */}
+          <div className="flex gap-2">
+            {user.banned ? (
               <Button
                 variant="outline"
-                className={`rounded-full border-gray-900/15 backdrop-blur-xl dark:border-white/15 ${
-                  user.banned
-                    ? "bg-green-500/10 text-green-700 hover:bg-green-500/20 dark:text-green-400"
-                    : "bg-red-500/10 text-red-700 hover:bg-red-500/20 dark:text-red-400"
-                }`}
+                onClick={() => setUnbanDialogOpen(true)}
+                className="rounded-full border-gray-900/15 bg-green-500/10 text-green-700 backdrop-blur-xl hover:bg-green-500/20 dark:border-white/15 dark:text-green-400"
               >
-                {user.banned ? "Unban User" : "Ban User"}
+                Unban User
               </Button>
-            </DialogTrigger>
-            <DialogContent className="rounded-2xl border-gray-900/15 bg-white/90 backdrop-blur-xl dark:border-white/15 dark:bg-gray-900/90">
-              <DialogHeader>
-                <DialogTitle className="font-display font-light">
-                  {user.banned ? "Unban User" : "Ban User"}
-                </DialogTitle>
-              </DialogHeader>
-              <p className="text-sm text-gray-900/70 dark:text-white/70">
-                {user.banned
-                  ? `Are you sure you want to unban ${user.name}? They will regain access to the platform.`
-                  : `Are you sure you want to ban ${user.name}? They will lose access to the platform.`}
-              </p>
-              <div className="flex justify-end gap-3 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setConfirmOpen(false)}
-                  className="rounded-full"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleBanToggle}
-                  disabled={isPending}
-                  className={`rounded-full ${
-                    user.banned
-                      ? "bg-green-600 hover:bg-green-700"
-                      : "bg-red-600 hover:bg-red-700"
-                  } text-white`}
-                >
-                  {isPending
-                    ? "Processing..."
-                    : user.banned
-                      ? "Confirm Unban"
-                      : "Confirm Ban"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => setBanDialogOpen(true)}
+                className="rounded-full border-gray-900/15 bg-red-500/10 text-red-700 backdrop-blur-xl hover:bg-red-500/20 dark:border-white/15 dark:text-red-400"
+              >
+                Ban User
+              </Button>
+            )}
+          </div>
         </div>
       </motion.div>
 
@@ -223,12 +299,25 @@ export default function UserDetailPage({
         transition={{ duration: 0.6, ease, delay: 0.1 }}
       >
         <Tabs defaultValue="profile">
-          <TabsList className="rounded-xl border border-gray-900/10 bg-white/50 backdrop-blur-xl dark:border-white/15 dark:bg-white/10">
-            <TabsTrigger value="profile" className="rounded-lg text-sm">
+          <TabsList className="rounded-full border border-gray-900/10 bg-white/50 p-1 backdrop-blur-xl dark:border-white/15 dark:bg-white/10">
+            <TabsTrigger
+              value="profile"
+              className="rounded-full text-sm data-[state=active]:bg-gray-900 data-[state=active]:text-white dark:data-[state=active]:bg-white dark:data-[state=active]:text-gray-900"
+            >
               Profile
             </TabsTrigger>
-            <TabsTrigger value="activity" className="rounded-lg text-sm">
+            <TabsTrigger
+              value="activity"
+              className="rounded-full text-sm data-[state=active]:bg-gray-900 data-[state=active]:text-white dark:data-[state=active]:bg-white dark:data-[state=active]:text-gray-900"
+            >
               Activity
+            </TabsTrigger>
+            <TabsTrigger
+              value="sessions"
+              className="rounded-full text-sm data-[state=active]:bg-gray-900 data-[state=active]:text-white dark:data-[state=active]:bg-white dark:data-[state=active]:text-gray-900"
+              onClick={loadSessions}
+            >
+              Sessions
             </TabsTrigger>
           </TabsList>
 
@@ -252,6 +341,30 @@ export default function UserDetailPage({
                   })}
                 />
                 <ProfileField label="User ID" value={user.id} mono />
+                {user.contributorEmail && (
+                  <ProfileField
+                    label="University Email (Contributor)"
+                    value={user.contributorEmail}
+                  />
+                )}
+                {user.contributorUniversity && (
+                  <ProfileField
+                    label="Verified University"
+                    value={user.contributorUniversity}
+                  />
+                )}
+                {user.contributorVerifiedAt && (
+                  <ProfileField
+                    label="Contributor Since"
+                    value={new Date(
+                      user.contributorVerifiedAt
+                    ).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  />
+                )}
               </div>
             </div>
           </TabsContent>
@@ -287,8 +400,145 @@ export default function UserDetailPage({
               </div>
             </div>
           </TabsContent>
+
+          <TabsContent value="sessions" className="mt-4 space-y-4">
+            {sessions.length > 0 && (
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setRevokeAllDialogOpen(true)}
+                  className="gap-2 rounded-full border-red-500/20 bg-red-500/10 text-red-700 hover:bg-red-500/20 dark:text-red-400"
+                  size="sm"
+                >
+                  <SignOut size={14} weight="duotone" />
+                  Revoke All Sessions
+                </Button>
+              </div>
+            )}
+
+            {sessions.length === 0 ? (
+              <div className="rounded-2xl border border-gray-900/10 bg-white/50 p-8 text-center backdrop-blur-xl dark:border-white/15 dark:bg-white/10">
+                <p className="text-sm text-gray-900/50 dark:text-white/50">
+                  No active sessions.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sessions.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between rounded-2xl border border-gray-900/10 bg-white/50 p-4 backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
+                  >
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-900 dark:text-white">
+                        {s.ipAddress || "Unknown IP"}
+                      </p>
+                      <p className="max-w-xs truncate text-xs text-gray-900/50 dark:text-white/50">
+                        {s.userAgent || "Unknown device"}
+                      </p>
+                      <p className="text-xs text-gray-900/40 dark:text-white/40">
+                        Created{" "}
+                        {new Date(s.createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleRevokeSession(s.token)}
+                      disabled={isPending}
+                      className="rounded-full p-2 text-gray-900/40 transition-colors hover:bg-red-500/10 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400"
+                    >
+                      <Trash size={16} weight="duotone" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
         </Tabs>
       </motion.div>
+
+      {/* Ban dialog with reason + duration */}
+      <Dialog open={banDialogOpen} onOpenChange={setBanDialogOpen}>
+        <DialogContent className="rounded-2xl border-gray-900/15 bg-white/90 backdrop-blur-xl dark:border-white/15 dark:bg-gray-900/90">
+          <DialogHeader>
+            <DialogTitle className="font-display font-light">
+              Ban {user.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-gray-900/70 dark:text-white/70">
+              This will immediately ban the user and revoke all their active
+              sessions. They will be logged out everywhere.
+            </p>
+            <div className="space-y-2">
+              <label className="text-xs text-gray-900/50 dark:text-white/50">
+                Reason (optional)
+              </label>
+              <Textarea
+                placeholder="e.g. Spam, policy violation, abuse..."
+                value={banReason}
+                onChange={(e) => setBanReason(e.target.value)}
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-gray-900/50 dark:text-white/50">
+                Duration
+              </label>
+              <Select value={banDuration} onValueChange={setBanDuration}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="permanent">Permanent</SelectItem>
+                  <SelectItem value="1">1 Day</SelectItem>
+                  <SelectItem value="7">7 Days</SelectItem>
+                  <SelectItem value="30">30 Days</SelectItem>
+                  <SelectItem value="90">90 Days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setBanDialogOpen(false)}
+                className="rounded-full"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBan}
+                disabled={isPending}
+                className="rounded-full bg-red-600 text-white hover:bg-red-700"
+              >
+                {isPending ? "Banning..." : "Confirm Ban"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unban confirm */}
+      <DestructiveConfirmDialog
+        open={unbanDialogOpen}
+        onOpenChange={setUnbanDialogOpen}
+        title={`Unban ${user.name}`}
+        description={`This will unban ${user.name} (${user.email}). They will regain access to the platform immediately.`}
+        onConfirmed={handleUnban}
+      />
+
+      {/* Revoke all sessions confirm */}
+      <DestructiveConfirmDialog
+        open={revokeAllDialogOpen}
+        onOpenChange={setRevokeAllDialogOpen}
+        title="Revoke All Sessions"
+        description={`This will immediately log out ${user.name} from all devices. They will need to sign in again.`}
+        onConfirmed={handleRevokeAll}
+      />
     </div>
   );
 }

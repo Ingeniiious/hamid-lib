@@ -15,6 +15,7 @@ import {
   confirmDeleteAccount,
   getUserProfile,
   updateUserProfile,
+  getContributorInfo,
 } from "./actions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -207,6 +208,10 @@ export default function AccountPage() {
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Contributor
+  const [contributorEmail, setContributorEmail] = useState<string | null>(null);
+  const [contributorUniversity, setContributorUniversity] = useState<string | null>(null);
+
   // Language
   const [language, setLanguage] = useState("en");
 
@@ -225,8 +230,15 @@ export default function AccountPage() {
       setName(data.user.name || "");
       setSessionLoaded(true);
 
-      // Load profile
-      const { profile } = await getUserProfile();
+      // Load profile + contributor info
+      const [{ profile }, { contributor }] = await Promise.all([
+        getUserProfile(),
+        getContributorInfo(),
+      ]);
+      if (contributor) {
+        setContributorEmail(contributor.universityEmail);
+        setContributorUniversity(contributor.universityName);
+      }
       if (profile) {
         const isKnown = UNIVERSITIES.includes(profile.university as typeof UNIVERSITIES[number]);
         if (profile.university && !isKnown) {
@@ -238,6 +250,10 @@ export default function AccountPage() {
         setGender(profile.gender || "");
         setFacultyId(profile.facultyId ?? null);
         setProgramId(profile.programId ?? null);
+        if (profile.language && ["en", "fa", "tr"].includes(profile.language)) {
+          setLanguage(profile.language);
+          localStorage.setItem("hamid-lib-lang", profile.language);
+        }
         if (profile.avatarUrl) {
           setAvatarUrl(profile.avatarUrl);
           setHasCustomAvatar(!!profile.avatarKey);
@@ -309,6 +325,7 @@ export default function AccountPage() {
   const handleLanguageChange = (lang: string) => {
     setLanguage(lang);
     localStorage.setItem("hamid-lib-lang", lang);
+    updateUserProfile({ language: lang });
   };
 
   // Load sessions
@@ -644,6 +661,24 @@ export default function AccountPage() {
                       className={`${inputClass} cursor-not-allowed opacity-50`}
                     />
                   </div>
+                  {contributorEmail && (
+                    <div>
+                      <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
+                        University Email
+                      </label>
+                      <Input
+                        type="email"
+                        value={contributorEmail}
+                        readOnly
+                        className={`${inputClass} cursor-not-allowed opacity-50`}
+                      />
+                      {contributorUniversity && (
+                        <p className="mt-1 text-center text-xs text-gray-900/40 dark:text-white/40">
+                          {contributorUniversity}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Right column — University & Gender */}

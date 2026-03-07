@@ -7,7 +7,7 @@ import { getAdminSession, requirePermission } from "@/lib/admin/auth";
 
 export async function getOverviewStats(dateFrom?: string, dateTo?: string) {
   const session = await getAdminSession();
-  requirePermission(session, "analytics.view");
+  await requirePermission(session, "analytics.view");
 
   const conditions = [];
   if (dateFrom) conditions.push(gte(pageView.createdAt, new Date(dateFrom)));
@@ -45,7 +45,7 @@ export async function getPageViewsOverTime(
   granularity: "day" | "week" | "month" = "day"
 ) {
   const session = await getAdminSession();
-  requirePermission(session, "analytics.view");
+  await requirePermission(session, "analytics.view");
 
   const trunc = granularity === "day" ? "day" : granularity === "week" ? "week" : "month";
 
@@ -64,7 +64,7 @@ export async function getPageViewsOverTime(
 
 export async function getTopPages(dateFrom?: string, dateTo?: string, limit = 10) {
   const session = await getAdminSession();
-  requirePermission(session, "analytics.view");
+  await requirePermission(session, "analytics.view");
 
   const safeLimit = Math.min(Math.max(limit, 1), 50);
   const conditions = [];
@@ -88,7 +88,7 @@ export async function getTopPages(dateFrom?: string, dateTo?: string, limit = 10
 
 export async function getDeviceBreakdown(dateFrom?: string, dateTo?: string) {
   const session = await getAdminSession();
-  requirePermission(session, "analytics.view");
+  await requirePermission(session, "analytics.view");
 
   const conditions = [];
   if (dateFrom) conditions.push(sql`${pageView.createdAt} >= ${dateFrom}::timestamp`);
@@ -118,7 +118,7 @@ export async function getDeviceBreakdown(dateFrom?: string, dateTo?: string) {
 
 export async function getGeoBreakdown(dateFrom?: string, dateTo?: string) {
   const session = await getAdminSession();
-  requirePermission(session, "analytics.view");
+  await requirePermission(session, "analytics.view");
 
   const conditions = [];
   if (dateFrom) conditions.push(sql`${pageView.createdAt} >= ${dateFrom}::timestamp`);
@@ -141,7 +141,7 @@ export async function getGeoBreakdown(dateFrom?: string, dateTo?: string) {
 
 export async function getRealtimeVisitors() {
   const session = await getAdminSession();
-  requirePermission(session, "analytics.view");
+  await requirePermission(session, "analytics.view");
 
   const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
   const rows = await db
@@ -154,7 +154,7 @@ export async function getRealtimeVisitors() {
 
 export async function getReferrerStats(dateFrom?: string, dateTo?: string) {
   const session = await getAdminSession();
-  requirePermission(session, "analytics.view");
+  await requirePermission(session, "analytics.view");
 
   const conditions = [sql`${pageView.referrer} IS NOT NULL`, sql`${pageView.referrer} != ''`];
   if (dateFrom) conditions.push(sql`${pageView.createdAt} >= ${dateFrom}::timestamp`);
@@ -174,7 +174,7 @@ export async function getReferrerStats(dateFrom?: string, dateTo?: string) {
 
 export async function getUserGrowth(dateFrom: string, dateTo: string) {
   const session = await getAdminSession();
-  requirePermission(session, "analytics.view");
+  await requirePermission(session, "analytics.view");
 
   const rows = await db.execute<{ date: string; count: string }>(
     sql`SELECT date_trunc('day', "createdAt")::date::text as date, count(*)::text as count
