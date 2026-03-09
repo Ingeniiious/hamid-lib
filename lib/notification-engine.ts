@@ -34,8 +34,9 @@ import {
   program,
   calendarEvent,
 } from "@/database/schema";
-import { eq, and, ne, sql, gte, lte } from "drizzle-orm";
+import { eq, and, ne, sql, gte, lte, inArray } from "drizzle-orm";
 import { sendPushNotification } from "@/lib/web-push";
+import { sqlInList } from "@/lib/db";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -226,8 +227,8 @@ export async function processAutomations(triggerFilter?: string): Promise<{
     .from(notificationAutomationLog)
     .where(
       and(
-        sql`${notificationAutomationLog.automationId} = ANY(${autoIds}::int[])`,
-        sql`${notificationAutomationLog.period} = ANY(${allPeriods}::text[])`
+        inArray(notificationAutomationLog.automationId, autoIds),
+        inArray(notificationAutomationLog.period, allPeriods)
       )
     );
   const dedupSet = new Set(
@@ -419,7 +420,7 @@ async function buildUserContextMap(
 
   // Fetch auth user data
   const authRows = (await db.execute(
-    sql`SELECT id::text, name, email, "createdAt" FROM neon_auth."user" WHERE id::text = ANY(${userIds}::text[])`
+    sql`SELECT id::text, name, email, "createdAt" FROM neon_auth."user" WHERE id::text IN (${sqlInList(userIds)})`
   )) as any[];
 
   // Fetch profiles with faculty/program names + timezone
@@ -437,7 +438,7 @@ async function buildUserContextMap(
     .from(userProfile)
     .leftJoin(faculty, eq(userProfile.facultyId, faculty.id))
     .leftJoin(program, eq(userProfile.programId, program.id))
-    .where(sql`${userProfile.userId} = ANY(${userIds}::text[])`);
+    .where(inArray(userProfile.userId, userIds));
 
   const profileMap = new Map(profiles.map((p) => [p.userId, p]));
 

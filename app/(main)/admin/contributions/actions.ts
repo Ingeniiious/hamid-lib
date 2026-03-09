@@ -15,6 +15,7 @@ import { getAdminSession } from "@/lib/admin/auth";
 import { requirePermission } from "@/lib/admin/auth";
 import { logAdminAction } from "@/lib/admin/audit";
 import { eq, desc, sql, and, asc } from "drizzle-orm";
+import { sqlInList } from "@/lib/db";
 import { nanoid } from "nanoid";
 
 function slugify(text: string): string {
@@ -74,7 +75,7 @@ export async function listContributions({
   let userNames: Record<string, string> = {};
   if (userIds.length > 0) {
     const users = await db.execute<{ id: string; name: string }>(
-      sql`SELECT id::text, name FROM neon_auth."user" WHERE id::text = ANY(${userIds}::text[])`
+      sql`SELECT id::text, name FROM neon_auth."user" WHERE id::text IN (${sqlInList(userIds)})`
     );
     userNames = Object.fromEntries(users.map((u) => [u.id, u.name]));
   }
@@ -187,7 +188,7 @@ export async function listContentRequests({
   let userNames: Record<string, string> = {};
   if (userIds.length > 0) {
     const users = await db.execute<{ id: string; name: string }>(
-      sql`SELECT id::text, name FROM neon_auth."user" WHERE id::text = ANY(${userIds}::text[])`
+      sql`SELECT id::text, name FROM neon_auth."user" WHERE id::text IN (${sqlInList(userIds)})`
     );
     userNames = Object.fromEntries(users.map((u) => [u.id, u.name]));
   }

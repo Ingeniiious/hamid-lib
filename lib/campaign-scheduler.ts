@@ -8,7 +8,8 @@ import {
   program,
   calendarEvent,
 } from "@/database/schema";
-import { eq, and, lte, sql, gte } from "drizzle-orm";
+import { eq, and, lte, sql, gte, inArray } from "drizzle-orm";
+import { sqlInList } from "@/lib/db";
 import { sendPushNotification } from "@/lib/web-push";
 
 // ── Full user context for variable resolution ─────────────────
@@ -35,7 +36,7 @@ async function buildFullUserContext(
   const todayStr = new Date().toISOString().slice(0, 10);
 
   const authRows = (await db.execute(
-    sql`SELECT id::text, name, email, "createdAt" FROM neon_auth."user" WHERE id::text = ANY(${userIds}::text[])`
+    sql`SELECT id::text, name, email, "createdAt" FROM neon_auth."user" WHERE id::text IN (${sqlInList(userIds)})`
   )) as any[];
 
   const profiles = await db
@@ -50,7 +51,7 @@ async function buildFullUserContext(
     .from(userProfile)
     .leftJoin(faculty, eq(userProfile.facultyId, faculty.id))
     .leftJoin(program, eq(userProfile.programId, program.id))
-    .where(sql`${userProfile.userId} = ANY(${userIds}::text[])`);
+    .where(inArray(userProfile.userId, userIds));
 
   const profileMap = new Map(profiles.map((p) => [p.userId, p]));
 
@@ -63,7 +64,7 @@ async function buildFullUserContext(
     .where(
       and(
         eq(calendarEvent.date, todayStr),
-        sql`${calendarEvent.userId} = ANY(${userIds}::text[])`
+        inArray(calendarEvent.userId, userIds)
       )
     )
     .groupBy(calendarEvent.userId);
@@ -86,7 +87,7 @@ async function buildFullUserContext(
       and(
         gte(calendarEvent.date, weekStart.toISOString().slice(0, 10)),
         lte(calendarEvent.date, weekEnd.toISOString().slice(0, 10)),
-        sql`${calendarEvent.userId} = ANY(${userIds}::text[])`
+        inArray(calendarEvent.userId, userIds)
       )
     )
     .groupBy(calendarEvent.userId);
@@ -167,7 +168,7 @@ async function getTargetSubscriptions(campaign: {
       return db
         .select()
         .from(pushSubscription)
-        .where(sql`${pushSubscription.userId} = ANY(${uids}::text[])`);
+        .where(inArray(pushSubscription.userId, uids));
     }
 
     case "faculty": {
@@ -183,7 +184,7 @@ async function getTargetSubscriptions(campaign: {
       return db
         .select()
         .from(pushSubscription)
-        .where(sql`${pushSubscription.userId} = ANY(${uids}::text[])`);
+        .where(inArray(pushSubscription.userId, uids));
     }
 
     case "program": {
@@ -199,7 +200,7 @@ async function getTargetSubscriptions(campaign: {
       return db
         .select()
         .from(pushSubscription)
-        .where(sql`${pushSubscription.userId} = ANY(${uids}::text[])`);
+        .where(inArray(pushSubscription.userId, uids));
     }
 
     case "all":
@@ -318,7 +319,7 @@ export async function executeCampaignInternal(campaignId: number) {
     if (expired.length > 0) {
       await db
         .delete(pushSubscription)
-        .where(sql`${pushSubscription.id} = ANY(${expired}::int[])`);
+        .where(inArray(pushSubscription.id, expired));
     }
 
     await db

@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { auditLog } from "@/database/schema";
 import { sql, desc, eq, gte, lte, and } from "drizzle-orm";
+import { sqlInList } from "@/lib/db";
 import { getAdminSession, requirePermission } from "@/lib/admin/auth";
 
 export async function getAuditLogs({
@@ -65,7 +66,7 @@ export async function getAuditLogs({
   let adminMap = new Map<string, string>();
   if (adminIds.length > 0) {
     const admins = await db.execute<{ id: string; name: string }>(
-      sql`SELECT id::text, name FROM neon_auth."user" WHERE id::text = ANY(${adminIds}::text[])`
+      sql`SELECT id::text, name FROM neon_auth."user" WHERE id::text IN (${sqlInList(adminIds)})`
     );
     adminMap = new Map(admins.map((a) => [a.id, a.name]));
   }
