@@ -549,6 +549,19 @@ export const note = pgTable("note", {
   index("note_updated_at_idx").on(table.updatedAt),
 ]);
 
+export const noteAsset = pgTable("note_asset", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),
+  url: text("url").notNull(),
+  objectKey: text("object_key").notNull(),
+  fileName: text("file_name"), // original file name for display
+  fileSize: integer("file_size"), // bytes, after compression
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("note_asset_user_id_idx").on(table.userId),
+  index("note_asset_created_at_idx").on(table.createdAt),
+]);
+
 // ==================
 // My Space — Mind Maps
 // ==================

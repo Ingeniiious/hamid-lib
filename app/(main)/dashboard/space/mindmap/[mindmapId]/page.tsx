@@ -1,7 +1,7 @@
+import { notFound } from "next/navigation";
 import { BackButton } from "@/components/BackButton";
-import { MindMapCanvas } from "@/components/MindMapCanvas";
+import { MindMapEditor } from "@/components/MindMapEditor";
 import { getMindMap } from "../actions";
-import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -19,19 +19,19 @@ export default async function MindMapEditorPage({
   const { mindmapId } = await params;
   const mindMap = await getMindMap(mindmapId);
 
-  if (!mindMap) {
-    redirect("/dashboard/space/mindmap");
-  }
+  if (!mindMap) notFound();
 
   return (
-    <div className="relative flex h-full flex-col">
-      <MindMapCanvas
-        mindMapId={mindMap.id}
-        name={mindMap.name}
-        nodes={mindMap.nodes}
-        edges={mindMap.edges}
-        viewport={mindMap.viewport}
-      />
+    <div className="flex h-full flex-col">
+      <div className="min-h-0 flex-1">
+        <MindMapEditor
+          mindMapId={mindMap.id}
+          name={mindMap.name}
+          nodes={mindMap.nodes}
+          edges={mindMap.edges}
+          viewport={mindMap.viewport}
+        />
+      </div>
       <BackButton
         href={mindMap.folderId ? `/dashboard/space/mindmap?folder=${mindMap.folderId}` : "/dashboard/space/mindmap"}
         label="Mind Maps"

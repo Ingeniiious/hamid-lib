@@ -9,6 +9,128 @@ const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
 const CDN = "https://lib.thevibecodedcompany.com";
 
+/* ── Floating illustrations — distributed across sections ── */
+// Seeded pseudo-random so positions are consistent across renders
+function seededRandom(seed: number) {
+  const x = Math.sin(seed * 9301 + 49297) * 49297;
+  return x - Math.floor(x);
+}
+
+const ILLU_SRCS = [
+  "pencil-writing-on-paper.webp",
+  "graduation-cap.webp",
+  "coffee-cup-with-steam.webp",
+  "highlighter-marker.webp",
+  "stack-of-textbooks.webp",
+  "usb-flash-drive.webp",
+  "headphones.webp",
+  "laptop-with-a-smiling-screen.webp",
+  "backpack-slightly-open-with-books-inside.webp",
+  "open-notebook.webp",
+  "bubble-tea-cup.webp",
+  "camera.webp",
+  "pizza-slice.webp",
+  "skateboard.webp",
+  "bicycle.webp",
+  "instant-ramen-bowl.webp",
+  "smartphone-with-chat-bubbles.webp",
+  "tablet-with-a-stylus.webp",
+  "paint-palette.webp",
+  "sticky-note-with-a-small-heart-or-star.webp",
+];
+
+// Split illustrations into groups for each section
+// Sticky notes: 5, How it works: 5, Features: 5, Community: 5
+const SECTION_ILLU_GROUPS = [
+  ILLU_SRCS.slice(0, 5),   // sticky notes
+  ILLU_SRCS.slice(5, 10),  // how it works
+  ILLU_SRCS.slice(10, 15), // features
+  ILLU_SRCS.slice(15, 20), // community
+];
+
+type FloatingDef = {
+  src: string;
+  top: string;
+  left?: string;
+  right?: string;
+  size: number;
+  rotate: number;
+};
+
+// Generate illustration defs for a section — bigger sizes, spread across the section
+function generateSectionIllustrations(srcs: string[], seedOffset: number): FloatingDef[] {
+  return srcs.map((src, i) => {
+    const r = seededRandom(i + seedOffset);
+    const isLeft = i % 2 === 0;
+    const baseTop = 5 + (i / srcs.length) * 80 + r * 8;
+    const edgeOffset = -2 + r * 8; // -2% to 6% from edge (can poke out)
+    const size = 240 + Math.round(seededRandom(i + seedOffset + 50) * 100); // 240-340px
+    const rotate = Math.round((seededRandom(i + seedOffset + 100) - 0.5) * 20);
+    return {
+      src,
+      top: `${baseTop.toFixed(1)}%`,
+      ...(isLeft ? { left: `${edgeOffset.toFixed(1)}%` } : { right: `${edgeOffset.toFixed(1)}%` }),
+      size,
+      rotate,
+    };
+  });
+}
+
+const STICKY_ILLUSTRATIONS = generateSectionIllustrations(SECTION_ILLU_GROUPS[0], 0);
+const HOWITWORKS_ILLUSTRATIONS = generateSectionIllustrations(SECTION_ILLU_GROUPS[1], 100);
+const FEATURES_ILLUSTRATIONS = generateSectionIllustrations(SECTION_ILLU_GROUPS[2], 200);
+const COMMUNITY_ILLUSTRATIONS = generateSectionIllustrations(SECTION_ILLU_GROUPS[3], 300);
+
+function FloatingIllustration({ def }: { def: FloatingDef }) {
+  const ref = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.style.opacity = "1";
+          obs.unobserve(el);
+        }
+      },
+      { threshold: 0.1 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  return (
+    <img
+      ref={ref}
+      src={`${CDN}/images/landing/${def.src}`}
+      alt=""
+      draggable={false}
+      loading="lazy"
+      className="pointer-events-none absolute select-none"
+      style={{
+        top: def.top,
+        left: def.left,
+        right: def.right,
+        width: `clamp(${Math.round(def.size * 0.5)}px, ${Math.round(def.size * 0.14)}vw, ${def.size}px)`,
+        transform: `rotate(${def.rotate}deg)`,
+        opacity: 0,
+        transition: "opacity 0.8s cubic-bezier(0.25,0.46,0.45,0.94)",
+      }}
+    />
+  );
+}
+
+function IllustrationLayer({ illustrations }: { illustrations: FloatingDef[] }) {
+  return (
+    <>
+      {illustrations.map((def, i) => (
+        <FloatingIllustration key={`illu-${def.src}`} def={def} />
+      ))}
+    </>
+  );
+}
+
 const STICKY_NOTES = [
   {
     image: `${CDN}/images/landing/sticky-grid.png`,
@@ -18,7 +140,7 @@ const STICKY_NOTES = [
   },
   {
     image: `${CDN}/images/landing/sticky-clip.png`,
-    text: "Students Build, Students Learn.",
+    text: "Students Build,\nStudents Learn.",
     tilt: 2,
     font: "font-delicious",
   },
@@ -39,9 +161,28 @@ function lerpNum(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
+// Hermite smoothstep — zero velocity at both ends
 function smoothstep(t: number) {
   const v = clamp(t, 0, 1);
   return v * v * (3 - 2 * v);
+}
+
+// Quintic smoothstep — even smoother zero-accel at both ends (professional ramp)
+function smootherstep(t: number) {
+  const v = clamp(t, 0, 1);
+  return v * v * v * (v * (v * 6 - 15) + 10);
+}
+
+// Ease-out cubic — fast start, gentle settle (for the "landing" feel)
+function easeOutCubic(t: number) {
+  const v = clamp(t, 0, 1);
+  return 1 - (1 - v) * (1 - v) * (1 - v);
+}
+
+// Ease-in-out cubic — smooth accel & decel
+function easeInOutCubic(t: number) {
+  const v = clamp(t, 0, 1);
+  return v < 0.5 ? 4 * v * v * v : 1 - Math.pow(-2 * v + 2, 3) / 2;
 }
 
 interface CardState {
@@ -212,8 +353,8 @@ function arcSwap(
   // z stays at bottom until the card has physically cleared the stack
   // (~15% into the swap), then ramps up so it's fully above by ~40%.
   // This prevents the z-index pop while cards still overlap.
-  const zUp = clamp((t - 0.15) * 4, 0, 1);
-  const zDown = clamp((t - 0.85) / 0.15, 0, 1);
+  const zUp = smootherstep(clamp((t - 0.15) * 4, 0, 1));
+  const zDown = smootherstep(clamp((t - 0.85) / 0.15, 0, 1));
   const z = lerpNum(from.z, to.z + 1, zUp) - zDown;
 
   return {
@@ -225,10 +366,86 @@ function arcSwap(
   };
 }
 
+/* ── Scroll-draw pencil path — realistic texture via SVG filter ── */
+// Two overlapping strokes that wander down, exit the frame, come back,
+// and finish by circling around the sticky-note stack at the center.
+// feTurbulence + feDisplacementMap gives a real pencil-on-paper wobble.
+// Desktop paths — viewBox 1440x2400. Cards centered at x=720, ~280px wide.
+// Smooth S-curves along the sides, converge for a big circle around the notes.
+const DESKTOP_LINES = [
+  // Left line — enters off-screen, smooth flowing curves, hugs left side
+  "M -60,400 C 80,520 260,560 180,720 C 100,880 -30,960 60,1120 " +
+  "C 150,1280 300,1340 200,1480 C 100,1620 180,1680 350,1740 " +
+  // Sweep to center → big circle
+  "C 450,1780 500,1800 460,1860 " +
+  "C 400,1940 500,1990 720,1990 C 940,1990 1040,1940 980,1860 " +
+  "C 940,1810 840,1790 720,1790 C 600,1790 520,1820 540,1870 " +
+  "C 560,1920 640,1950 720,1945",
+  // Right line — wider swings, different rhythm, exits further right
+  "M 1500,450 C 1380,580 1200,640 1300,800 C 1400,960 1520,1020 1400,1200 " +
+  "C 1300,1380 1160,1420 1280,1540 C 1380,1660 1300,1720 1100,1760 " +
+  // Sweep to center → circle, slightly offset
+  "C 980,1790 930,1810 970,1870 " +
+  "C 1030,1945 930,1995 720,1995 C 510,1995 410,1945 470,1870 " +
+  "C 510,1820 610,1800 720,1800 C 830,1800 910,1830 890,1880 " +
+  "C 870,1930 790,1955 720,1950",
+];
+
+// Mobile paths — viewBox 400x2400. Cards centered at x=200, ~240px wide.
+// Cards visually at ~y=1760 in mobile SVG coords. Circle below at ~y=1900-2100.
+const MOBILE_LINES = [
+  // Left line — tight curves hugging the left edge
+  "M -20,600 C 40,700 80,780 50,900 C 10,1020 -30,1120 20,1260 " +
+  "C 60,1380 100,1480 60,1600 C 20,1720 50,1790 120,1830 " +
+  // Circle below the notes — raised ~100 units
+  "C 150,1860 130,1890 120,1930 " +
+  "C 100,1990 140,2040 200,2040 C 260,2040 300,1990 280,1930 " +
+  "C 265,1880 235,1860 200,1860 C 165,1860 140,1890 150,1930 " +
+  "C 160,1960 180,1990 200,1985",
+  // Right line — lazier swings, longer wavelength, distinctly different rhythm
+  "M 420,700 C 390,860 360,960 380,1080 C 405,1220 430,1260 395,1420 " +
+  "C 360,1560 320,1640 350,1720 C 375,1780 350,1810 290,1840 " +
+  // Circle — offset
+  "C 260,1865 275,1895 285,1935 " +
+  "C 305,1995 265,2045 200,2045 C 135,2045 95,1995 115,1935 " +
+  "C 130,1885 165,1865 200,1865 C 235,1865 265,1895 255,1935 " +
+  "C 245,1965 220,1995 200,1990",
+];
+
+// Imperative update — called from useLenis, bypasses React.
+// Handles both desktop & mobile SVGs — registers all paths from both.
+function useDrawPathUpdate() {
+  const allPaths = useRef<SVGPathElement[]>([]);
+  const allLengths = useRef<number[]>([]);
+
+  const register = useRef((svg: SVGSVGElement | null) => {
+    if (!svg) return;
+    const paths = Array.from(svg.querySelectorAll("path"));
+    // Append to existing (first SVG registers, then second)
+    allPaths.current = [...allPaths.current, ...paths];
+    const lens = paths.map((p) => p.getTotalLength());
+    allLengths.current = [...allLengths.current, ...lens];
+    paths.forEach((p, i) => {
+      p.style.strokeDasharray = `${lens[i]}`;
+      p.style.strokeDashoffset = `${lens[i]}`;
+    });
+  });
+
+  const update = useRef((progress: number) => {
+    allPaths.current.forEach((p, i) => {
+      if (!allLengths.current[i]) return;
+      p.style.strokeDashoffset = `${allLengths.current[i] * (1 - progress)}`;
+    });
+  });
+
+  return { register: register.current, update: update.current };
+}
+
 /* ── Sticky Notes with scroll-driven stacking ── */
 function StickyNotesSection() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const cardEls = useRef<(HTMLDivElement | null)[]>([]);
+  const drawPath = useDrawPathUpdate();
 
   // Set initial spread positions on mount
   useEffect(() => {
@@ -245,6 +462,12 @@ function StickyNotesSection() {
     const rect = sectionRef.current.getBoundingClientRect();
     const vh = window.innerHeight;
     const progress = clamp((vh - rect.top) / (vh + rect.height), 0, 1);
+
+    // ── Timing — original values that sync SVG circle with card positions ──
+    // Cards + draw both use the same range so the circle aligns with the sticky cards
+    const anim = clamp((progress - 0.18) / 0.5, 0, 1);
+    drawPath.update(easeInOutCubic(anim));
+
     const spread = getSpread(getSpreadX());
 
     // Responsive arc size
@@ -252,39 +475,19 @@ function StickyNotesSection() {
     const arcX = w < 640 ? 100 : w < 768 ? 140 : 190;
     const arcY = w < 640 ? 50 : 75;
 
-    // Animation range: starts at progress 0.18, spans 50% of total travel.
-    // This gives reading time before stacking begins, and enough scroll
-    // distance for each phase to feel deliberate.
-    const anim = clamp((progress - 0.18) / 0.5, 0, 1);
-
-    /*
-     * Card ordering — matches spread z-order (Card 2 highest).
-     *
-     *   Spread:         Card 0 z=1,  Card 1 z=2,  Card 2 z=3
-     *   Initial stack:  Card 0 = BOT, Card 1 = MID, Card 2 = TOP
-     *   After swap 1:   Card 0 = TOP, Card 1 = BOT, Card 2 = MID
-     *   After swap 2:   Card 1 = TOP, Card 0 = MID, Card 2 = BOT
-     */
-
     cardEls.current.forEach((el, i) => {
       if (!el) return;
 
       let state: CardState;
 
       if (anim <= 0.25) {
-        /* ── Phase 1: Spread → Stack ──
-         * Cards converge preserving spread z-order:
-         * Card 2 on top, Card 1 middle, Card 0 bottom.
-         */
-        const t = smoothstep(anim / 0.25);
+        // Spread → Stack (smootherstep for zero-accel ramp)
+        const t = smootherstep(anim / 0.25);
         const slot = i === 2 ? SLOT_TOP : i === 1 ? SLOT_MID : SLOT_BOT;
         state = lerpState(spread[i], slot, t);
       } else if (anim <= 0.5) {
-        /* ── Phase 2: Swap — Card 0 (bottom) peels out RIGHT → lands on top ──
-         * Card 0 arcs right, z gradually rises.
-         * Card 2 slides top → middle, Card 1 middle → bottom.
-         */
-        const t = smoothstep((anim - 0.25) / 0.25);
+        // Swap 1 — Card 0 arcs right → top
+        const t = smootherstep((anim - 0.25) / 0.25);
 
         if (i === 0) {
           state = arcSwap(SLOT_BOT, SLOT_TOP, t, arcX, arcY, 1);
@@ -294,10 +497,8 @@ function StickyNotesSection() {
           state = lerpState(SLOT_MID, SLOT_BOT, t);
         }
       } else if (anim <= 0.75) {
-        /* ── Phase 3: Swap — Card 1 (now bottom) peels out LEFT → lands on top ──
-         * After phase 2: Card 0=TOP, Card 2=MID, Card 1=BOT
-         */
-        const t = smoothstep((anim - 0.5) / 0.25);
+        // Swap 2 — Card 1 arcs left → top
+        const t = smootherstep((anim - 0.5) / 0.25);
 
         if (i === 1) {
           state = arcSwap(SLOT_BOT, SLOT_TOP, t, arcX, arcY, -1);
@@ -307,9 +508,7 @@ function StickyNotesSection() {
           state = lerpState(SLOT_MID, SLOT_BOT, t);
         }
       } else {
-        /* ── Phase 4: Settled ──
-         * Final: Card 1=TOP, Card 0=MID, Card 2=BOT
-         */
+        // Settled — LOCKED, circle draws around them
         const slot = i === 1 ? SLOT_TOP : i === 0 ? SLOT_MID : SLOT_BOT;
         state = slot;
       }
@@ -323,6 +522,49 @@ function StickyNotesSection() {
       ref={sectionRef}
       className="relative h-[250vh] bg-[var(--background)]"
     >
+      {/* Hand-drawn scroll paths — separate desktop/mobile for proper sizing */}
+      {/* Desktop */}
+      <svg
+        ref={(el) => { drawPath.register(el); }}
+        className="pointer-events-none absolute inset-0 hidden h-full w-full md:block"
+        viewBox="0 0 1440 2400"
+        preserveAspectRatio="none"
+        fill="none"
+      >
+        <defs>
+          <filter id="pencil-d" x="-2%" y="-2%" width="104%" height="104%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" seed="7" result="n" />
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="2" xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+        </defs>
+        {DESKTOP_LINES.map((d, i) => (
+          <path key={i} d={d} stroke="currentColor" className="text-foreground"
+            strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" filter="url(#pencil-d)" />
+        ))}
+      </svg>
+      {/* Mobile */}
+      <svg
+        ref={(el) => { drawPath.register(el); }}
+        className="pointer-events-none absolute inset-0 h-full w-full md:hidden"
+        viewBox="0 0 400 2400"
+        preserveAspectRatio="none"
+        fill="none"
+      >
+        <defs>
+          <filter id="pencil-m" x="-2%" y="-2%" width="104%" height="104%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" seed="7" result="n" />
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="1.5" xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+        </defs>
+        {MOBILE_LINES.map((d, i) => (
+          <path key={i} d={d} stroke="currentColor" className="text-foreground"
+            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" filter="url(#pencil-m)" />
+        ))}
+      </svg>
+
+      {/* Floating illustrations — scattered throughout this section */}
+      <IllustrationLayer illustrations={STICKY_ILLUSTRATIONS} />
+
       {/* Title — pins independently near the top */}
       <motion.h2
         initial={{ opacity: 0 }}
@@ -361,7 +603,7 @@ function StickyNotesSection() {
             />
             <div className="absolute inset-0 flex items-center justify-center p-8 sm:p-7 md:p-9">
               <p
-                className={`text-center text-lg leading-relaxed sm:text-xl md:text-2xl ${note.font}`}
+                className={`whitespace-pre-line text-center text-lg leading-relaxed sm:text-xl md:text-2xl ${note.font}`}
                 style={{ color: "rgb(60, 50, 40)" }}
               >
                 {note.text}
@@ -371,6 +613,226 @@ function StickyNotesSection() {
         ))}
       </div>
     </section>
+  );
+}
+
+/* ── How It Works — three-step contribution flow ── */
+const STEPS = [
+  {
+    number: "01",
+    title: "Contribute",
+    description: "Share your course notes, study guides, and exam materials from your university.",
+    font: "font-gochi",
+  },
+  {
+    number: "02",
+    title: "Moderate",
+    description: "Submissions are reviewed, cross-checked, and verified by the community.",
+    font: "font-delicious",
+  },
+  {
+    number: "03",
+    title: "Learn",
+    description: "Original study resources are created — examples, practices, and mock exams for everyone.",
+    font: "font-gochi",
+  },
+];
+
+function HowItWorksSection() {
+  return (
+    <section className="relative overflow-hidden bg-[var(--background)] py-24 sm:py-32 md:py-40">
+      <IllustrationLayer illustrations={HOWITWORKS_ILLUSTRATIONS} />
+
+      <div className="relative z-10 mx-auto max-w-4xl px-6">
+        <motion.h2
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, margin: "-10%" }}
+          transition={{ duration: 0.7, ease }}
+          className="mb-16 text-center font-display text-3xl font-light text-foreground sm:mb-20 sm:text-4xl md:text-5xl"
+        >
+          How It Works
+        </motion.h2>
+
+        <div className="flex flex-col items-center gap-12 sm:gap-16 md:gap-20">
+          {STEPS.map((step, i) => (
+            <motion.div
+              key={step.number}
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true, margin: "-5%" }}
+              transition={{ duration: 0.7, ease, delay: i * 0.12 }}
+              className="flex w-full max-w-lg flex-col items-center gap-4 text-center"
+            >
+              <span className="font-display text-6xl font-light text-[#5227FF] opacity-40 sm:text-7xl">
+                {step.number}
+              </span>
+              <h3 className={`text-2xl text-foreground sm:text-3xl ${step.font}`}>
+                {step.title}
+              </h3>
+              <p className="max-w-sm text-base leading-relaxed text-foreground/60 sm:text-lg">
+                {step.description}
+              </p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Features — key platform features ── */
+const FEATURES = [
+  {
+    title: "Mock Exams",
+    description: "Practice with real-style exams, multiple versions, instant scoring.",
+    font: "font-gochi",
+  },
+  {
+    title: "Study Guides",
+    description: "Structured content built from verified student contributions.",
+    font: "font-delicious",
+  },
+  {
+    title: "Presentations",
+    description: "Class presentations toggled live by instructors, then yours forever.",
+    font: "font-gochi",
+  },
+  {
+    title: "Professor Ratings",
+    description: "Anonymous, moderated reviews — know before you enroll.",
+    font: "font-delicious",
+  },
+  {
+    title: "Progress Tracking",
+    description: "See your scores improve over time, course by course.",
+    font: "font-gochi",
+  },
+  {
+    title: "Community Driven",
+    description: "Built by students, powered by the community — for everyone.",
+    font: "font-delicious",
+  },
+];
+
+function FeaturesSection() {
+  return (
+    <section className="relative overflow-hidden bg-[var(--background)] py-24 sm:py-32 md:py-40">
+      <IllustrationLayer illustrations={FEATURES_ILLUSTRATIONS} />
+
+      <div className="relative z-10 mx-auto max-w-5xl px-6">
+        <motion.h2
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, margin: "-10%" }}
+          transition={{ duration: 0.7, ease }}
+          className="mb-16 text-center font-display text-3xl font-light text-foreground sm:mb-20 sm:text-4xl md:text-5xl"
+        >
+          Everything You Need
+        </motion.h2>
+
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3">
+          {FEATURES.map((feature, i) => (
+            <motion.div
+              key={feature.title}
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true, margin: "-5%" }}
+              transition={{ duration: 0.6, ease, delay: i * 0.08 }}
+              className="flex flex-col items-center gap-3 rounded-3xl border border-foreground/[0.06] bg-foreground/[0.02] px-6 py-8 text-center backdrop-blur-sm sm:px-8 sm:py-10"
+            >
+              <h3 className={`text-xl text-foreground sm:text-2xl ${feature.font}`}>
+                {feature.title}
+              </h3>
+              <p className="max-w-xs text-sm leading-relaxed text-foreground/50 sm:text-base">
+                {feature.description}
+              </p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Community / About section ── */
+function CommunitySection() {
+  return (
+    <section className="relative overflow-hidden bg-[var(--background)] py-24 sm:py-32 md:py-40">
+      <IllustrationLayer illustrations={COMMUNITY_ILLUSTRATIONS} />
+
+      <div className="relative z-10 mx-auto flex max-w-3xl flex-col items-center gap-8 px-6 text-center sm:gap-12">
+        <motion.h2
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, margin: "-10%" }}
+          transition={{ duration: 0.7, ease }}
+          className="font-display text-3xl font-light text-foreground sm:text-4xl md:text-5xl"
+        >
+          Built By The Community
+        </motion.h2>
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, margin: "-5%" }}
+          transition={{ duration: 0.7, ease, delay: 0.1 }}
+          className="max-w-xl text-base leading-relaxed text-foreground/60 sm:text-lg md:text-xl"
+        >
+          Libraryyy is an open-source platform where students contribute, verify, and build
+          study resources together. Every note you share helps someone else succeed.
+        </motion.p>
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, margin: "-5%" }}
+          transition={{ duration: 0.7, ease, delay: 0.2 }}
+          className="max-w-lg text-base leading-relaxed text-foreground/40 sm:text-lg"
+        >
+          Professors can become Core Contributors — verified educators who shape the
+          study material directly. Students and professors, building the future of learning.
+        </motion.p>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7, ease, delay: 0.3 }}
+        >
+          <Link
+            href="/auth"
+            className="inline-flex items-center justify-center rounded-full bg-[#5227FF] px-8 py-3 text-base font-medium text-white transition-opacity hover:opacity-90 sm:px-10 sm:py-4 sm:text-lg"
+          >
+            Join The Community
+          </Link>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Footer ── */
+function Footer() {
+  return (
+    <footer className="border-t border-foreground/[0.06] bg-[var(--background)] py-12 sm:py-16">
+      <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 px-6 text-center">
+        <Link href="/" className="font-display text-2xl font-light text-foreground sm:text-3xl">
+          Libraryyy
+        </Link>
+        <p className="font-gochi text-sm text-foreground/40 sm:text-base">
+          By A Student, For A Student
+        </p>
+        <div className="flex items-center gap-6">
+          <Link href="/auth" className="text-sm text-foreground/50 transition-colors hover:text-foreground sm:text-base">
+            Get Started
+          </Link>
+          <Link href="/portal" className="text-sm text-foreground/50 transition-colors hover:text-foreground sm:text-base">
+            Portal
+          </Link>
+        </div>
+      </div>
+    </footer>
   );
 }
 
@@ -395,11 +857,9 @@ export default function Home() {
             transition={{ duration: 0.6, ease, delay: 0.3 }}
             className="flex w-full items-center justify-center gap-2 px-6 pt-7 sm:gap-4 sm:px-10 sm:pt-9"
           >
-            {/* Delicious Handrawn font — for comparison */}
             <NavLink href="/auth" font="delicious">
               Lets Start
             </NavLink>
-            {/* Gochi Hand font — for comparison */}
             <NavLink href="/portal" font="gochi">
               Portal
             </NavLink>
@@ -453,6 +913,18 @@ export default function Home() {
 
       {/* ── Sticky Notes Section ── */}
       <StickyNotesSection />
+
+      {/* ── How It Works ── */}
+      <HowItWorksSection />
+
+      {/* ── Features ── */}
+      <FeaturesSection />
+
+      {/* ── Community / About ── */}
+      <CommunitySection />
+
+      {/* ── Footer ── */}
+      <Footer />
     </ReactLenis>
   );
 }

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { noteAsset } from "@/database/schema";
 import { uploadToR2 } from "@/lib/r2";
 import { rateLimit } from "@/lib/rate-limit";
 import { createHash } from "crypto";
@@ -67,6 +69,15 @@ export async function POST(req: NextRequest) {
   if (!result.success) {
     return NextResponse.json({ error: "Upload failed." }, { status: 500 });
   }
+
+  // Record asset in database
+  await db.insert(noteAsset).values({
+    userId: session.user.id,
+    url: result.url,
+    objectKey,
+    fileName: file.name,
+    fileSize: compressed.length,
+  });
 
   return NextResponse.json({ url: result.url });
 }

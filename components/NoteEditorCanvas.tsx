@@ -85,6 +85,8 @@ import {
   ArrowUpRight,
   LineSegment,
   CaretDown,
+  CornersOut,
+  CornersIn,
 } from "@phosphor-icons/react";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
@@ -290,6 +292,9 @@ export default function NoteEditorCanvas({
   initialFont,
 }: NoteEditorProps) {
   const [editor, setEditor] = useState<Editor | null>(null);
+  const minZoomRef = useRef(1);
+  const maxZoom = 4;
+  const [zoomLevel, setZoomLevel] = useState(1);
   const [title, setTitle] = useState(initialTitle);
   const [paperStyle, setPaperStyle] = useState<PaperStyle>(
     initialPaperStyle as PaperStyle
@@ -314,13 +319,15 @@ export default function NoteEditorCanvas({
   const [opacity, setOpacity] = useState(1);
   // Only one tool dropdown open at a time
   const [openToolDropdown, setOpenToolDropdown] = useState<string | null>(null);
+  // Focus mode — hides title bar + toolbar, paper fits with breathing room
+  const [focusMode, setFocusMode] = useState(false);
 
-  // Sync atoms eagerly during render so tldraw's track()-wrapped Background/Grid
-  // components see the correct values immediately. The React warning about
-  // "setState during render" is expected — tldraw atoms aren't React state.
-  paperStyleAtom.set(paperStyle);
-  paperColorAtom.set(paperColor);
-  lineAlignAtom.set(lineAlign);
+  // Sync atoms so tldraw's track()-wrapped Background/Grid components react.
+  useEffect(() => {
+    paperStyleAtom.set(paperStyle);
+    paperColorAtom.set(paperColor);
+    lineAlignAtom.set(lineAlign);
+  }, [paperStyle, paperColor, lineAlign]);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(null);
   const [pageInfo, setPageInfo] = useState({ currentIndex: 0, total: 1 });
@@ -340,21 +347,28 @@ export default function NoteEditorCanvas({
 
   // Save ref — always points to latest
   const saveRef = useRef<(e: Editor) => Promise<void>>(async () => {});
+  const lastSavedHash = useRef("");
 
   const save = useCallback(
     async (e: Editor) => {
+      const snapshot = getSnapshot(e.store);
+      const content = JSON.stringify(snapshot);
+      // Build a simple hash of everything that would be saved
+      const hash = `${title}|${paperStyle}|${paperColor}|${paperSize}|${lineAlign}|${font}|${content.length}:${content.slice(0, 200)}:${content.slice(-200)}`;
+      if (hash === lastSavedHash.current) return; // Nothing changed — skip DB call
+
       setSaving(true);
       try {
-        const snapshot = getSnapshot(e.store);
         await updateNote(noteId, {
           title,
-          content: JSON.stringify(snapshot),
+          content,
           paperStyle,
           paperColor,
           paperSize,
           lineAlign,
           font,
         });
+        lastSavedHash.current = hash;
       } catch {
         // Fail silently — auto-save retries
       }
@@ -381,6 +395,31 @@ export default function NoteEditorCanvas({
       // Only text gets magnetic line-snapping (handled below).
       e.updateInstanceState({ isGridMode: false });
       syncPages(e);
+
+      // Lock zoom-out at the initial level (the page-load zoom).
+      // Finer zoom-in steps (10% increments) for a smooth experience.
+      const initZoom = e.getZoomLevel();
+      minZoomRef.current = initZoom;
+      setZoomLevel(initZoom);
+      const steps: number[] = [initZoom];
+      for (let z = initZoom + 0.1; z <= 4; z = Math.round((z + 0.1) * 100) / 100) {
+        steps.push(z);
+      }
+
+      // Constrain panning to paper bounds — no infinite canvas.
+      const sz = PAPER_SIZES[paperSizeRef.current] ?? PAPER_SIZES.a4;
+      e.setCameraOptions({
+        zoomSteps: steps,
+        zoomSpeed: 1,
+        constraints: {
+          bounds: { x: 0, y: 0, w: sz.width, h: sz.height },
+          padding: { x: 32, y: 32 },
+          origin: { x: 0.5, y: 0 },
+          initialZoom: "fit-x",
+          baseZoom: "fit-x",
+          behavior: "contain",
+        },
+      });
 
       const getPaperWidth = () => {
         const sz = PAPER_SIZES[paperSizeRef.current] ?? PAPER_SIZES.a4;
@@ -466,9 +505,16 @@ export default function NoteEditorCanvas({
         }
       );
 
+      // Track zoom level changes for button disable state
+      const cleanupCameraListener = e.store.listen(
+        () => setZoomLevel(e.getZoomLevel()),
+        { source: "all", scope: "document" }
+      );
+
       return () => {
         cleanupAfterCreate();
         cleanupAfterChange();
+        cleanupCameraListener();
         if (snapTimer) clearTimeout(snapTimer);
       };
     },
@@ -602,13 +648,69 @@ export default function NoteEditorCanvas({
   // Image upload — delegates to tldraw's built-in handler which uses our asset store
   const handleImageUpload = () => fileInputRef.current?.click();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !editor) return;
     // Delegate to tldraw — it handles asset creation, dimension detection,
     // and shape placement, calling our noteAssetStore.upload() for R2 upload
     editor.putExternalContent({ type: "files", files: [file] });
     e.target.value = "";
+    // Refresh gallery after a short delay (upload takes a moment)
+    setTimeout(() => fetchAssets(), 2000);
+  };
+
+  // Image gallery — previously uploaded assets
+  type NoteAsset = { id: string; url: string; objectKey: string; fileName: string | null; fileSize: number | null; createdAt: string };
+  const [galleryAssets, setGalleryAssets] = useState<NoteAsset[]>([]);
+  const [galleryLoading, setGalleryLoading] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+
+  const fetchAssets = useCallback(async () => {
+    setGalleryLoading(true);
+    try {
+      const res = await fetch("/api/notes/assets");
+      if (res.ok) {
+        const { assets } = await res.json();
+        setGalleryAssets(assets);
+      }
+    } catch { /* silent */ }
+    setGalleryLoading(false);
+  }, []);
+
+  // Fetch gallery when popover opens
+  useEffect(() => {
+    if (galleryOpen) fetchAssets();
+  }, [galleryOpen, fetchAssets]);
+
+  const insertImageFromUrl = (url: string) => {
+    if (!editor) return;
+    const center = editor.getViewportScreenCenter();
+    const pagePoint = editor.screenToPage(center);
+    // Create an image asset + shape at the center of the viewport
+    const assetId = `asset:gallery_${Date.now()}` as const;
+    editor.createAssets([{
+      id: assetId as any,
+      type: "image",
+      typeName: "asset",
+      props: { name: "image", src: url, w: 300, h: 300, mimeType: "image/webp", isAnimated: false },
+      meta: {},
+    }]);
+    editor.createShape({
+      type: "image",
+      x: pagePoint.x - 150,
+      y: pagePoint.y - 150,
+      props: { assetId: assetId as any, w: 300, h: 300 },
+    });
+    setGalleryOpen(false);
+  };
+
+  const deleteAsset = async (assetId: string) => {
+    try {
+      const res = await fetch(`/api/notes/assets/${assetId}`, { method: "DELETE" });
+      if (res.ok) {
+        setGalleryAssets((prev) => prev.filter((a) => a.id !== assetId));
+      }
+    } catch { /* silent */ }
   };
 
   // Active tool tracking
@@ -635,12 +737,15 @@ export default function NoteEditorCanvas({
         transition={{ duration: 0.5, ease }}
         className="flex h-full flex-col"
       >
-        {/* Title bar */}
+        {/* Title bar — hidden in focus mode */}
+        <AnimatePresence>
+        {!focusMode && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, ease, delay: 0.1 }}
-          className="shrink-0 px-6"
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.3, ease }}
+          className="shrink-0 overflow-hidden px-6"
         >
           <div className="mx-auto flex max-w-5xl items-center gap-3 py-2">
             <input
@@ -699,13 +804,18 @@ export default function NoteEditorCanvas({
             </motion.span>
           </div>
         </motion.div>
+        )}
+        </AnimatePresence>
 
-        {/* Toolbar — all tools with dropdowns + paper settings */}
+        {/* Toolbar — hidden in focus mode (replaced by floating compact bar) */}
+        <AnimatePresence>
+        {!focusMode && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, ease, delay: 0.15 }}
-          className="shrink-0 border-y border-gray-900/5 dark:border-white/5"
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.3, ease }}
+          className="shrink-0 overflow-hidden border-y border-gray-900/5 dark:border-white/5"
         >
           <div className="mx-auto flex max-w-5xl items-center gap-1 overflow-x-auto px-6 py-2 scrollbar-hide">
             {/* Simple tools — no dropdown */}
@@ -724,22 +834,30 @@ export default function NoteEditorCanvas({
               </ToolBtn>
             ))}
 
-            {/* Drawing tools — each has a dropdown with style options */}
+            {/* Drawing tools — first click activates, second click opens dropdown */}
             {DRAWING_TOOLS.map((tool) => (
               <Popover
                 key={tool.id}
                 open={openToolDropdown === tool.id}
                 onOpenChange={(open) => {
-                  setOpenToolDropdown(open ? tool.id : null);
-                  if (open) {
-                    editor?.setCurrentTool(tool.id);
-                    setActiveTool(tool.id);
-                  }
+                  if (!open) setOpenToolDropdown(null);
                 }}
               >
                 <PopoverTrigger asChild>
                   <button
                     title={tool.label}
+                    onClick={(e) => {
+                      if (activeTool === tool.id) {
+                        // Already active → toggle dropdown
+                        setOpenToolDropdown(openToolDropdown === tool.id ? null : tool.id);
+                      } else {
+                        // First click → just activate the tool
+                        e.preventDefault();
+                        editor?.setCurrentTool(tool.id);
+                        setActiveTool(tool.id);
+                        setOpenToolDropdown(null);
+                      }
+                    }}
                     className={`flex shrink-0 items-center gap-0.5 rounded-full px-2 py-1 text-xs font-medium transition-colors ${
                       activeTool === tool.id
                         ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white"
@@ -878,20 +996,26 @@ export default function NoteEditorCanvas({
               </Popover>
             ))}
 
-            {/* Shape tool — dropdown with shape grid + style options */}
+            {/* Shape tool — first click activates, second click opens dropdown */}
             <Popover
               open={openToolDropdown === "geo"}
               onOpenChange={(open) => {
-                setOpenToolDropdown(open ? "geo" : null);
-                if (open) {
-                  editor?.setCurrentTool("geo");
-                  setActiveTool("geo");
-                }
+                if (!open) setOpenToolDropdown(null);
               }}
             >
               <PopoverTrigger asChild>
                 <button
                   title="Shape"
+                  onClick={(e) => {
+                    if (activeTool === "geo") {
+                      setOpenToolDropdown(openToolDropdown === "geo" ? null : "geo");
+                    } else {
+                      e.preventDefault();
+                      editor?.setCurrentTool("geo");
+                      setActiveTool("geo");
+                      setOpenToolDropdown(null);
+                    }
+                  }}
                   className={`flex shrink-0 items-center gap-0.5 rounded-full px-2 py-1 text-xs font-medium transition-colors ${
                     activeTool === "geo"
                       ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white"
@@ -987,23 +1111,100 @@ export default function NoteEditorCanvas({
 
             <Separator orientation="vertical" className="mx-1 h-4 shrink-0 bg-gray-900/10 dark:bg-white/10" />
 
-            {/* Image upload */}
-            <ToolBtn onClick={handleImageUpload} label="Insert Image">
-              <ImageSquare size={14} weight="duotone" />
-            </ToolBtn>
+            {/* Image gallery + upload */}
+            <Popover open={galleryOpen} onOpenChange={setGalleryOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  title="Insert Image"
+                  className={`rounded-full px-2 py-1 text-xs font-medium transition-colors ${
+                    galleryOpen
+                      ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white"
+                      : "text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900/70 dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70"
+                  }`}
+                >
+                  <ImageSquare size={14} weight="duotone" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-72 rounded-2xl border-gray-900/10 bg-white/95 p-0 backdrop-blur-xl dark:border-white/15 dark:bg-gray-900/95"
+                align="center"
+                sideOffset={8}
+              >
+                <div className="p-3">
+                  <div className="mb-2 flex items-center justify-center gap-2">
+                    <span className="text-center text-xs font-medium text-gray-900/60 dark:text-white/60">Images</span>
+                  </div>
+
+                  {/* Upload new */}
+                  <button
+                    onClick={handleImageUpload}
+                    className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gray-900/15 py-2.5 text-xs text-gray-900/50 transition-colors hover:border-[#5227FF]/40 hover:text-[#5227FF] dark:border-white/15 dark:text-white/50 dark:hover:border-[#5227FF]/40 dark:hover:text-[#5227FF]"
+                  >
+                    <Plus size={14} weight="bold" />
+                    Upload New
+                  </button>
+
+                  {/* Gallery grid */}
+                  {galleryLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <span className="text-xs text-gray-900/30 dark:text-white/30">Loading...</span>
+                    </div>
+                  ) : galleryAssets.length === 0 ? (
+                    <div className="flex items-center justify-center py-6">
+                      <span className="text-xs text-gray-900/30 dark:text-white/30">No Images Yet</span>
+                    </div>
+                  ) : (
+                    <div className="grid max-h-52 grid-cols-3 gap-1.5 overflow-y-auto">
+                      {galleryAssets.map((asset) => (
+                        <div key={asset.id} className="group relative">
+                          <button
+                            onClick={() => insertImageFromUrl(asset.url)}
+                            className="block w-full overflow-hidden rounded-lg border border-gray-900/5 transition-all hover:border-[#5227FF]/40 hover:shadow-sm dark:border-white/10 dark:hover:border-[#5227FF]/40"
+                          >
+                            <img
+                              src={asset.url}
+                              alt={asset.fileName || "Image"}
+                              className="aspect-square w-full object-cover"
+                              loading="lazy"
+                            />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteAsset(asset.id);
+                            }}
+                            className="absolute -right-1 -top-1 hidden rounded-full bg-red-500 p-0.5 text-white shadow-sm transition-transform hover:scale-110 group-hover:block"
+                            title="Delete"
+                          >
+                            <Trash size={10} weight="bold" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
 
             <Separator orientation="vertical" className="mx-1 h-4 shrink-0 bg-gray-900/10 dark:bg-white/10" />
 
             {/* Zoom */}
             <div className="flex shrink-0 items-center gap-0.5">
-              <ToolBtn onClick={() => editor?.zoomIn(editor.getViewportScreenCenter(), { animation: { duration: 200 } })} label="Zoom In">
+              <ToolBtn disabled={zoomLevel >= maxZoom} onClick={() => editor?.zoomIn(editor.getViewportScreenCenter(), { animation: { duration: 200 } })} label="Zoom In">
                 <MagnifyingGlassPlus size={14} weight="duotone" />
               </ToolBtn>
-              <ToolBtn onClick={() => editor?.zoomOut(editor.getViewportScreenCenter(), { animation: { duration: 200 } })} label="Zoom Out">
+              <ToolBtn disabled={zoomLevel <= minZoomRef.current} onClick={() => editor?.zoomOut(editor.getViewportScreenCenter(), { animation: { duration: 200 } })} label="Zoom Out">
                 <MagnifyingGlassMinus size={14} weight="duotone" />
               </ToolBtn>
             </div>
+
+            <Separator orientation="vertical" className="mx-1 h-4 shrink-0 bg-gray-900/10 dark:bg-white/10" />
+
+            {/* Focus mode */}
+            <ToolBtn onClick={() => setFocusMode(true)} label="Focus Mode">
+              <CornersOut size={14} weight="duotone" />
+            </ToolBtn>
 
             {/* Spacer */}
             <div className="flex-1" />
@@ -1103,6 +1304,8 @@ export default function NoteEditorCanvas({
             </Popover>
           </div>
         </motion.div>
+        )}
+        </AnimatePresence>
 
         {/* Notebook paper card — tldraw canvas inside, NO SCROLL */}
         <div className="flex min-h-0 flex-1 items-center justify-center px-4 py-4 sm:px-6 sm:py-6">
@@ -1114,8 +1317,9 @@ export default function NoteEditorCanvas({
               width: "100%",
               maxWidth: sizeConfig.width,
               height: "100%",
-              maxHeight: `min(100%, ${sizeConfig.height}px)`,
-              aspectRatio: `${sizeConfig.width} / ${sizeConfig.height}`,
+              // Normal: paper card with aspect ratio. Focus: same width, fills available height.
+              ...(focusMode ? {} : { maxHeight: `min(100%, ${sizeConfig.height}px)`, aspectRatio: `${sizeConfig.width} / ${sizeConfig.height}` }),
+              touchAction: "none",
             }}
           >
             <Tldraw
@@ -1127,12 +1331,73 @@ export default function NoteEditorCanvas({
             />
           </motion.div>
         </div>
+
+        {/* Focus mode — compact floating toolbar at bottom */}
+        <AnimatePresence>
+          {focusMode && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ duration: 0.3, ease }}
+              className="pointer-events-none absolute inset-x-0 bottom-6 z-50 flex justify-center"
+            >
+              <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-gray-900/10 bg-white/90 px-2 py-1.5 shadow-lg backdrop-blur-xl dark:border-white/15 dark:bg-gray-900/90">
+                {/* Core drawing tools only */}
+                {SIMPLE_TOOLS.map((tool) => (
+                  <ToolBtn
+                    key={tool.id}
+                    active={activeTool === tool.id}
+                    onClick={() => { editor?.setCurrentTool(tool.id); setActiveTool(tool.id); }}
+                    label={tool.label}
+                  >
+                    <tool.icon size={14} weight="duotone" />
+                  </ToolBtn>
+                ))}
+                <Separator orientation="vertical" className="mx-0.5 h-4 shrink-0 bg-gray-900/10 dark:bg-white/10" />
+                {DRAWING_TOOLS.map((tool) => (
+                  <ToolBtn
+                    key={tool.id}
+                    active={activeTool === tool.id}
+                    onClick={() => { editor?.setCurrentTool(tool.id); setActiveTool(tool.id); }}
+                    label={tool.label}
+                  >
+                    <tool.icon size={14} weight="duotone" />
+                  </ToolBtn>
+                ))}
+                <ToolBtn
+                  active={activeTool === "geo"}
+                  onClick={() => { editor?.setCurrentTool("geo"); setActiveTool("geo"); }}
+                  label="Shape"
+                >
+                  {(() => { const I = GEO_SHAPES.find((s) => s.id === activeGeo)?.icon ?? Rectangle; return <I size={14} weight="duotone" />; })()}
+                </ToolBtn>
+                <Separator orientation="vertical" className="mx-0.5 h-4 shrink-0 bg-gray-900/10 dark:bg-white/10" />
+                <ToolBtn onClick={() => editor?.undo()} label="Undo">
+                  <ArrowCounterClockwise size={14} weight="duotone" />
+                </ToolBtn>
+                <ToolBtn onClick={() => editor?.redo()} label="Redo">
+                  <ArrowClockwise size={14} weight="duotone" />
+                </ToolBtn>
+                <Separator orientation="vertical" className="mx-0.5 h-4 shrink-0 bg-gray-900/10 dark:bg-white/10" />
+                {/* Exit focus mode */}
+                <ToolBtn onClick={() => setFocusMode(false)} label="Exit Focus Mode">
+                  <CornersIn size={14} weight="duotone" />
+                </ToolBtn>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
 
-      {/* Hide tldraw's default UI — we use our own toolbar */}
+      {/* Hide tldraw's default UI + watermark — we use our own toolbar */}
       <style>{`
         .note-canvas-container .tlui-layout { display: none !important; }
         .note-canvas-container .tl-overlays__item { pointer-events: auto; }
+        .note-canvas-container canvas { touch-action: none !important; }
+        .note-canvas-container [class*="watermark"],
+        .note-canvas-container [style*="z-index: 200"],
+        .note-canvas-container a[href*="tldraw"] { display: none !important; }
       `}</style>
     </>
   );
@@ -1145,22 +1410,27 @@ export default function NoteEditorCanvas({
 function ToolBtn({
   children,
   active,
+  disabled,
   onClick,
   label,
 }: {
   children: React.ReactNode;
   active?: boolean;
+  disabled?: boolean;
   onClick?: () => void;
   label: string;
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       title={label}
       className={`rounded-full px-2 py-1 text-xs font-medium transition-colors ${
-        active
-          ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white"
-          : "text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900/70 dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70"
+        disabled
+          ? "cursor-not-allowed text-gray-900/20 dark:text-white/20"
+          : active
+            ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white"
+            : "text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900/70 dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70"
       }`}
     >
       {children}
