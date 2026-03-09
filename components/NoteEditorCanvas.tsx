@@ -115,6 +115,12 @@ const NotebookBackground = track(function NotebookBackground() {
   const zoom = camera.z;
   const spacing = LINE_HEIGHT;
 
+  // Adaptive line color — light lines on dark paper, dark lines on light paper
+  const dark = isDarkColor(color);
+  const lineColor = dark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.15)";
+  const gridColor = dark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.12)";
+  const dotColor = dark ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.2)";
+
   const style: React.CSSProperties = {
     position: "absolute",
     inset: 0,
@@ -127,20 +133,20 @@ const NotebookBackground = track(function NotebookBackground() {
     const oy = camera.y * zoom;
 
     if (paperStyle === "lined") {
-      style.backgroundImage = `repeating-linear-gradient(transparent, transparent ${s - 1}px, rgba(0,0,0,0.15) ${s - 1}px, rgba(0,0,0,0.15) ${s}px)`;
+      style.backgroundImage = `repeating-linear-gradient(transparent, transparent ${s - 1}px, ${lineColor} ${s - 1}px, ${lineColor} ${s}px)`;
       style.backgroundPosition = `0px ${oy % s}px`;
       style.backgroundSize = `100% ${s}px`;
     } else if (paperStyle === "grid") {
       style.backgroundImage = [
-        `repeating-linear-gradient(transparent, transparent ${s - 1}px, rgba(0,0,0,0.12) ${s - 1}px, rgba(0,0,0,0.12) ${s}px)`,
-        `repeating-linear-gradient(90deg, transparent, transparent ${s - 1}px, rgba(0,0,0,0.12) ${s - 1}px, rgba(0,0,0,0.12) ${s}px)`,
+        `repeating-linear-gradient(transparent, transparent ${s - 1}px, ${gridColor} ${s - 1}px, ${gridColor} ${s}px)`,
+        `repeating-linear-gradient(90deg, transparent, transparent ${s - 1}px, ${gridColor} ${s - 1}px, ${gridColor} ${s}px)`,
       ].join(", ");
       style.backgroundPosition = `${ox % s}px ${oy % s}px`;
       style.backgroundSize = `${s}px ${s}px`;
     } else if (paperStyle === "dotted") {
       const ds = spacing * 0.75 * zoom;
       if (ds >= 4) {
-        style.backgroundImage = `radial-gradient(circle, rgba(0,0,0,0.2) ${Math.max(0.8, zoom * 0.8)}px, transparent ${Math.max(0.8, zoom * 0.8)}px)`;
+        style.backgroundImage = `radial-gradient(circle, ${dotColor} ${Math.max(0.8, zoom * 0.8)}px, transparent ${Math.max(0.8, zoom * 0.8)}px)`;
         style.backgroundPosition = `${ox % ds}px ${oy % ds}px`;
         style.backgroundSize = `${ds}px ${ds}px`;
       }
