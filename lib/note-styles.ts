@@ -33,7 +33,24 @@ export const PAPER_COLORS = [
   { label: "Green", value: "#e8f5e9" },
   { label: "Lavender", value: "#ede7f6" },
   { label: "Peach", value: "#fff3e0" },
+  { label: "Dark", value: "#1e1e1e" },
+  { label: "Charcoal", value: "#2d2d2d" },
+  { label: "Navy", value: "#1a1a2e" },
+  { label: "Forest", value: "#1a2e1a" },
+  { label: "Black", value: "#0a0a0a" },
 ] as const;
+
+/** Returns true if a hex color is dark (perceived luminance < 0.4) */
+export function isDarkColor(hex: string): boolean {
+  const c = hex.replace("#", "");
+  if (c.length < 6) return false;
+  const r = parseInt(c.slice(0, 2), 16) / 255;
+  const g = parseInt(c.slice(2, 4), 16) / 255;
+  const b = parseInt(c.slice(4, 6), 16) / 255;
+  // Relative luminance (sRGB)
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance < 0.4;
+}
 
 export const NOTE_FONTS = [
   { label: "Default", value: "default", className: "font-sans" },

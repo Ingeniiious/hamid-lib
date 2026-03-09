@@ -39,6 +39,7 @@ import {
   LINE_ALIGNS,
   LINE_HEIGHT,
   NOTE_FONTS,
+  isDarkColor,
   type PaperStyle,
   type PaperColor,
   type NoteFont,
