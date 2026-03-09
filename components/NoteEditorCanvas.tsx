@@ -296,14 +296,45 @@ export default function NoteEditorCanvas({
       e.updateInstanceState({ isGridMode: true });
       syncPages(e);
 
-      // Register text-to-line magnetic snapping
+      // Paper-aware text constraints:
+      // 1. Snap Y to line (magnetic alignment)
+      // 2. Clamp X so text stays within paper bounds
+      // 3. Set autoSize: false with paper-width wrap so text never overflows
+      const getPaperWidth = () => {
+        const sz = PAPER_SIZES[paperSizeRef.current] ?? PAPER_SIZES.a4;
+        return sz.width;
+      };
+      const textPadding = 24; // px padding from paper edges
+
       const cleanupAfterCreate = e.sideEffects.registerAfterCreateHandler(
         "shape",
         (shape) => {
           if (shape.type !== "text") return;
+          const pw = getPaperWidth();
+          const maxW = pw - textPadding * 2;
           const snappedY = snapYToLine(shape.y);
-          if (Math.abs(shape.y - snappedY) < 1) return;
-          e.updateShape({ id: shape.id, type: "text", y: snappedY });
+          const clampedX = Math.max(textPadding, Math.min(shape.x, pw - textPadding - 20));
+          const availW = pw - clampedX - textPadding;
+
+          const updates: Record<string, unknown> = {
+            id: shape.id,
+            type: "text",
+          };
+
+          if (Math.abs(shape.y - snappedY) >= 1) updates.y = snappedY;
+          if (Math.abs(shape.x - clampedX) >= 1) updates.x = clampedX;
+
+          // Force text wrap within paper bounds
+          if ((shape.props as { autoSize?: boolean }).autoSize !== false) {
+            updates.props = {
+              autoSize: false,
+              w: Math.min(maxW, availW),
+            };
+          }
+
+          if (Object.keys(updates).length > 2) {
+            e.updateShape(updates as Parameters<typeof e.updateShape>[0]);
+          }
         }
       );
 
@@ -311,11 +342,24 @@ export default function NoteEditorCanvas({
         "shape",
         (prev, next) => {
           if (next.type !== "text") return;
-          // Only snap when position changed (not content edits)
+          // Only act when position changed (not content edits)
           if (prev.x === next.x && prev.y === next.y) return;
+
+          const pw = getPaperWidth();
           const snappedY = snapYToLine(next.y);
-          if (Math.abs(next.y - snappedY) < 1) return;
-          e.updateShape({ id: next.id, type: "text", y: snappedY });
+          const clampedX = Math.max(textPadding, Math.min(next.x, pw - textPadding - 20));
+
+          const updates: Record<string, unknown> = {
+            id: next.id,
+            type: "text",
+          };
+
+          if (Math.abs(next.y - snappedY) >= 1) updates.y = snappedY;
+          if (Math.abs(next.x - clampedX) >= 1) updates.x = clampedX;
+
+          if (Object.keys(updates).length > 2) {
+            e.updateShape(updates as Parameters<typeof e.updateShape>[0]);
+          }
         }
       );
 
@@ -326,6 +370,10 @@ export default function NoteEditorCanvas({
     },
     [syncPages]
   );
+
+  // Keep a ref to current paperSize so the mount callback can read it
+  const paperSizeRef = useRef(paperSize);
+  paperSizeRef.current = paperSize;
 
   // Auto-save on canvas changes
   useEffect(() => {
