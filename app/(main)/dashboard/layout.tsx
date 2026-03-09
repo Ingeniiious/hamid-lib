@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { userProfile } from "@/database/schema";
 import { getAvatarUrl } from "@/lib/avatar";
@@ -21,6 +21,17 @@ export default async function DashboardLayout({
 }) {
   const { data: session } = await auth.getSession();
   if (!session) redirect("/auth");
+
+  // Extend 7-day Neon Auth sessions to 30 days for PWA persistence.
+  // Non-blocking — runs in the background, doesn't delay page render.
+  const sessionExpiry = new Date(session.session.expiresAt).getTime();
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+  if (sessionExpiry - Date.now() < 25 * 24 * 60 * 60 * 1000) {
+    const newExpiry = new Date(Date.now() + THIRTY_DAYS_MS);
+    db.execute(
+      sql`UPDATE neon_auth.session SET "expiresAt" = ${newExpiry} WHERE id = ${session.session.id}::uuid`
+    ).catch(() => {});
+  }
 
   const userName = session.user?.name || "Student";
 

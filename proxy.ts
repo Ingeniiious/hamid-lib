@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
+/** Neon Auth cookie names (prefix: __Secure-neon-auth) */
+const SESSION_TOKEN_COOKIE = "__Secure-neon-auth.session_token";
+const SESSION_DATA_COOKIE = "__Secure-neon-auth.local.session_data";
+
 /**
  * Matches any auth-related cookie set by Neon Auth / Better Auth.
  * Catches: session_token, session_data, neonauth.*, better-auth.*, etc.
@@ -139,7 +143,41 @@ export default async function proxy(request: NextRequest) {
   }
 
   const response = await neonMiddleware(request);
-  return persistSessionCookies(response);
+  const patched = persistSessionCookies(response);
+
+  // ── PWA cookie persistence ──────────────────────────────────
+  // Re-set existing auth cookies with 30-day Max-Age on every
+  // authenticated request. The upstream Neon Auth may set session
+  // cookies (no Expires/Max-Age) that iOS WebKit kills when the
+  // standalone PWA process is terminated. By re-setting them here
+  // with explicit persistence, we ensure they survive app restarts.
+  const sessionToken = request.cookies.get(SESSION_TOKEN_COOKIE);
+  if (sessionToken?.value) {
+    const expires = new Date(Date.now() + SESSION_MAX_AGE * 1000);
+    patched.cookies.set(SESSION_TOKEN_COOKIE, sessionToken.value, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none" as const,
+      path: "/",
+      maxAge: SESSION_MAX_AGE,
+      expires,
+    });
+
+    // Also refresh the session data cache cookie if present
+    const sessionData = request.cookies.get(SESSION_DATA_COOKIE);
+    if (sessionData?.value) {
+      patched.cookies.set(SESSION_DATA_COOKIE, sessionData.value, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax" as const,
+        path: "/",
+        maxAge: SESSION_MAX_AGE,
+        expires,
+      });
+    }
+  }
+
+  return patched;
 }
 
 export const config = {
