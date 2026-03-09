@@ -59,6 +59,15 @@ export const NOTE_FONTS = [
   { label: "Delicious", value: "delicious", className: "font-delicious" },
 ] as const;
 
+export const FONT_SIZES = [
+  { label: "S", value: "s" },
+  { label: "M", value: "m" },
+  { label: "L", value: "l" },
+  { label: "XL", value: "xl" },
+] as const;
+
+export type FontSize = (typeof FONT_SIZES)[number]["value"];
+
 /** Paper sizes — width & height in px for on-screen display (real aspect ratios) */
 export const PAPER_SIZES = {
   a4: { label: "A4", width: 640, height: 905 },

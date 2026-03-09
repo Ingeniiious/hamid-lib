@@ -17,6 +17,13 @@ import {
   type Editor,
 } from "tldraw";
 import type { TLAssetStore } from "@tldraw/tlschema";
+import {
+  DefaultSizeStyle,
+  DefaultColorStyle,
+  DefaultDashStyle,
+  DefaultFillStyle,
+  GeoShapeGeoStyle,
+} from "@tldraw/tlschema";
 import "tldraw/tldraw.css";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -39,12 +46,14 @@ import {
   LINE_ALIGNS,
   LINE_HEIGHT,
   NOTE_FONTS,
+  FONT_SIZES,
   isDarkColor,
   type PaperStyle,
   type PaperColor,
   type NoteFont,
   type PaperSize,
   type LineAlign,
+  type FontSize,
 } from "@/lib/note-styles";
 import { updateNote } from "@/app/(main)/dashboard/space/notes/actions";
 import {
@@ -63,6 +72,19 @@ import {
   Trash,
   MagnifyingGlassPlus,
   MagnifyingGlassMinus,
+  Highlighter,
+  Circle,
+  Triangle,
+  Diamond,
+  Star,
+  Heart,
+  Cloud,
+  Hexagon,
+  Pentagon,
+  Octagon,
+  ArrowUpRight,
+  LineSegment,
+  CaretDown,
 } from "@phosphor-icons/react";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
@@ -125,6 +147,7 @@ const NotebookBackground = track(function NotebookBackground() {
     position: "absolute",
     inset: 0,
     backgroundColor: color,
+    transition: "background-color 0.4s cubic-bezier(0.25,0.46,0.45,0.94)",
   };
 
   if (paperStyle !== "blank" && spacing * zoom >= 4) {
@@ -167,14 +190,65 @@ const tldrawComponents: TLComponents = {
   Grid: NotebookGrid,
 };
 
-// Canvas tool definitions
-const CANVAS_TOOLS = [
+// Simple tools — no dropdown, just activate on click
+const SIMPLE_TOOLS = [
   { id: "select", label: "Select", icon: Cursor },
   { id: "hand", label: "Pan", icon: Hand },
-  { id: "draw", label: "Draw", icon: PencilSimple },
-  { id: "eraser", label: "Eraser", icon: Eraser },
-  { id: "text", label: "Text", icon: TextAa },
-  { id: "geo", label: "Shape", icon: Rectangle },
+] as const;
+
+// Drawing tools — each gets a dropdown popover with relevant style options
+const DRAWING_TOOLS = [
+  { id: "draw", label: "Draw", icon: PencilSimple, hasColor: true, hasSize: true, hasStroke: true },
+  { id: "highlight", label: "Highlight", icon: Highlighter, hasColor: true, hasSize: true },
+  { id: "eraser", label: "Eraser", icon: Eraser, hasSize: true },
+  { id: "text", label: "Text", icon: TextAa, hasColor: true, hasSize: true },
+  { id: "arrow", label: "Arrow", icon: ArrowUpRight, hasColor: true, hasSize: true, hasFill: true, hasStroke: true },
+  { id: "line", label: "Line", icon: LineSegment, hasColor: true, hasSize: true, hasStroke: true },
+] as const;
+
+// Geo shape options — shown in shape picker dropdown
+const GEO_SHAPES = [
+  { id: "rectangle", label: "Rectangle", icon: Rectangle },
+  { id: "ellipse", label: "Ellipse", icon: Circle },
+  { id: "triangle", label: "Triangle", icon: Triangle },
+  { id: "diamond", label: "Diamond", icon: Diamond },
+  { id: "star", label: "Star", icon: Star },
+  { id: "heart", label: "Heart", icon: Heart },
+  { id: "cloud", label: "Cloud", icon: Cloud },
+  { id: "hexagon", label: "Hexagon", icon: Hexagon },
+  { id: "pentagon", label: "Pentagon", icon: Pentagon },
+  { id: "octagon", label: "Octagon", icon: Octagon },
+] as const;
+
+// tldraw color palette
+const TLDRAW_COLORS = [
+  { id: "black", hex: "#1d1d1d" },
+  { id: "grey", hex: "#adb5bd" },
+  { id: "white", hex: "#ffffff" },
+  { id: "red", hex: "#e03131" },
+  { id: "light-red", hex: "#ff8787" },
+  { id: "orange", hex: "#ff8534" },
+  { id: "yellow", hex: "#ffc034" },
+  { id: "green", hex: "#099268" },
+  { id: "light-green", hex: "#40c057" },
+  { id: "blue", hex: "#4263eb" },
+  { id: "light-blue", hex: "#4dabf7" },
+  { id: "violet", hex: "#ae3ec9" },
+  { id: "light-violet", hex: "#c9b1ff" },
+] as const;
+
+const FILL_STYLES = [
+  { id: "none", label: "None" },
+  { id: "semi", label: "Semi" },
+  { id: "solid", label: "Solid" },
+  { id: "pattern", label: "Pattern" },
+] as const;
+
+const DASH_STYLES = [
+  { id: "draw", label: "Draw" },
+  { id: "solid", label: "Solid" },
+  { id: "dashed", label: "Dashed" },
+  { id: "dotted", label: "Dotted" },
 ] as const;
 
 // ==================
@@ -228,8 +302,18 @@ export default function NoteEditorCanvas({
     initialLineAlign as LineAlign
   );
   const [font, setFont] = useState<NoteFont>(initialFont as NoteFont);
+  const [fontSize, setFontSize] = useState<FontSize>("m");
   const [customColor, setCustomColor] = useState(initialPaperColor);
   const [saving, setSaving] = useState(false);
+
+  // Style panel state — typed to match tldraw's style value unions
+  const [activeColor, setActiveColor] = useState<(typeof TLDRAW_COLORS)[number]["id"]>("black");
+  const [activeFill, setActiveFill] = useState<(typeof FILL_STYLES)[number]["id"]>("none");
+  const [activeDash, setActiveDash] = useState<(typeof DASH_STYLES)[number]["id"]>("draw");
+  const [activeGeo, setActiveGeo] = useState<(typeof GEO_SHAPES)[number]["id"]>("rectangle");
+  const [opacity, setOpacity] = useState(1);
+  // Only one tool dropdown open at a time
+  const [openToolDropdown, setOpenToolDropdown] = useState<string | null>(null);
 
   // Sync atoms eagerly during render so tldraw's track()-wrapped Background/Grid
   // components see the correct values immediately. The React warning about
@@ -293,19 +377,18 @@ export default function NoteEditorCanvas({
   const handleMount = useCallback(
     (e: Editor) => {
       setEditor(e);
-      e.updateInstanceState({ isGridMode: true });
+      // Grid mode OFF — shapes/arrows/lines move freely with no snapping.
+      // Only text gets magnetic line-snapping (handled below).
+      e.updateInstanceState({ isGridMode: false });
       syncPages(e);
 
-      // Paper-aware text constraints:
-      // 1. Snap Y to line (magnetic alignment)
-      // 2. Clamp X so text stays within paper bounds
-      // 3. Set autoSize: false with paper-width wrap so text never overflows
       const getPaperWidth = () => {
         const sz = PAPER_SIZES[paperSizeRef.current] ?? PAPER_SIZES.a4;
         return sz.width;
       };
       const textPadding = 24; // px padding from paper edges
 
+      // On text creation: instant snap + auto-wrap (new shapes don't need animation)
       const cleanupAfterCreate = e.sideEffects.registerAfterCreateHandler(
         "shape",
         (shape) => {
@@ -324,7 +407,6 @@ export default function NoteEditorCanvas({
           if (Math.abs(shape.y - snappedY) >= 1) updates.y = snappedY;
           if (Math.abs(shape.x - clampedX) >= 1) updates.x = clampedX;
 
-          // Force text wrap within paper bounds
           if ((shape.props as { autoSize?: boolean }).autoSize !== false) {
             updates.props = {
               autoSize: false,
@@ -338,34 +420,56 @@ export default function NoteEditorCanvas({
         }
       );
 
+      // On text move: debounced smooth snap — text moves freely during drag,
+      // then gently glides to the nearest line when the user releases.
+      let snapTimer: ReturnType<typeof setTimeout> | null = null;
+      let isSnapping = false; // guard against re-entrant snap triggers
+
       const cleanupAfterChange = e.sideEffects.registerAfterChangeHandler(
         "shape",
         (prev, next) => {
           if (next.type !== "text") return;
-          // Only act when position changed (not content edits)
           if (prev.x === next.x && prev.y === next.y) return;
+          if (isSnapping) return; // ignore position changes from our own animation
 
-          const pw = getPaperWidth();
-          const snappedY = snapYToLine(next.y);
-          const clampedX = Math.max(textPadding, Math.min(next.x, pw - textPadding - 20));
+          // Debounce: wait 120ms after the last move before snapping.
+          // This means text moves freely while dragging and only
+          // snaps once the user stops / releases.
+          if (snapTimer) clearTimeout(snapTimer);
+          const shapeId = next.id;
+          snapTimer = setTimeout(() => {
+            const shape = e.getShape(shapeId);
+            if (!shape || shape.type !== "text") return;
 
-          const updates: Record<string, unknown> = {
-            id: next.id,
-            type: "text",
-          };
+            const pw = getPaperWidth();
+            const snappedY = snapYToLine(shape.y);
+            const clampedX = Math.max(textPadding, Math.min(shape.x, pw - textPadding - 20));
 
-          if (Math.abs(next.y - snappedY) >= 1) updates.y = snappedY;
-          if (Math.abs(next.x - clampedX) >= 1) updates.x = clampedX;
+            const needsSnapY = Math.abs(shape.y - snappedY) >= 1;
+            const needsClampX = Math.abs(shape.x - clampedX) >= 1;
 
-          if (Object.keys(updates).length > 2) {
-            e.updateShape(updates as Parameters<typeof e.updateShape>[0]);
-          }
+            if (!needsSnapY && !needsClampX) return;
+
+            isSnapping = true;
+            e.animateShape(
+              {
+                id: shape.id,
+                type: "text",
+                ...(needsSnapY && { y: snappedY }),
+                ...(needsClampX && { x: clampedX }),
+              },
+              { animation: { duration: 180, easing: (t) => 1 - Math.pow(1 - t, 3) } }
+            );
+            // Reset guard after animation completes
+            setTimeout(() => { isSnapping = false; }, 200);
+          }, 120);
         }
       );
 
       return () => {
         cleanupAfterCreate();
         cleanupAfterChange();
+        if (snapTimer) clearTimeout(snapTimer);
       };
     },
     [syncPages]
@@ -401,6 +505,67 @@ export default function NoteEditorCanvas({
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, []);
+
+  // Sync font size with tldraw — sets size for next + selected shapes
+  useEffect(() => {
+    if (!editor) return;
+    editor.setStyleForNextShapes(DefaultSizeStyle, fontSize);
+    editor.setStyleForSelectedShapes(DefaultSizeStyle, fontSize);
+  }, [editor, fontSize]);
+
+  // Sync style panel with tldraw
+  useEffect(() => {
+    if (!editor) return;
+    editor.setStyleForNextShapes(DefaultColorStyle, activeColor);
+    editor.setStyleForSelectedShapes(DefaultColorStyle, activeColor);
+  }, [editor, activeColor]);
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.setStyleForNextShapes(DefaultFillStyle, activeFill);
+    editor.setStyleForSelectedShapes(DefaultFillStyle, activeFill);
+  }, [editor, activeFill]);
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.setStyleForNextShapes(DefaultDashStyle, activeDash);
+    editor.setStyleForSelectedShapes(DefaultDashStyle, activeDash);
+  }, [editor, activeDash]);
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.setStyleForNextShapes(GeoShapeGeoStyle, activeGeo);
+    editor.setStyleForSelectedShapes(GeoShapeGeoStyle, activeGeo);
+  }, [editor, activeGeo]);
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.setOpacityForNextShapes(opacity);
+    editor.setOpacityForSelectedShapes(opacity);
+  }, [editor, opacity]);
+
+  // Read styles from selected shapes when selection changes
+  useEffect(() => {
+    if (!editor) return;
+    const cleanup = editor.store.listen(() => {
+      const styles = editor.getSharedStyles();
+      const color = styles.get(DefaultColorStyle);
+      if (color?.type === "shared") setActiveColor(color.value);
+      const fill = styles.get(DefaultFillStyle);
+      const validFills = FILL_STYLES.map((f) => f.id) as string[];
+      if (fill?.type === "shared" && validFills.includes(fill.value))
+        setActiveFill(fill.value as (typeof FILL_STYLES)[number]["id"]);
+      const dash = styles.get(DefaultDashStyle);
+      if (dash?.type === "shared") setActiveDash(dash.value);
+      const geo = styles.get(GeoShapeGeoStyle);
+      const validGeos = GEO_SHAPES.map((g) => g.id) as string[];
+      if (geo?.type === "shared" && validGeos.includes(geo.value))
+        setActiveGeo(geo.value as (typeof GEO_SHAPES)[number]["id"]);
+      const size = styles.get(DefaultSizeStyle);
+      if (size?.type === "shared") setFontSize(size.value as FontSize);
+    }, { source: "user", scope: "session" });
+    return cleanup;
+  }, [editor]);
 
   // Page navigation
   const goToPage = useCallback(
@@ -535,86 +700,307 @@ export default function NoteEditorCanvas({
           </div>
         </motion.div>
 
-        {/* Toolbar — canvas tools + paper settings */}
+        {/* Toolbar — all tools with dropdowns + paper settings */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, ease, delay: 0.15 }}
-          className="shrink-0 border-y border-gray-900/5 px-6 dark:border-white/5"
+          className="shrink-0 border-y border-gray-900/5 dark:border-white/5"
         >
-          <div className="mx-auto flex max-w-5xl items-center gap-1 py-2">
-            {/* Canvas tools */}
-            <div className="flex items-center gap-0.5">
-              {CANVAS_TOOLS.map((tool) => (
-                <ToolBtn
-                  key={tool.id}
-                  active={activeTool === tool.id}
-                  onClick={() => {
+          <div className="mx-auto flex max-w-5xl items-center gap-1 overflow-x-auto px-6 py-2 scrollbar-hide">
+            {/* Simple tools — no dropdown */}
+            {SIMPLE_TOOLS.map((tool) => (
+              <ToolBtn
+                key={tool.id}
+                active={activeTool === tool.id}
+                onClick={() => {
+                  editor?.setCurrentTool(tool.id);
+                  setActiveTool(tool.id);
+                  setOpenToolDropdown(null);
+                }}
+                label={tool.label}
+              >
+                <tool.icon size={14} weight="duotone" />
+              </ToolBtn>
+            ))}
+
+            {/* Drawing tools — each has a dropdown with style options */}
+            {DRAWING_TOOLS.map((tool) => (
+              <Popover
+                key={tool.id}
+                open={openToolDropdown === tool.id}
+                onOpenChange={(open) => {
+                  setOpenToolDropdown(open ? tool.id : null);
+                  if (open) {
                     editor?.setCurrentTool(tool.id);
                     setActiveTool(tool.id);
-                  }}
-                  label={tool.label}
+                  }
+                }}
+              >
+                <PopoverTrigger asChild>
+                  <button
+                    title={tool.label}
+                    className={`flex shrink-0 items-center gap-0.5 rounded-full px-2 py-1 text-xs font-medium transition-colors ${
+                      activeTool === tool.id
+                        ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white"
+                        : "text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900/70 dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70"
+                    }`}
+                  >
+                    <tool.icon size={14} weight="duotone" />
+                    <CaretDown size={8} weight="bold" className="opacity-50" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-56 rounded-2xl border-gray-900/10 bg-white/95 p-0 backdrop-blur-xl dark:border-white/15 dark:bg-gray-900/95"
+                  align="start"
+                  sideOffset={8}
                 >
-                  <tool.icon size={14} weight="duotone" />
-                </ToolBtn>
-              ))}
-            </div>
+                  <div className="space-y-3 p-3">
+                    {/* Color */}
+                    {"hasColor" in tool && tool.hasColor && (
+                      <div className="space-y-1.5">
+                        <label className="block text-center text-[10px] font-medium text-gray-900/50 dark:text-white/50">
+                          Color
+                        </label>
+                        <div className="flex flex-wrap justify-center gap-1.5">
+                          {TLDRAW_COLORS.map((c) => (
+                            <button
+                              key={c.id}
+                              onClick={() => setActiveColor(c.id)}
+                              className={`h-5 w-5 rounded-full border transition-transform hover:scale-110 ${
+                                activeColor === c.id
+                                  ? "border-gray-900/40 ring-1.5 ring-gray-900/20 dark:border-white/40 dark:ring-white/20"
+                                  : "border-gray-900/10 dark:border-white/20"
+                              }`}
+                              style={{ backgroundColor: c.hex }}
+                              title={c.id}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Size */}
+                    {"hasSize" in tool && tool.hasSize && (
+                      <>
+                        {"hasColor" in tool && tool.hasColor && <Separator className="bg-gray-900/5 dark:bg-white/5" />}
+                        <div className="space-y-1.5">
+                          <label className="block text-center text-[10px] font-medium text-gray-900/50 dark:text-white/50">
+                            Size
+                          </label>
+                          <div className="flex flex-wrap justify-center gap-1">
+                            {FONT_SIZES.map((s) => (
+                              <button
+                                key={s.value}
+                                onClick={() => setFontSize(s.value)}
+                                className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                                  fontSize === s.value
+                                    ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white"
+                                    : "text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900/70 dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70"
+                                }`}
+                              >
+                                {s.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {/* Fill */}
+                    {"hasFill" in tool && tool.hasFill && (
+                      <>
+                        <Separator className="bg-gray-900/5 dark:bg-white/5" />
+                        <div className="space-y-1.5">
+                          <label className="block text-center text-[10px] font-medium text-gray-900/50 dark:text-white/50">
+                            Fill
+                          </label>
+                          <div className="flex flex-wrap justify-center gap-1">
+                            {FILL_STYLES.map((f) => (
+                              <button
+                                key={f.id}
+                                onClick={() => setActiveFill(f.id)}
+                                className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                                  activeFill === f.id
+                                    ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white"
+                                    : "text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900/70 dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70"
+                                }`}
+                              >
+                                {f.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {/* Stroke */}
+                    {"hasStroke" in tool && tool.hasStroke && (
+                      <>
+                        <Separator className="bg-gray-900/5 dark:bg-white/5" />
+                        <div className="space-y-1.5">
+                          <label className="block text-center text-[10px] font-medium text-gray-900/50 dark:text-white/50">
+                            Stroke
+                          </label>
+                          <div className="flex flex-wrap justify-center gap-1">
+                            {DASH_STYLES.map((d) => (
+                              <button
+                                key={d.id}
+                                onClick={() => setActiveDash(d.id)}
+                                className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                                  activeDash === d.id
+                                    ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white"
+                                    : "text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900/70 dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70"
+                                }`}
+                              >
+                                {d.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {/* Opacity */}
+                    <Separator className="bg-gray-900/5 dark:bg-white/5" />
+                    <div className="space-y-1.5">
+                      <label className="block text-center text-[10px] font-medium text-gray-900/50 dark:text-white/50">
+                        Opacity — {Math.round(opacity * 100)}%
+                      </label>
+                      <input
+                        type="range"
+                        min={0.1}
+                        max={1}
+                        step={0.05}
+                        value={opacity}
+                        onChange={(e) => setOpacity(Number(e.target.value))}
+                        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-gray-900/10 accent-[#5227FF] dark:bg-white/10"
+                      />
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            ))}
 
-            <Separator
-              orientation="vertical"
-              className="mx-1 h-4 bg-gray-900/10 dark:bg-white/10"
-            />
+            {/* Shape tool — dropdown with shape grid + style options */}
+            <Popover
+              open={openToolDropdown === "geo"}
+              onOpenChange={(open) => {
+                setOpenToolDropdown(open ? "geo" : null);
+                if (open) {
+                  editor?.setCurrentTool("geo");
+                  setActiveTool("geo");
+                }
+              }}
+            >
+              <PopoverTrigger asChild>
+                <button
+                  title="Shape"
+                  className={`flex shrink-0 items-center gap-0.5 rounded-full px-2 py-1 text-xs font-medium transition-colors ${
+                    activeTool === "geo"
+                      ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white"
+                      : "text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900/70 dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70"
+                  }`}
+                >
+                  {(() => {
+                    const ShapeIcon = GEO_SHAPES.find((s) => s.id === activeGeo)?.icon ?? Rectangle;
+                    return <ShapeIcon size={14} weight="duotone" />;
+                  })()}
+                  <CaretDown size={8} weight="bold" className="opacity-50" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-56 rounded-2xl border-gray-900/10 bg-white/95 p-0 backdrop-blur-xl dark:border-white/15 dark:bg-gray-900/95"
+                align="start"
+                sideOffset={8}
+              >
+                <div className="space-y-3 p-3">
+                  {/* Shape picker grid */}
+                  <div className="grid grid-cols-5 gap-1">
+                    {GEO_SHAPES.map((shape) => (
+                      <button
+                        key={shape.id}
+                        onClick={() => setActiveGeo(shape.id)}
+                        title={shape.label}
+                        className={`flex h-8 w-full items-center justify-center rounded-xl transition-colors ${
+                          activeGeo === shape.id
+                            ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white"
+                            : "text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900/70 dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70"
+                        }`}
+                      >
+                        <shape.icon size={16} weight="duotone" />
+                      </button>
+                    ))}
+                  </div>
+                  <Separator className="bg-gray-900/5 dark:bg-white/5" />
+                  {/* Color */}
+                  <div className="space-y-1.5">
+                    <label className="block text-center text-[10px] font-medium text-gray-900/50 dark:text-white/50">
+                      Color
+                    </label>
+                    <div className="flex flex-wrap justify-center gap-1.5">
+                      {TLDRAW_COLORS.map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => setActiveColor(c.id)}
+                          className={`h-5 w-5 rounded-full border transition-transform hover:scale-110 ${
+                            activeColor === c.id
+                              ? "border-gray-900/40 ring-1.5 ring-gray-900/20 dark:border-white/40 dark:ring-white/20"
+                              : "border-gray-900/10 dark:border-white/20"
+                          }`}
+                          style={{ backgroundColor: c.hex }}
+                          title={c.id}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <Separator className="bg-gray-900/5 dark:bg-white/5" />
+                  {/* Size + Fill + Stroke */}
+                  <div className="flex flex-wrap justify-center gap-1">
+                    {FONT_SIZES.map((s) => (
+                      <button key={s.value} onClick={() => setFontSize(s.value)} className={`rounded-full px-3 py-1 text-xs transition-colors ${fontSize === s.value ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white" : "text-gray-900/50 hover:bg-gray-900/5 dark:text-white/50 dark:hover:bg-white/5"}`}>{s.label}</button>
+                    ))}
+                  </div>
+                  <Separator className="bg-gray-900/5 dark:bg-white/5" />
+                  <div className="flex flex-wrap justify-center gap-1">
+                    {FILL_STYLES.map((f) => (
+                      <button key={f.id} onClick={() => setActiveFill(f.id)} className={`rounded-full px-2.5 py-1 text-xs transition-colors ${activeFill === f.id ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white" : "text-gray-900/50 hover:bg-gray-900/5 dark:text-white/50 dark:hover:bg-white/5"}`}>{f.label}</button>
+                    ))}
+                  </div>
+                  <Separator className="bg-gray-900/5 dark:bg-white/5" />
+                  <div className="flex flex-wrap justify-center gap-1">
+                    {DASH_STYLES.map((d) => (
+                      <button key={d.id} onClick={() => setActiveDash(d.id)} className={`rounded-full px-2.5 py-1 text-xs transition-colors ${activeDash === d.id ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white" : "text-gray-900/50 hover:bg-gray-900/5 dark:text-white/50 dark:hover:bg-white/5"}`}>{d.label}</button>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <Separator orientation="vertical" className="mx-1 h-4 shrink-0 bg-gray-900/10 dark:bg-white/10" />
 
             {/* Undo/Redo */}
-            <div className="flex items-center gap-0.5">
-              <ToolBtn
-                onClick={() => editor?.undo()}
-                label="Undo"
-              >
+            <div className="flex shrink-0 items-center gap-0.5">
+              <ToolBtn onClick={() => editor?.undo()} label="Undo">
                 <ArrowCounterClockwise size={14} weight="duotone" />
               </ToolBtn>
-              <ToolBtn
-                onClick={() => editor?.redo()}
-                label="Redo"
-              >
+              <ToolBtn onClick={() => editor?.redo()} label="Redo">
                 <ArrowClockwise size={14} weight="duotone" />
               </ToolBtn>
             </div>
 
-            <Separator
-              orientation="vertical"
-              className="mx-1 h-4 bg-gray-900/10 dark:bg-white/10"
-            />
+            <Separator orientation="vertical" className="mx-1 h-4 shrink-0 bg-gray-900/10 dark:bg-white/10" />
 
             {/* Image upload */}
             <ToolBtn onClick={handleImageUpload} label="Insert Image">
               <ImageSquare size={14} weight="duotone" />
             </ToolBtn>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
 
-            <Separator
-              orientation="vertical"
-              className="mx-1 h-4 bg-gray-900/10 dark:bg-white/10"
-            />
+            <Separator orientation="vertical" className="mx-1 h-4 shrink-0 bg-gray-900/10 dark:bg-white/10" />
 
             {/* Zoom */}
-            <div className="flex items-center gap-0.5">
-              <ToolBtn
-                onClick={() => editor?.zoomIn(editor.getViewportScreenCenter(), { animation: { duration: 200 } })}
-                label="Zoom In"
-              >
+            <div className="flex shrink-0 items-center gap-0.5">
+              <ToolBtn onClick={() => editor?.zoomIn(editor.getViewportScreenCenter(), { animation: { duration: 200 } })} label="Zoom In">
                 <MagnifyingGlassPlus size={14} weight="duotone" />
               </ToolBtn>
-              <ToolBtn
-                onClick={() => editor?.zoomOut(editor.getViewportScreenCenter(), { animation: { duration: 200 } })}
-                label="Zoom Out"
-              >
+              <ToolBtn onClick={() => editor?.zoomOut(editor.getViewportScreenCenter(), { animation: { duration: 200 } })} label="Zoom Out">
                 <MagnifyingGlassMinus size={14} weight="duotone" />
               </ToolBtn>
             </div>
@@ -622,187 +1008,95 @@ export default function NoteEditorCanvas({
             {/* Spacer */}
             <div className="flex-1" />
 
-            {/* Paper settings */}
+            {/* Font */}
             <Popover>
               <PopoverTrigger asChild>
-                <button className="rounded-full border border-gray-900/10 bg-gray-900/5 px-3 py-1 text-xs text-gray-900/60 transition-colors hover:bg-gray-900/10 hover:text-gray-900/80 dark:border-white/15 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white/80">
+                <button className="shrink-0 rounded-full border border-gray-900/10 bg-gray-900/5 px-3 py-1 text-xs text-gray-900/60 transition-colors hover:bg-gray-900/10 hover:text-gray-900/80 dark:border-white/15 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white/80">
+                  Font
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 rounded-2xl border-gray-900/10 bg-white/95 p-0 backdrop-blur-xl dark:border-white/15 dark:bg-gray-900/95" align="end" sideOffset={8}>
+                <div className="space-y-4 p-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-center text-xs font-medium text-gray-900/50 dark:text-white/50">Family</label>
+                    <Select value={font} onValueChange={(v) => setFont(v as NoteFont)}>
+                      <SelectTrigger className="h-8 w-full rounded-full border-gray-900/10 bg-gray-900/5 text-xs *:data-[slot=select-value]:flex-1 *:data-[slot=select-value]:justify-center dark:border-white/15 dark:bg-white/5">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl text-center">
+                        {NOTE_FONTS.map((f) => (
+                          <SelectItem key={f.value} value={f.value} className={`${f.className} justify-center`}>{f.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Separator className="bg-gray-900/5 dark:bg-white/5" />
+                  <div className="space-y-1.5">
+                    <label className="block text-center text-xs font-medium text-gray-900/50 dark:text-white/50">Size</label>
+                    <div className="flex flex-wrap justify-center gap-1">
+                      {FONT_SIZES.map((s) => (
+                        <button key={s.value} onClick={() => setFontSize(s.value)} className={`rounded-full px-3 py-1 text-xs transition-colors ${fontSize === s.value ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white" : "text-gray-900/50 hover:bg-gray-900/5 dark:text-white/50 dark:hover:bg-white/5"}`}>{s.label}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Paper */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="shrink-0 rounded-full border border-gray-900/10 bg-gray-900/5 px-3 py-1 text-xs text-gray-900/60 transition-colors hover:bg-gray-900/10 hover:text-gray-900/80 dark:border-white/15 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white/80">
                   Paper
                 </button>
               </PopoverTrigger>
-              <PopoverContent
-                className="w-72 rounded-2xl border-gray-900/10 bg-white/95 p-0 backdrop-blur-xl dark:border-white/15 dark:bg-gray-900/95"
-                align="end"
-                sideOffset={8}
-              >
+              <PopoverContent className="w-72 rounded-2xl border-gray-900/10 bg-white/95 p-0 backdrop-blur-xl dark:border-white/15 dark:bg-gray-900/95" align="end" sideOffset={8}>
                 <div className="space-y-4 p-4">
-                  {/* Paper size */}
                   <div className="space-y-1.5">
-                    <label className="block text-center text-xs font-medium text-gray-900/50 dark:text-white/50">
-                      Size
-                    </label>
+                    <label className="block text-center text-xs font-medium text-gray-900/50 dark:text-white/50">Size</label>
                     <div className="flex flex-wrap justify-center gap-1">
-                      {(Object.keys(PAPER_SIZES) as PaperSize[]).map(
-                        (size) => (
-                          <button
-                            key={size}
-                            onClick={() => setPaperSize(size)}
-                            className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                              paperSize === size
-                                ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white"
-                                : "text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900/70 dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70"
-                            }`}
-                          >
-                            {PAPER_SIZES[size].label}
-                          </button>
-                        )
-                      )}
+                      {(Object.keys(PAPER_SIZES) as PaperSize[]).map((size) => (
+                        <button key={size} onClick={() => setPaperSize(size)} className={`rounded-full px-3 py-1 text-xs transition-colors ${paperSize === size ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white" : "text-gray-900/50 hover:bg-gray-900/5 dark:text-white/50 dark:hover:bg-white/5"}`}>{PAPER_SIZES[size].label}</button>
+                      ))}
                     </div>
                   </div>
-
                   <Separator className="bg-gray-900/5 dark:bg-white/5" />
-
-                  {/* Paper style */}
                   <div className="space-y-1.5">
-                    <label className="block text-center text-xs font-medium text-gray-900/50 dark:text-white/50">
-                      Style
-                    </label>
+                    <label className="block text-center text-xs font-medium text-gray-900/50 dark:text-white/50">Style</label>
                     <div className="flex flex-wrap justify-center gap-1">
-                      {(Object.keys(PAPER_STYLES) as PaperStyle[]).map(
-                        (style) => (
-                          <button
-                            key={style}
-                            onClick={() => setPaperStyle(style)}
-                            className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                              paperStyle === style
-                                ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white"
-                                : "text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900/70 dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70"
-                            }`}
-                          >
-                            {PAPER_STYLES[style].label}
-                          </button>
-                        )
-                      )}
+                      {(Object.keys(PAPER_STYLES) as PaperStyle[]).map((style) => (
+                        <button key={style} onClick={() => setPaperStyle(style)} className={`rounded-full px-3 py-1 text-xs transition-colors ${paperStyle === style ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white" : "text-gray-900/50 hover:bg-gray-900/5 dark:text-white/50 dark:hover:bg-white/5"}`}>{PAPER_STYLES[style].label}</button>
+                      ))}
                     </div>
                   </div>
-
-                  {/* Line alignment */}
                   <AnimatePresence>
                     {(paperStyle === "lined" || paperStyle === "grid") && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.25, ease }}
-                        className="overflow-hidden"
-                      >
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.25, ease }} className="overflow-hidden">
                         <div className="space-y-1.5">
-                          <label className="block text-center text-xs font-medium text-gray-900/50 dark:text-white/50">
-                            Line Alignment
-                          </label>
+                          <label className="block text-center text-xs font-medium text-gray-900/50 dark:text-white/50">Line Alignment</label>
                           <div className="flex flex-wrap justify-center gap-1">
-                            {(Object.keys(LINE_ALIGNS) as LineAlign[]).map(
-                              (align) => (
-                                <button
-                                  key={align}
-                                  onClick={() => setLineAlign(align)}
-                                  className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                                    lineAlign === align
-                                      ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white"
-                                      : "text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900/70 dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70"
-                                  }`}
-                                >
-                                  {LINE_ALIGNS[align].label}
-                                </button>
-                              )
-                            )}
+                            {(Object.keys(LINE_ALIGNS) as LineAlign[]).map((align) => (
+                              <button key={align} onClick={() => setLineAlign(align)} className={`rounded-full px-3 py-1 text-xs transition-colors ${lineAlign === align ? "bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white" : "text-gray-900/50 hover:bg-gray-900/5 dark:text-white/50 dark:hover:bg-white/5"}`}>{LINE_ALIGNS[align].label}</button>
+                            ))}
                           </div>
                         </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
-
                   <Separator className="bg-gray-900/5 dark:bg-white/5" />
-
-                  {/* Paper color */}
                   <div className="space-y-1.5">
-                    <label className="block text-center text-xs font-medium text-gray-900/50 dark:text-white/50">
-                      Color
-                    </label>
+                    <label className="block text-center text-xs font-medium text-gray-900/50 dark:text-white/50">Color</label>
                     <div className="flex flex-wrap items-center justify-center gap-2">
                       {PAPER_COLORS.map((c) => (
-                        <button
-                          key={c.value}
-                          onClick={() => {
-                            setPaperColor(c.value);
-                            setCustomColor(c.value);
-                          }}
-                          className={`h-7 w-7 rounded-full border transition-transform hover:scale-110 ${
-                            paperColor === c.value
-                              ? "border-gray-900/40 ring-2 ring-gray-900/20 dark:border-white/40 dark:ring-white/20"
-                              : "border-gray-900/10 dark:border-white/20"
-                          }`}
-                          style={{ backgroundColor: c.value }}
-                          title={c.label}
-                        />
+                        <button key={c.value} onClick={() => { setPaperColor(c.value); setCustomColor(c.value); }} className={`h-7 w-7 rounded-full border transition-transform hover:scale-110 ${paperColor === c.value ? "border-gray-900/40 ring-2 ring-gray-900/20 dark:border-white/40 dark:ring-white/20" : "border-gray-900/10 dark:border-white/20"}`} style={{ backgroundColor: c.value }} title={c.label} />
                       ))}
                       <div className="relative">
-                        <input
-                          type="color"
-                          value={customColor}
-                          onChange={(e) => {
-                            setCustomColor(e.target.value);
-                            setPaperColor(e.target.value);
-                          }}
-                          className="absolute inset-0 h-7 w-7 cursor-pointer opacity-0"
-                        />
-                        <div
-                          className={`flex h-7 w-7 items-center justify-center rounded-full border text-[10px] transition-transform hover:scale-110 ${
-                            !isPresetColor
-                              ? "border-gray-900/40 ring-2 ring-gray-900/20 dark:border-white/40 dark:ring-white/20"
-                              : "border-gray-900/10 dark:border-white/20"
-                          }`}
-                          style={{
-                            backgroundColor: !isPresetColor
-                              ? paperColor
-                              : undefined,
-                          }}
-                        >
-                          {isPresetColor && (
-                            <span className="text-gray-900/40 dark:text-white/40">
-                              +
-                            </span>
-                          )}
+                        <input type="color" value={customColor} onChange={(e) => { setCustomColor(e.target.value); setPaperColor(e.target.value); }} className="absolute inset-0 h-7 w-7 cursor-pointer opacity-0" />
+                        <div className={`flex h-7 w-7 items-center justify-center rounded-full border text-[10px] transition-transform hover:scale-110 ${!isPresetColor ? "border-gray-900/40 ring-2 ring-gray-900/20 dark:border-white/40 dark:ring-white/20" : "border-gray-900/10 dark:border-white/20"}`} style={{ backgroundColor: !isPresetColor ? paperColor : undefined }}>
+                          {isPresetColor && <span className="text-gray-900/40 dark:text-white/40">+</span>}
                         </div>
                       </div>
                     </div>
-                  </div>
-
-                  <Separator className="bg-gray-900/5 dark:bg-white/5" />
-
-                  {/* Font */}
-                  <div className="space-y-1.5">
-                    <label className="block text-center text-xs font-medium text-gray-900/50 dark:text-white/50">
-                      Font
-                    </label>
-                    <Select
-                      value={font}
-                      onValueChange={(v) => setFont(v as NoteFont)}
-                    >
-                      <SelectTrigger className="h-8 w-full rounded-full border-gray-900/10 bg-gray-900/5 text-xs dark:border-white/15 dark:bg-white/5">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        {NOTE_FONTS.map((f) => (
-                          <SelectItem
-                            key={f.value}
-                            value={f.value}
-                            className={f.className}
-                          >
-                            {f.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
                 </div>
               </PopoverContent>
