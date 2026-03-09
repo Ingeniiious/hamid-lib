@@ -74,7 +74,7 @@ export async function listContributions({
   let userNames: Record<string, string> = {};
   if (userIds.length > 0) {
     const users = await db.execute<{ id: string; name: string }>(
-      sql`SELECT id, name FROM neon_auth."user" WHERE id = ANY(${userIds}::text[])`
+      sql`SELECT id::text, name FROM neon_auth."user" WHERE id::text = ANY(${userIds}::text[])`
     );
     userNames = Object.fromEntries(users.map((u) => [u.id, u.name]));
   }
@@ -187,7 +187,7 @@ export async function listContentRequests({
   let userNames: Record<string, string> = {};
   if (userIds.length > 0) {
     const users = await db.execute<{ id: string; name: string }>(
-      sql`SELECT id, name FROM neon_auth."user" WHERE id = ANY(${userIds}::text[])`
+      sql`SELECT id::text, name FROM neon_auth."user" WHERE id::text = ANY(${userIds}::text[])`
     );
     userNames = Object.fromEntries(users.map((u) => [u.id, u.name]));
   }

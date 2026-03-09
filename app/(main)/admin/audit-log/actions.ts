@@ -65,7 +65,7 @@ export async function getAuditLogs({
   let adminMap = new Map<string, string>();
   if (adminIds.length > 0) {
     const admins = await db.execute<{ id: string; name: string }>(
-      sql`SELECT id, name FROM neon_auth."user" WHERE id = ANY(${adminIds}::text[])`
+      sql`SELECT id::text, name FROM neon_auth."user" WHERE id::text = ANY(${adminIds}::text[])`
     );
     adminMap = new Map(admins.map((a) => [a.id, a.name]));
   }

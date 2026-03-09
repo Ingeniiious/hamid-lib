@@ -848,9 +848,9 @@ function Footer() {
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
-          <span className="text-sm text-white/40 cursor-default">
-            Rate Your Professor (Coming Soon)
-          </span>
+          <Link href="/professors" className="text-sm text-white/80 transition-colors hover:text-white">
+            Rate Your Professor
+          </Link>
           <Link href="/privacy" className="text-sm text-white/80 transition-colors hover:text-white">
             Privacy Policy
           </Link>

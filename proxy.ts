@@ -2,7 +2,12 @@ import { auth } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
-const SESSION_COOKIE_MARKER = "session_token";
+
+/**
+ * Matches any auth-related cookie set by Neon Auth / Better Auth.
+ * Catches: session_token, session_data, neonauth.*, better-auth.*, etc.
+ */
+const AUTH_COOKIE_RE = /session_token|session_data|neonauth|better-auth/i;
 
 const ALLOWED_ORIGINS = new Set(
   [
@@ -21,7 +26,7 @@ const neonMiddleware = auth.middleware({
 });
 
 /**
- * Ensures session_token cookies persist across PWA restarts by forcing
+ * Ensures ALL auth cookies persist across PWA restarts by forcing
  * Max-Age=30days AND Expires. The upstream may set a shorter Max-Age or omit
  * it entirely. We always override to 30 days.
  *
@@ -37,7 +42,7 @@ function persistSessionCookies(response: NextResponse): NextResponse {
   const expires = new Date(Date.now() + SESSION_MAX_AGE * 1000).toUTCString();
 
   for (const header of setCookieHeaders) {
-    if (header.includes(SESSION_COOKIE_MARKER)) {
+    if (AUTH_COOKIE_RE.test(header)) {
       let cleaned = header
         .replace(/;\s*Max-Age=[^;]*/gi, "")
         .replace(/;\s*Expires=[^;]*/gi, "");

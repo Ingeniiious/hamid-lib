@@ -214,7 +214,7 @@ export const CHECKLIST_ITEMS = [
 ] as const;
 
 export const FOOTER_LINKS = [
-  { label: "Rate Your Professor (Coming Soon)", href: "#" },
+  { label: "Rate Your Professor", href: "/professors" },
   { label: "Privacy Policy", href: "/privacy" },
   { label: "Terms Of Use", href: "/terms" },
 ] as const;

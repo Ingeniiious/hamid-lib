@@ -35,7 +35,7 @@ async function buildFullUserContext(
   const todayStr = new Date().toISOString().slice(0, 10);
 
   const authRows = (await db.execute(
-    sql`SELECT id::text, name, email, "createdAt" FROM neon_auth."user" WHERE id = ANY(${userIds}::text[])`
+    sql`SELECT id::text, name, email, "createdAt" FROM neon_auth."user" WHERE id::text = ANY(${userIds}::text[])`
   )) as any[];
 
   const profiles = await db
