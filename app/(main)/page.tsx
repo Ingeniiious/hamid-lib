@@ -278,7 +278,7 @@ function StickyNotesSection() {
       ref={sectionRef}
       className="relative h-[250vh] bg-[var(--background)]"
     >
-      <div className="sticky top-0 flex h-screen flex-col items-center justify-center">
+      <div className="sticky top-0 flex h-screen flex-col items-center justify-center pb-[15vh] sm:pb-[18vh]">
         <motion.h2
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
