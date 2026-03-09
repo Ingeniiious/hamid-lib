@@ -81,8 +81,8 @@ function ImageCard({
       whileInView={{ opacity: 1 }}
       viewport={{ once: true, margin: "-60px" }}
       transition={{ duration: 0.6, ease: EASE, delay }}
+      className="bg-white transition-colors duration-500 dark:bg-[rgb(35,35,35)]"
       style={{
-        background: COLORS.white,
         borderRadius: LAYOUT.valueBlock.cardBorderRadius,
         padding: 10,
         boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",
@@ -129,8 +129,8 @@ function RestingSection() {
             }}
           >
             <div
+              className="bg-white transition-colors duration-500 dark:bg-[rgb(35,35,35)]"
               style={{
-                background: COLORS.white,
                 borderRadius: LAYOUT.valueBlock.cardBorderRadius,
                 padding: 10,
                 boxShadow:
@@ -152,9 +152,9 @@ function RestingSection() {
         ))}
       </div>
 
-      {/* Mobile: stacked vertically */}
-      <div className="flex flex-col gap-4 px-4 md:hidden w-full max-w-[400px]">
-        {RESTING_CARDS.map((card, i) => (
+      {/* Mobile: 2 cards side-by-side (compact) */}
+      <div className="grid grid-cols-2 gap-3 px-4 md:hidden w-full max-w-[400px]">
+        {RESTING_CARDS.slice(0, 2).map((card, i) => (
           <ImageCard key={i} src={card.src} delay={0.1 + i * 0.1} />
         ))}
       </div>
@@ -228,7 +228,6 @@ function BeliefSection({
       viewport={{ once: true, margin: "-100px" }}
       transition={{ duration: 0.7, ease: EASE }}
       className="w-full"
-      style={{ minHeight: 800 }}
     >
       {/* Desktop: three-column layout */}
       <div className="hidden lg:flex items-stretch w-full" style={{ minHeight: 1040 }}>
@@ -283,7 +282,7 @@ function BeliefSection({
         </div>
       </div>
 
-      {/* Mobile: stacked layout */}
+      {/* Mobile: compact layout — only 2 images per belief so titles stay visible */}
       <div className="lg:hidden flex flex-col items-center gap-6 px-4">
         {/* Title first on mobile */}
         <motion.p
@@ -302,11 +301,10 @@ function BeliefSection({
           {config.title}
         </motion.p>
 
-        {/* All cards stacked */}
-        <div className="w-full max-w-[420px] flex flex-col gap-4">
-          {[...config.images.left, ...config.images.right].map((src, i) => (
-            <ImageCard key={i} src={src} delay={0.1 + i * 0.08} />
-          ))}
+        {/* 2 cards side-by-side (1 from each column) */}
+        <div className="grid w-full max-w-[420px] grid-cols-2 gap-3">
+          <ImageCard src={config.images.left[0]} delay={0.1} />
+          <ImageCard src={config.images.right[0]} delay={0.18} />
         </div>
       </div>
     </motion.div>
@@ -324,10 +322,10 @@ export function LandingValueBlock() {
 
       {/* Spacer */}
       <div style={{ height: 224 }} className="hidden md:block" />
-      <div style={{ height: 80 }} className="md:hidden" />
+      <div style={{ height: 32 }} className="md:hidden" />
 
       {/* Belief sections */}
-      <div className="flex flex-col gap-16 lg:gap-0">
+      <div className="flex flex-col gap-8 lg:gap-0">
         {BELIEF_SECTIONS.map((config, i) => (
           <BeliefSection key={config.title} config={config} index={i} />
         ))}

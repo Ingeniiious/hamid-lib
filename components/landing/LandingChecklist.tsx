@@ -8,27 +8,33 @@ import {
   LAYOUT,
   CHECKLIST_ITEMS,
   CHECKLIST_IMAGE,
-  DOODLES,
 } from "./landing-constants";
+import { useDoodleSlice } from "./useRandomDoodles";
 
 export function LandingChecklist() {
+  const doodles = useDoodleSlice(3);
+
   return (
     <section
       id="about"
       className="relative flex flex-col items-center px-4 py-8 sm:py-16"
     >
-      {/* Doodle: flower top-left outside card */}
-      <img
-        src={DOODLES.flower01}
-        alt=""
-        className="absolute left-[5%] top-[10%] w-[100px] sm:w-[163px] hidden md:block opacity-70"
-      />
-      {/* Doodle: bird bottom-right outside card */}
-      <img
-        src={DOODLES.bird}
-        alt=""
-        className="absolute right-[5%] bottom-[10%] w-[120px] sm:w-[207px] hidden md:block opacity-70"
-      />
+      {/* Doodle: top-left outside card (randomized) */}
+      {doodles[0] && (
+        <img
+          src={doodles[0]}
+          alt=""
+          className="absolute left-[5%] top-[10%] w-[100px] sm:w-[163px] hidden md:block opacity-70"
+        />
+      )}
+      {/* Doodle: bottom-right outside card (randomized) */}
+      {doodles[1] && (
+        <img
+          src={doodles[1]}
+          alt=""
+          className="absolute right-[5%] bottom-[10%] w-[120px] sm:w-[207px] hidden md:block opacity-70"
+        />
+      )}
 
       {/* Cream card */}
       <motion.div
@@ -36,10 +42,9 @@ export function LandingChecklist() {
         whileInView={{ opacity: 1 }}
         viewport={{ once: true, margin: "-100px" }}
         transition={{ duration: 0.7, ease: EASE }}
-        className="relative z-10 flex flex-col sm:flex-row gap-6 sm:gap-10 w-full p-8 sm:p-10"
+        className="relative z-10 flex flex-col sm:flex-row gap-6 sm:gap-10 w-full bg-[rgb(242,227,207)] dark:bg-[rgb(35,30,25)] p-8 transition-colors duration-500 sm:p-10"
         style={{
           maxWidth: LAYOUT.checklist.maxWidth,
-          background: COLORS.cream,
           borderRadius: LAYOUT.checklist.borderRadius,
         }}
       >
@@ -125,16 +130,18 @@ export function LandingChecklist() {
         </div>
       </motion.div>
 
-      {/* Computer doodle below the card */}
-      <motion.img
-        src={DOODLES.computer}
-        alt=""
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.6, ease: EASE, delay: 0.3 }}
-        className="mt-8 w-[80px] sm:w-[121px] opacity-80"
-      />
+      {/* Doodle below the card (randomized) */}
+      {doodles[2] && (
+        <motion.img
+          src={doodles[2]}
+          alt=""
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, ease: EASE, delay: 0.3 }}
+          className="mt-8 w-[80px] sm:w-[121px] opacity-80"
+        />
+      )}
     </section>
   );
 }

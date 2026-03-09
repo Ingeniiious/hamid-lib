@@ -5,34 +5,40 @@ import {
   COLORS,
   EASE,
   LAYOUT,
-  DOODLES,
   CUT_MAT_IMAGES,
   CUT_MAT_TEXTURE,
 } from "./landing-constants";
+import { useDoodleSlice } from "./useRandomDoodles";
 
 export function LandingCutMat() {
+  const doodles = useDoodleSlice(2);
+
   return (
     <section className="relative flex flex-col items-center px-4 py-8 sm:py-16">
-      {/* Top decorations */}
+      {/* Top decorations (randomized) */}
       <div className="relative w-full flex justify-center" style={{ maxWidth: LAYOUT.cutMat.maxWidth }}>
-        <motion.img
-          src={DOODLES.stickerSmall}
-          alt=""
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, ease: EASE }}
-          className="absolute left-[35%] -top-[20px] w-[80px] sm:w-[126px] hidden md:block opacity-80 z-10"
-        />
-        <motion.img
-          src={DOODLES.mushroomDeco}
-          alt=""
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
-          className="absolute left-[44%] -top-[60px] w-[160px] sm:w-[252px] hidden md:block opacity-80 z-10"
-        />
+        {doodles[0] && (
+          <motion.img
+            src={doodles[0]}
+            alt=""
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, ease: EASE }}
+            className="absolute left-[35%] -top-[20px] w-[80px] sm:w-[126px] hidden md:block opacity-80 z-10"
+          />
+        )}
+        {doodles[1] && (
+          <motion.img
+            src={doodles[1]}
+            alt=""
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
+            className="absolute left-[44%] -top-[60px] w-[160px] sm:w-[252px] hidden md:block opacity-80 z-10"
+          />
+        )}
       </div>
 
       {/* Dark cutting mat */}
@@ -41,10 +47,9 @@ export function LandingCutMat() {
         whileInView={{ opacity: 1 }}
         viewport={{ once: true, margin: "-100px" }}
         transition={{ duration: 0.8, ease: EASE }}
-        className="relative w-full overflow-hidden"
+        className="relative w-full overflow-hidden bg-[rgb(28,28,28)] transition-colors duration-500 dark:bg-[rgb(18,18,18)]"
         style={{
           maxWidth: LAYOUT.cutMat.maxWidth,
-          background: COLORS.cutMatBg,
           borderRadius: LAYOUT.cutMat.borderRadius,
         }}
       >

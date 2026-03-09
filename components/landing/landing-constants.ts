@@ -1,4 +1,6 @@
 // ── Colors ──
+// Theme-aware backgrounds use Tailwind dark: variants directly on elements
+// (e.g. bg-[rgb(242,227,207)] dark:bg-[rgb(35,30,25)] transition-colors duration-500)
 export const COLORS = {
   purple: "#5227FF",
   pink: "#ff9ffc",
@@ -9,7 +11,6 @@ export const COLORS = {
   creamText: "rgb(60, 50, 40)",
   bookBorder: "linear-gradient(180deg, #f5e1ce 0%, #ff9ffc 100%)",
   bookBinder: "#ff9ffc",
-  cutMatBg: "rgb(28, 28, 28)",
   leatherOverlay: "rgba(180, 140, 100, 0.54)",
   white: "rgb(255, 255, 255)",
 } as const;
@@ -81,6 +82,9 @@ export const DOODLES = {
   mushroomDeco: IMG("DJ6zTo2EiDMZipwzcmZgjH2tNhU.png"),
   stickerSmall: IMG("Bg0nbySqeUlxqYI6KKDaJ8mbJo.png"),
 } as const;
+
+// ── Randomizable floating doodle pool ──
+export const DOODLE_POOL = Object.values(DOODLES);
 
 // ── Resting section: 3 overlapping cards at top of value block ──
 export const RESTING_IMAGES = {
@@ -155,6 +159,30 @@ export const CUT_MAT_TEXTURE = IMG("9G25ruOgt322clA0e0vFrw4RNEs.png");
 // ── Checklist image ──
 export const CHECKLIST_IMAGE = IMG("iSwyFpVCzzKTbmhtq2Gakc2k5Xk.png");
 
+// ── How It Works book pages ──
+export const BOOK_PAGES = [
+  {
+    illustration: IMG("illu-2516cf65aef4f8f3.png"),
+    title: "Students Contribute",
+    body: "Upload your course notes, summaries, and study materials. Every contribution helps the community.",
+  },
+  {
+    illustration: IMG("illu-a2d142a5a15c68e3.png"),
+    title: "We Verify & Create",
+    body: "Contributions are reviewed, cross-checked, and used to build original study resources.",
+  },
+  {
+    illustration: IMG("illu-5de081f2f4fff41c.png"),
+    title: "Learn Together",
+    body: "Access free courses, mock exams, presentations, and study guides — all community-powered.",
+  },
+  {
+    illustration: IMG("illu-d512fd73f38d0cbd.png"),
+    title: "Achieve More",
+    body: "Track your progress, practice with real exams, and ace your courses with confidence.",
+  },
+] as const;
+
 // ── Noise texture ──
 export const NOISE_TEXTURE = "/images/noise-grain.png";
 
@@ -186,8 +214,7 @@ export const CHECKLIST_ITEMS = [
 ] as const;
 
 export const FOOTER_LINKS = [
-  { label: "hello@libraryyy.com", href: "mailto:hello@libraryyy.com" },
+  { label: "Rate Your Professor (Coming Soon)", href: "#" },
   { label: "Privacy Policy", href: "/privacy" },
   { label: "Terms Of Use", href: "/terms" },
-  { label: "Contact", href: "mailto:hello@libraryyy.com" },
 ] as const;

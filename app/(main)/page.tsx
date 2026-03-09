@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ReactLenis, useLenis } from "lenis/react";
+import { GrainientButton } from "@/components/GrainientButton";
+import { FeatureCard } from "@/components/FeatureCard";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -107,7 +109,7 @@ function FloatingIllustration({ def }: { def: FloatingDef }) {
       alt=""
       draggable={false}
       loading="lazy"
-      className="pointer-events-none absolute select-none"
+      className="pointer-events-none absolute hidden select-none md:block"
       style={{
         top: def.top,
         left: def.left,
@@ -122,10 +124,18 @@ function FloatingIllustration({ def }: { def: FloatingDef }) {
 }
 
 function IllustrationLayer({ illustrations }: { illustrations: FloatingDef[] }) {
+  const [defs, setDefs] = useState(illustrations);
+
+  useEffect(() => {
+    // Shuffle illustrations on each page load for variety
+    const shuffled = [...ILLU_SRCS].sort(() => Math.random() - 0.5).slice(0, illustrations.length);
+    setDefs(generateSectionIllustrations(shuffled, Math.floor(Math.random() * 1000)));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <>
-      {illustrations.map((def, i) => (
-        <FloatingIllustration key={`illu-${def.src}`} def={def} />
+      {defs.map((def, i) => (
+        <FloatingIllustration key={`illu-${i}`} def={def} />
       ))}
     </>
   );
@@ -463,10 +473,12 @@ function StickyNotesSection() {
     const vh = window.innerHeight;
     const progress = clamp((vh - rect.top) / (vh + rect.height), 0, 1);
 
-    // ── Timing — original values that sync SVG circle with card positions ──
-    // Cards + draw both use the same range so the circle aligns with the sticky cards
+    // Card animation — mid-section range for swaps
     const anim = clamp((progress - 0.18) / 0.5, 0, 1);
-    drawPath.update(easeInOutCubic(anim));
+    // Draw path — complete by ~75% scroll so the circle is fully drawn
+    // when it aligns with the sticky cards at viewport center
+    const drawAnim = clamp(progress / 0.75, 0, 1);
+    drawPath.update(easeInOutCubic(drawAnim));
 
     const spread = getSpread(getSpreadX());
 
@@ -475,20 +487,25 @@ function StickyNotesSection() {
     const arcX = w < 640 ? 100 : w < 768 ? 140 : 190;
     const arcY = w < 640 ? 50 : 75;
 
+    // 6 equal phases — each card gets equal dwell time on top
+    const P = 1 / 6;
+
     cardEls.current.forEach((el, i) => {
       if (!el) return;
 
       let state: CardState;
 
-      if (anim <= 0.25) {
-        // Spread → Stack (smootherstep for zero-accel ramp)
-        const t = smootherstep(anim / 0.25);
+      if (anim <= P) {
+        // Phase 1: Spread → Stack (Card 2 on top)
+        const t = smootherstep(anim / P);
         const slot = i === 2 ? SLOT_TOP : i === 1 ? SLOT_MID : SLOT_BOT;
         state = lerpState(spread[i], slot, t);
-      } else if (anim <= 0.5) {
-        // Swap 1 — Card 0 arcs right → top
-        const t = smootherstep((anim - 0.25) / 0.25);
-
+      } else if (anim <= 2 * P) {
+        // Phase 2: Card 2 dwells on top
+        state = i === 2 ? SLOT_TOP : i === 1 ? SLOT_MID : SLOT_BOT;
+      } else if (anim <= 3 * P) {
+        // Phase 3: Swap 1 — Card 0 arcs right → top
+        const t = smootherstep((anim - 2 * P) / P);
         if (i === 0) {
           state = arcSwap(SLOT_BOT, SLOT_TOP, t, arcX, arcY, 1);
         } else if (i === 2) {
@@ -496,10 +513,12 @@ function StickyNotesSection() {
         } else {
           state = lerpState(SLOT_MID, SLOT_BOT, t);
         }
-      } else if (anim <= 0.75) {
-        // Swap 2 — Card 1 arcs left → top
-        const t = smootherstep((anim - 0.5) / 0.25);
-
+      } else if (anim <= 4 * P) {
+        // Phase 4: Card 0 dwells on top
+        state = i === 0 ? SLOT_TOP : i === 2 ? SLOT_MID : SLOT_BOT;
+      } else if (anim <= 5 * P) {
+        // Phase 5: Swap 2 — Card 1 arcs left → top
+        const t = smootherstep((anim - 4 * P) / P);
         if (i === 1) {
           state = arcSwap(SLOT_BOT, SLOT_TOP, t, arcX, arcY, -1);
         } else if (i === 0) {
@@ -508,9 +527,8 @@ function StickyNotesSection() {
           state = lerpState(SLOT_MID, SLOT_BOT, t);
         }
       } else {
-        // Settled — LOCKED, circle draws around them
-        const slot = i === 1 ? SLOT_TOP : i === 0 ? SLOT_MID : SLOT_BOT;
-        state = slot;
+        // Phase 6: Card 1 dwells / settled
+        state = i === 1 ? SLOT_TOP : i === 0 ? SLOT_MID : SLOT_BOT;
       }
 
       applyCardTransform(el, state);
@@ -523,11 +541,11 @@ function StickyNotesSection() {
       className="relative h-[250vh] bg-[var(--background)]"
     >
       {/* Hand-drawn scroll paths — separate desktop/mobile for proper sizing */}
-      {/* Desktop */}
+      {/* Desktop — viewBox y-offset pushes paths down so the circle aligns with sticky cards */}
       <svg
         ref={(el) => { drawPath.register(el); }}
         className="pointer-events-none absolute inset-0 hidden h-full w-full md:block"
-        viewBox="0 0 1440 2400"
+        viewBox="0 -300 1440 2400"
         preserveAspectRatio="none"
         fill="none"
       >
@@ -542,11 +560,11 @@ function StickyNotesSection() {
             strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" filter="url(#pencil-d)" />
         ))}
       </svg>
-      {/* Mobile */}
+      {/* Mobile — same y-offset to match sticky card position */}
       <svg
         ref={(el) => { drawPath.register(el); }}
         className="pointer-events-none absolute inset-0 h-full w-full md:hidden"
-        viewBox="0 0 400 2400"
+        viewBox="0 -300 400 2400"
         preserveAspectRatio="none"
         fill="none"
       >
@@ -731,23 +749,15 @@ function FeaturesSection() {
           Everything You Need
         </motion.h2>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3">
+        <div className="grid auto-rows-[1fr] grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3">
           {FEATURES.map((feature, i) => (
-            <motion.div
+            <FeatureCard
               key={feature.title}
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true, margin: "-5%" }}
-              transition={{ duration: 0.6, ease, delay: i * 0.08 }}
-              className="flex flex-col items-center gap-3 rounded-3xl border border-foreground/[0.06] bg-foreground/[0.02] px-6 py-8 text-center backdrop-blur-sm sm:px-8 sm:py-10"
-            >
-              <h3 className={`text-xl text-foreground sm:text-2xl ${feature.font}`}>
-                {feature.title}
-              </h3>
-              <p className="max-w-xs text-sm leading-relaxed text-foreground/50 sm:text-base">
-                {feature.description}
-              </p>
-            </motion.div>
+              title={feature.title}
+              description={feature.description}
+              font={feature.font}
+              index={i}
+            />
           ))}
         </div>
       </div>
@@ -800,12 +810,9 @@ function CommunitySection() {
           viewport={{ once: true }}
           transition={{ duration: 0.7, ease, delay: 0.3 }}
         >
-          <Link
-            href="/auth"
-            className="inline-flex items-center justify-center rounded-full bg-[#5227FF] px-8 py-3 text-base font-medium text-white transition-opacity hover:opacity-90 sm:px-10 sm:py-4 sm:text-lg"
-          >
-            Join The Community
-          </Link>
+          <GrainientButton href="/auth">
+            Get Started
+          </GrainientButton>
         </motion.div>
       </div>
     </section>
@@ -815,21 +822,53 @@ function CommunitySection() {
 /* ── Footer ── */
 function Footer() {
   return (
-    <footer className="border-t border-foreground/[0.06] bg-[var(--background)] py-12 sm:py-16">
-      <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 px-6 text-center">
-        <Link href="/" className="font-display text-2xl font-light text-foreground sm:text-3xl">
-          Libraryyy
-        </Link>
-        <p className="font-gochi text-sm text-foreground/40 sm:text-base">
-          By A Student, For A Student
-        </p>
-        <div className="flex items-center gap-6">
-          <Link href="/auth" className="text-sm text-foreground/50 transition-colors hover:text-foreground sm:text-base">
-            Get Started
+    <footer className="relative pt-20 pb-12 sm:pt-28 sm:pb-16">
+      {/* Fade from solid background → transparent so Grainient bleeds through */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: `linear-gradient(to bottom,
+            var(--background) 0%,
+            color-mix(in oklch, var(--background) 85%, transparent) 20%,
+            color-mix(in oklch, var(--background) 55%, transparent) 45%,
+            color-mix(in oklch, var(--background) 25%, transparent) 70%,
+            transparent 100%
+          )`,
+        }}
+      />
+
+      <div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center gap-8 px-6 text-center">
+        <div className="flex flex-col items-center gap-2">
+          <Link href="/" className="font-display text-2xl font-light text-white sm:text-3xl">
+            Libraryyy
           </Link>
-          <Link href="/portal" className="text-sm text-foreground/50 transition-colors hover:text-foreground sm:text-base">
-            Portal
+          <p className="font-gochi text-sm text-white/70 sm:text-base">
+            By A Student, For A Student
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
+          <span className="text-sm text-white/40 cursor-default">
+            Rate Your Professor (Coming Soon)
+          </span>
+          <Link href="/privacy" className="text-sm text-white/80 transition-colors hover:text-white">
+            Privacy Policy
           </Link>
+          <Link href="/terms" className="text-sm text-white/80 transition-colors hover:text-white">
+            Terms Of Use
+          </Link>
+        </div>
+
+        <div className="flex flex-col items-center gap-1.5">
+          <a
+            href="mailto:hello@libraryyy.com"
+            className="text-sm text-white/70 transition-colors hover:text-white"
+          >
+            hello@libraryyy.com
+          </a>
+          <p className="text-xs text-white/50">
+            &copy; {new Date().getFullYear()} Libraryyy. All Rights Reserved.
+          </p>
         </div>
       </div>
     </footer>

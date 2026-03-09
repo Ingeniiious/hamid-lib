@@ -10,9 +10,9 @@ import {
   BOOK_DECO,
   BOOK_FOOTER_DECO,
   HERO_NOODLE,
-  DOODLES,
   BELIEFS,
 } from "./landing-constants";
+import { useDoodleSlice } from "./useRandomDoodles";
 
 /* ── Helpers ── */
 
@@ -118,6 +118,7 @@ const STICKY_NOTES: {
 
 export function LandingHeroBook() {
   const [tz, setTz] = useState("");
+  const doodles = useDoodleSlice(0);
 
   useEffect(() => {
     setTz(getTimezoneDisplay());
@@ -125,31 +126,37 @@ export function LandingHeroBook() {
 
   return (
     <section className="relative flex flex-col items-center px-4 pb-4">
-      {/* ── Floating Doodles (hidden on mobile) ── */}
-      <motion.img
-        src={DOODLES.juicebox}
-        alt=""
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6, ease: EASE, delay: 0.8 }}
-        className="pointer-events-none absolute left-[5%] top-[55%] hidden w-[80px] md:block sm:w-[104px]"
-      />
-      <motion.img
-        src={DOODLES.godzilla}
-        alt=""
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6, ease: EASE, delay: 1.0 }}
-        className="pointer-events-none absolute right-[8%] top-[60%] hidden w-[110px] md:block sm:w-[155px]"
-      />
-      <motion.img
-        src={DOODLES.noodle}
-        alt=""
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6, ease: EASE, delay: 0.9 }}
-        className="pointer-events-none absolute right-[12%] top-[25%] hidden w-[90px] lg:block sm:w-[131px]"
-      />
+      {/* ── Floating Doodles (randomized, hidden on mobile) ── */}
+      {doodles[0] && (
+        <motion.img
+          src={doodles[0]}
+          alt=""
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, ease: EASE, delay: 0.8 }}
+          className="pointer-events-none absolute left-[5%] top-[55%] hidden w-[80px] md:block sm:w-[104px]"
+        />
+      )}
+      {doodles[1] && (
+        <motion.img
+          src={doodles[1]}
+          alt=""
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, ease: EASE, delay: 1.0 }}
+          className="pointer-events-none absolute right-[8%] top-[60%] hidden w-[110px] md:block sm:w-[155px]"
+        />
+      )}
+      {doodles[2] && (
+        <motion.img
+          src={doodles[2]}
+          alt=""
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, ease: EASE, delay: 0.9 }}
+          className="pointer-events-none absolute right-[12%] top-[25%] hidden w-[90px] lg:block sm:w-[131px]"
+        />
+      )}
 
       {/* ── Book Container ── */}
       <motion.div
@@ -173,9 +180,8 @@ export function LandingHeroBook() {
         >
           {/* Cream interior */}
           <div
-            className="relative overflow-hidden"
+            className="relative overflow-hidden bg-[rgb(242,227,207)] transition-colors duration-500 dark:bg-[rgb(35,30,25)]"
             style={{
-              background: COLORS.cream,
               borderRadius: `${LAYOUT.book.borderRadius - 2}px ${LAYOUT.book.borderRadius - 2}px 2px 2px`,
               minHeight: 500,
             }}
@@ -341,9 +347,8 @@ export function LandingHeroBook() {
           }}
         >
           <div
-            className="relative p-6 sm:p-10 md:p-14"
+            className="relative bg-[rgb(242,227,207)] p-6 transition-colors duration-500 dark:bg-[rgb(35,30,25)] sm:p-10 md:p-14"
             style={{
-              background: COLORS.cream,
               borderRadius: `0 0 ${LAYOUT.book.borderRadius - 2}px ${LAYOUT.book.borderRadius - 2}px`,
               minHeight: 200,
             }}
