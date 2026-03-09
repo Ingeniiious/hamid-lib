@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
+import ConfettiBurst from "@/components/ConfettiBurst";
 import Link from "next/link";
 import { Eye, EyeSlash, CaretUpDown, Check } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
@@ -89,13 +90,17 @@ function PasswordInput({
 
 export default function AuthPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>(() => {
-    // Default to sign-up for new users, sign-in for returning users
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("hamid-lib-visited") ? "sign-in" : "sign-up";
+  // Always start with "sign-in" on server & client to avoid hydration mismatch,
+  // then switch to "sign-up" after mount if user has never visited
+  const [mode, setMode] = useState<Mode>("sign-in");
+  const hasCheckedVisit = useRef(false);
+  if (typeof window !== "undefined" && !hasCheckedVisit.current) {
+    hasCheckedVisit.current = true;
+    if (!localStorage.getItem("hamid-lib-visited")) {
+      // Schedule after hydration to avoid mismatch
+      queueMicrotask(() => setMode("sign-up"));
     }
-    return "sign-in";
-  });
+  }
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -110,6 +115,7 @@ export default function AuthPage() {
   const [genderOpen, setGenderOpen] = useState(false);
 
   const [adminOtp, setAdminOtp] = useState("");
+  const [showConfetti, setShowConfetti] = useState(false);
   const adminOtpSending = useRef(false);
 
   const redirectByRole = async (user: Record<string, unknown> | undefined) => {
@@ -218,6 +224,9 @@ export default function AuthPage() {
       if (gender) {
         await saveUserProfile("", gender);
       }
+
+      // Pop confetti on successful sign-up
+      setShowConfetti(true);
 
       redirectByRole(data?.user as Record<string, unknown> | undefined);
     } catch {
@@ -385,6 +394,8 @@ export default function AuthPage() {
 
   return (
     <div className="flex w-full flex-col items-center justify-center">
+      {/* Confetti — pops on successful sign-up, overlays everything */}
+      {showConfetti && <ConfettiBurst particleCount={90} startVelocity={32} spread={130} />}
       {/* Back To Home — absolutely positioned, completely independent of card */}
       <motion.div
         initial={{ opacity: 0 }}

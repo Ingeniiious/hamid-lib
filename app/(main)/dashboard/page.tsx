@@ -32,7 +32,7 @@ export default async function DashboardPage() {
         }}
       >
         <DashboardNotificationPrompt />
-        <div className="mx-auto grid w-full max-w-[340px] grid-cols-1 gap-3 sm:max-w-3xl sm:grid-cols-2 sm:gap-6">
+        <div className="mx-auto grid w-full max-w-[340px] grid-cols-1 gap-3 sm:max-w-3xl sm:grid-cols-2 sm:gap-6 lg:max-w-5xl lg:grid-cols-3">
           <DashboardCard
             title="My Studies"
             description="Track your progress"
@@ -41,12 +41,20 @@ export default async function DashboardPage() {
             index={0}
           />
           <DashboardCard
+            title="My Space"
+            description="Notes, mind maps & more"
+            href="/dashboard/space"
+            image={`${R2_BASE}/images/my-space.webp`}
+            imageClassName="max-h-full w-full object-contain scale-110"
+            index={1}
+          />
+          <DashboardCard
             title="Courses"
             description="Browse all courses"
             href="/dashboard/courses"
             image={`${R2_BASE}/images/courses.webp`}
             imageClassName="max-h-full w-full object-contain scale-110"
-            index={1}
+            index={2}
           />
         </div>
       </div>

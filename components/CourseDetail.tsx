@@ -1,10 +1,13 @@
 "use client";
 
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Separator } from "@/components/ui/separator";
-import Link from "next/link";
+import { GrainientButton } from "@/components/GrainientButton";
+import { FadeImage, preloadImages } from "@/components/FadeImage";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
+const CDN = "https://lib.thevibecodedcompany.com";
 
 interface CourseDetailProps {
   course: {
@@ -16,9 +19,15 @@ interface CourseDetailProps {
     major: string | null;
   };
   isContributor?: boolean;
+  facultySlug?: string;
 }
 
-export function CourseDetail({ course, isContributor }: CourseDetailProps) {
+export function CourseDetail({ course, isContributor, facultySlug }: CourseDetailProps) {
+  // Preload on mount so the image is ready before user scrolls down
+  useEffect(() => {
+    preloadImages([`${CDN}/images/expert.webp`]);
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -55,28 +64,36 @@ export function CourseDetail({ course, isContributor }: CourseDetailProps) {
         ))}
       </div>
 
-      {/* Empty state — encourage contribution */}
+      {/* Illustrated empty state CTA */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6, ease, delay: 0.6 }}
-        className="mx-auto mt-10 max-w-md text-center"
+        className="mx-auto mt-12 flex max-w-md flex-col items-center text-center"
       >
-        <p className="text-sm text-gray-900/50 dark:text-white/50">
-          This course doesn&apos;t have any content yet.{" "}
-          <span className="text-gray-900/70 dark:text-white/70">
-            Be the first to contribute
-          </span>{" "}
-          and help future students who visit this page.
-        </p>
-        <Link
-          href={`/dashboard/contribute?courseId=${course.id}`}
-          className="mt-4 inline-flex items-center gap-2 rounded-full border border-gray-900/10 bg-white/50 px-6 py-2.5 text-sm font-medium text-gray-900/70 transition-colors hover:bg-gray-900/5 dark:border-white/10 dark:bg-white/5 dark:text-white/70 dark:hover:bg-white/10"
-        >
+        <FadeImage
+          src={`${CDN}/images/expert.webp`}
+          className="h-[200px] w-auto object-contain"
+        />
+        <h3 className="mt-6 font-display text-xl font-light text-gray-900 dark:text-white">
           {isContributor
-            ? "Contribute To This Course"
-            : "Become A Contributor"}
-        </Link>
+            ? "Share Your Materials"
+            : "Be The First To Contribute"}
+        </h3>
+        <p className="mt-3 text-sm leading-relaxed text-gray-900/50 dark:text-white/50">
+          {isContributor
+            ? "Upload your notes, slides, or documents for this course and help fellow students learn."
+            : "This course needs your help. Share your notes and we\u2019ll create study resources with AI so everyone can learn."}
+        </p>
+        <div className="mt-6">
+          <GrainientButton
+            href={`/dashboard/contribute?courseId=${course.id}${facultySlug ? `&facultySlug=${facultySlug}` : ""}`}
+          >
+            {isContributor
+              ? "Contribute To This Course"
+              : "Become A Contributor"}
+          </GrainientButton>
+        </div>
       </motion.div>
     </motion.div>
   );

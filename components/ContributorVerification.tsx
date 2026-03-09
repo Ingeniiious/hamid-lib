@@ -1,16 +1,25 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { GrainientButton } from "@/components/GrainientButton";
+import { FadeImage, preloadImages } from "@/components/FadeImage";
 import {
   sendContributorOTP,
   verifyContributorOTP,
 } from "@/app/(main)/dashboard/contribute/actions";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
+const CDN = "https://lib.thevibecodedcompany.com";
+
+const IMAGES = {
+  mail: `${CDN}/images/mail-verify.webp`,
+  badge: `${CDN}/images/verified-badge.webp`,
+  expert: `${CDN}/images/expert.webp`,
+};
 
 type Step = "email-input" | "otp-verify" | "success" | "manual-review";
 
@@ -22,6 +31,11 @@ export function ContributorVerification() {
   const [universityName, setUniversityName] = useState("");
   const [reviewMessage, setReviewMessage] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  // Aggressively preload all images on mount so they're cached for later steps
+  useEffect(() => {
+    preloadImages([IMAGES.mail, IMAGES.badge, IMAGES.expert]);
+  }, []);
 
   function handleSendOTP() {
     setError("");
@@ -47,11 +61,9 @@ export function ContributorVerification() {
       }
 
       if (result.autoVerified) {
-        // Domain matched — instant verification
         setUniversityName(result.universityName || "");
         setStep("success");
       } else {
-        // Domain not in our DB — needs manual review
         setReviewMessage(
           result.message ||
             "We need to manually verify this email domain. You'll hear from us soon."
@@ -62,7 +74,7 @@ export function ContributorVerification() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center px-6 py-12">
+    <div className="flex min-h-full flex-col items-center justify-center px-6">
       <AnimatePresence mode="wait">
         {step === "email-input" && (
           <motion.div
@@ -102,7 +114,7 @@ export function ContributorVerification() {
                 <Button
                   onClick={handleSendOTP}
                   disabled={isPending || !email.includes("@")}
-                  className="w-full"
+                  className="w-full rounded-full bg-[#5227FF] font-medium text-white hover:opacity-90 disabled:opacity-50"
                 >
                   {isPending ? "Sending..." : "Send Verification Code"}
                 </Button>
@@ -118,11 +130,17 @@ export function ContributorVerification() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5, ease }}
-            className="mx-auto w-full max-w-md text-center"
+            className="relative mx-auto w-full max-w-md text-center"
           >
+            {/* Mail illustration — absolutely positioned above card */}
+            <FadeImage
+              src={IMAGES.mail}
+              className="absolute left-1/2 bottom-full mb-4 h-[240px] w-auto -translate-x-1/2 object-contain"
+            />
+
             <div className="rounded-2xl border border-gray-900/10 bg-white/50 p-8 backdrop-blur-xl dark:border-white/15 dark:bg-white/10">
               <h2 className="font-display text-2xl font-light text-gray-900 dark:text-white">
-                Enter Verification Code
+                Check Your Email
               </h2>
               <p className="mt-3 text-sm text-gray-900/50 dark:text-white/50">
                 We sent a 6-digit code to{" "}
@@ -185,22 +203,13 @@ export function ContributorVerification() {
             className="mx-auto w-full max-w-md text-center"
           >
             <div className="rounded-2xl border border-gray-900/10 bg-white/50 p-8 backdrop-blur-xl dark:border-white/15 dark:bg-white/10">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
-                <svg
-                  className="h-8 w-8 text-green-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              </div>
-              <h2 className="font-display text-2xl font-light text-gray-900 dark:text-white">
+              <FadeImage
+                src={IMAGES.badge}
+                alt="Verified"
+                className="mx-auto h-[160px] w-auto object-contain"
+              />
+
+              <h2 className="mt-6 font-display text-2xl font-light text-gray-900 dark:text-white">
                 You&apos;re Verified!
               </h2>
               {universityName && (
@@ -209,15 +218,27 @@ export function ContributorVerification() {
                 </p>
               )}
               <p className="mt-3 text-sm text-gray-900/50 dark:text-white/50">
-                Welcome to the contributor community. You can now submit course
-                materials to help fellow students.
+                Here&apos;s your contributor badge. It&apos;ll appear next to
+                your name across Libraryyy.
               </p>
-              <Button
-                onClick={() => window.location.reload()}
-                className="mt-6 w-full"
-              >
-                Start Contributing
-              </Button>
+
+              <div className="mt-4 inline-flex items-center gap-2 text-sm text-gray-900/60 dark:text-white/60">
+                <FadeImage
+                  src={IMAGES.badge}
+                  alt="Badge"
+                  className="h-5 w-5 object-contain"
+                />
+                <span>Verified Contributor</span>
+              </div>
+
+              <div className="mt-6">
+                <GrainientButton
+                  href="#"
+                  onClick={() => window.location.reload()}
+                >
+                  Start Contributing
+                </GrainientButton>
+              </div>
             </div>
           </motion.div>
         )}

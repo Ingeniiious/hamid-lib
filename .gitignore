@@ -27,3 +27,7 @@ database/*.json
 # Landing page reference images
 current-landing.png
 landing-clone-full.png
+
+# Landing page sandbox (WIP)
+app/landing-clone/
+app/landing-v2/

@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, serial, boolean, unique, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, serial, boolean, unique, jsonb, index, uuid } from "drizzle-orm/pg-core";
 
 // ==================
 // App tables
@@ -44,11 +44,13 @@ export const course = pgTable("course", {
   professor: text("professor"),
   coverImage: text("cover_image"),
   facultyId: integer("faculty_id").references(() => faculty.id, { onDelete: "set null" }),
+  programId: integer("program_id").references(() => program.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: text("created_by"),
 }, (table) => [
   index("course_faculty_id_idx").on(table.facultyId),
+  index("course_program_id_idx").on(table.programId),
   index("course_created_at_idx").on(table.createdAt),
 ]);
 
@@ -507,4 +509,77 @@ export const contentReport = pgTable("content_report", {
   index("content_report_contribution_id_idx").on(table.contributionId),
   index("content_report_status_idx").on(table.status),
   index("content_report_created_at_idx").on(table.createdAt),
+]);
+
+// ==================
+// My Space — Notes
+// ==================
+
+export const noteFolder = pgTable("note_folder", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  parentId: uuid("parent_id"), // self-referencing for nested folders
+  color: text("color").notNull().default("#5227FF"),
+  icon: text("icon"), // Phosphor icon name, e.g. "BookOpen", "GraduationCap"
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("note_folder_user_id_idx").on(table.userId),
+  index("note_folder_parent_id_idx").on(table.parentId),
+]);
+
+export const note = pgTable("note", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),
+  folderId: uuid("folder_id").references(() => noteFolder.id, { onDelete: "set null" }),
+  title: text("title").notNull().default("Untitled"),
+  content: text("content"), // Tiptap JSON content
+  paperStyle: text("paper_style").notNull().default("blank"), // blank, lined, grid, dotted
+  paperColor: text("paper_color").notNull().default("#ffffff"),
+  paperSize: text("paper_size").notNull().default("a4"), // a4, a5, letter, b5, notebook
+  lineAlign: text("line_align").notNull().default("between"), // on-line, between, above
+  font: text("font").notNull().default("default"), // default, display, gochi, delicious
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("note_user_id_idx").on(table.userId),
+  index("note_folder_id_idx").on(table.folderId),
+  index("note_updated_at_idx").on(table.updatedAt),
+]);
+
+// ==================
+// My Space — Mind Maps
+// ==================
+
+export const mindMapFolder = pgTable("mind_map_folder", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  parentId: uuid("parent_id"), // self-referencing for nested folders
+  color: text("color").notNull().default("#5227FF"),
+  icon: text("icon"), // Phosphor icon name
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("mind_map_folder_user_id_idx").on(table.userId),
+  index("mind_map_folder_parent_id_idx").on(table.parentId),
+]);
+
+export const mindMap = pgTable("mind_map", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),
+  folderId: uuid("folder_id").references(() => mindMapFolder.id, { onDelete: "set null" }),
+  name: text("name").notNull().default("Untitled"),
+  nodes: text("nodes"), // React Flow nodes JSON
+  edges: text("edges"), // React Flow edges JSON
+  viewport: text("viewport"), // React Flow viewport JSON {x, y, zoom}
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("mind_map_user_id_idx").on(table.userId),
+  index("mind_map_folder_id_idx").on(table.folderId),
+  index("mind_map_updated_at_idx").on(table.updatedAt),
 ]);

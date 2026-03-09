@@ -36,7 +36,7 @@ export default function MainLayout({
       <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors duration-500 dark:bg-black/60" />
 
       {/* Content */}
-      <div className="relative z-10 flex h-full w-full">
+      <div className="relative z-10 h-full w-full overflow-hidden">
         {children}
       </div>
 

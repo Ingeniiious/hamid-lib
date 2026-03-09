@@ -273,34 +273,27 @@ export async function submitReview(data: {
     REVIEW_TAGS.includes(t as ReviewTag)
   );
 
-  // Check if user already reviewed this professor
-  const existing = await db
-    .select({ id: professorReview.id })
-    .from(professorReview)
-    .where(
-      and(
-        eq(professorReview.userId, session.user.id),
-        eq(professorReview.professorId, data.professorId)
-      )
-    )
-    .limit(1);
+  // Atomic insert — unique constraint (userId, professorId) prevents duplicates
+  const inserted = await db
+    .insert(professorReview)
+    .values({
+      professorId: data.professorId,
+      courseId: data.courseId || null,
+      userId: session.user.id,
+      overallRating: data.overallRating,
+      difficultyRating: data.difficultyRating,
+      wouldTakeAgain: data.wouldTakeAgain,
+      reviewText: data.reviewText?.trim() || null,
+      tags: validTags && validTags.length > 0 ? validTags : null,
+      courseName: data.courseName?.trim() || null,
+      status: "pending",
+    })
+    .onConflictDoNothing()
+    .returning({ id: professorReview.id });
 
-  if (existing.length > 0) {
+  if (inserted.length === 0) {
     return { error: "You have already reviewed this professor." };
   }
-
-  await db.insert(professorReview).values({
-    professorId: data.professorId,
-    courseId: data.courseId || null,
-    userId: session.user.id,
-    overallRating: data.overallRating,
-    difficultyRating: data.difficultyRating,
-    wouldTakeAgain: data.wouldTakeAgain,
-    reviewText: data.reviewText?.trim() || null,
-    tags: validTags && validTags.length > 0 ? validTags : null,
-    courseName: data.courseName?.trim() || null,
-    status: "pending",
-  });
 
   return { success: true };
 }

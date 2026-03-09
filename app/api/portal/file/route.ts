@@ -9,6 +9,14 @@ import { NextRequest, NextResponse } from "next/server";
  * Query params: ?codeId=123
  */
 export async function GET(request: NextRequest) {
+  // Rate limit file downloads to prevent brute-force enumeration
+  const { rateLimit } = await import("@/lib/rate-limit");
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const rl = await rateLimit(`portal-file:${ip}`, 30, 60);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429 });
+  }
+
   const codeId = request.nextUrl.searchParams.get("codeId");
 
   if (!codeId) {

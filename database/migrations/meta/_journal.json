@@ -43,6 +43,41 @@
       "when": 1772881625719,
       "tag": "0005_wealthy_mordo",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1772950644100,
+      "tag": "0006_stiff_jackal",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1772952803737,
+      "tag": "0007_sudden_ender_wiggin",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772955721050,
+      "tag": "0008_orange_franklin_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1772955881466,
+      "tag": "0009_fuzzy_kitty_pryde",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772958563448,
+      "tag": "0010_nebulous_doctor_octopus",
+      "breakpoints": true
     }
   ]
 }

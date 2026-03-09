@@ -89,7 +89,7 @@ export default async function CoursePage({ params }: Props) {
         }}
       >
         <div className="mx-auto max-w-5xl pt-8">
-          <CourseDetail course={c} isContributor={isContributor} />
+          <CourseDetail course={c} isContributor={isContributor} facultySlug={facultySlug} />
         </div>
       </div>
       <BackButton

@@ -18,9 +18,11 @@ const ease = [0.25, 0.46, 0.45, 0.94] as const;
 export function DashboardTopBar({
   userName,
   avatarUrl,
+  isContributor,
 }: {
   userName: string;
   avatarUrl?: string;
+  isContributor?: boolean;
 }) {
   const router = useRouter();
   const initial = userName.charAt(0).toUpperCase();
@@ -38,7 +40,7 @@ export function DashboardTopBar({
       className="pointer-events-none flex items-center justify-between px-6 py-5 sm:px-8"
     >
       {/* Left — avatar dropdown + greeting */}
-      <div className="pointer-events-auto flex items-center gap-3">
+      <div className="pointer-events-auto flex items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="focus-visible:outline-none">
@@ -80,6 +82,12 @@ export function DashboardTopBar({
             >
               Presentations
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => router.push("/dashboard/space")}
+              className="cursor-pointer rounded-lg text-gray-900/80 focus:bg-gray-900/5 focus:text-gray-900 dark:text-white/80 dark:focus:bg-white/10 dark:focus:text-white"
+            >
+              My Space
+            </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-gray-900/10 dark:bg-white/10" />
             <DropdownMenuItem
               onClick={() => router.push("/dashboard/users")}
@@ -105,6 +113,15 @@ export function DashboardTopBar({
         <span className="font-display text-sm font-light text-gray-900 dark:text-white">
           Hello, {userName.split(" ")[0]}
         </span>
+        {isContributor && (
+          <motion.img
+            src="https://lib.thevibecodedcompany.com/images/verified-badge.webp"
+            alt="Verified Contributor"
+            className="h-5 w-5 object-contain"
+            whileHover={{ scale: 1.1 }}
+            transition={{ duration: 0.2, ease }}
+          />
+        )}
       </div>
 
       {/* Right — theme toggle */}

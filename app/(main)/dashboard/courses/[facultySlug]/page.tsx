@@ -1,10 +1,12 @@
 import { db } from "@/lib/db";
-import { faculty, course } from "@/database/schema";
+import { auth } from "@/lib/auth";
+import { faculty, course, userProfile } from "@/database/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { CourseGrid } from "@/components/CourseGrid";
 import { BackButton } from "@/components/BackButton";
 import { PageHeader } from "@/components/PageHeader";
+import { ContributorCTA } from "@/components/ContributorCTA";
 import type { Metadata } from "next";
 
 type Props = {
@@ -54,6 +56,22 @@ export default async function FacultyCoursesPage({ params }: Props) {
     .where(eq(course.facultyId, fac.id))
     .orderBy(course.title);
 
+  // Check if user is a contributor
+  let isContributor = false;
+  try {
+    const { data: session } = await auth.getSession();
+    if (session?.user?.id) {
+      const profile = await db
+        .select({ contributorVerifiedAt: userProfile.contributorVerifiedAt })
+        .from(userProfile)
+        .where(eq(userProfile.userId, session.user.id))
+        .limit(1);
+      isContributor = !!profile[0]?.contributorVerifiedAt;
+    }
+  } catch {
+    // Ignore
+  }
+
   return (
     <div className="flex h-full flex-col">
       {/* Fixed header */}
@@ -74,30 +92,32 @@ export default async function FacultyCoursesPage({ params }: Props) {
       >
         <div className="mx-auto max-w-5xl pt-8">
           {courses.length === 0 ? (
-            <div className="flex flex-col items-center justify-center pt-32 text-center">
-              <h2 className="font-display text-xl font-light text-gray-900 dark:text-white">
-                No Courses Yet
-              </h2>
-              <p className="mt-2 text-sm text-gray-900/50 dark:text-white/50">
-                Courses for {fac.name} will appear here once they&apos;re added.
-              </p>
-            </div>
-          ) : (
-            <CourseGrid
-              courses={courses}
-              hrefPrefix={`/dashboard/courses/${facultySlug}`}
+            <ContributorCTA
+              heading="No Courses Yet"
+              subtext={`Be the first to request a course for ${fac.name}. Contribute your materials and we'll create study resources.`}
+              href={`/dashboard/contribute?facultySlug=${facultySlug}`}
+              imageHeight={200}
+              variant="full"
+              isContributor={isContributor}
             />
-          )}
+          ) : (
+            <>
+              <CourseGrid
+                courses={courses}
+                hrefPrefix={`/dashboard/courses/${facultySlug}`}
+              />
 
-          {/* Request link */}
-          <div className="mt-8 text-center">
-            <a
-              href="/dashboard/contribute"
-              className="text-sm text-gray-900/40 underline hover:text-gray-900/60 dark:text-white/40 dark:hover:text-white/60"
-            >
-              Can&apos;t Find Your Course?
-            </a>
-          </div>
+              {/* Persistent CTA below course grid */}
+              <ContributorCTA
+                heading="Can't Find Your Course?"
+                subtext="Help us grow this library. Contribute your notes and materials."
+                href={`/dashboard/contribute?facultySlug=${facultySlug}`}
+                imageHeight={120}
+                variant="compact"
+                isContributor={isContributor}
+              />
+            </>
+          )}
         </div>
       </div>
       <BackButton href="/dashboard/courses" label="All Faculties" floating />

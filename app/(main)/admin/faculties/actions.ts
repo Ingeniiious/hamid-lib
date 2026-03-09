@@ -191,7 +191,13 @@ export async function updateFaculty(
 
   await db
     .update(faculty)
-    .set({ ...data, updatedAt: new Date() })
+    .set({
+      name: data.name,
+      slug: data.slug,
+      university: data.university,
+      description: data.description,
+      updatedAt: new Date(),
+    })
     .where(eq(faculty.id, id));
 
   await logAdminAction({
@@ -271,7 +277,11 @@ export async function updateProgram(
 
   await db
     .update(program)
-    .set({ ...data, updatedAt: new Date() })
+    .set({
+      name: data.name,
+      slug: data.slug,
+      updatedAt: new Date(),
+    })
     .where(eq(program.id, id));
 
   await logAdminAction({

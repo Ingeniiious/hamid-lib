@@ -9,8 +9,10 @@ import {
   userProfile,
   contribution,
   course,
+  faculty,
+  program,
 } from "@/database/schema";
-import { eq, sql, like, and, desc } from "drizzle-orm";
+import { eq, sql, like, ilike, and, desc, inArray } from "drizzle-orm";
 import { sendOTP, verifyOTP } from "@/app/(main)/auth/actions";
 
 export async function getContributorStatus() {
@@ -47,7 +49,7 @@ async function matchUniversityDomainDB(emailDomain: string) {
   const matches = await db
     .select({ domain: universityDomain.domain, universityName: universityDomain.universityName })
     .from(universityDomain)
-    .where(sql`${universityDomain.domain} = ANY(${candidates}::text[])`)
+    .where(inArray(universityDomain.domain, candidates))
     .limit(1);
 
   return matches[0] || null;
@@ -332,33 +334,275 @@ export async function getMyContributions(page = 1, limit = 10) {
   return { contributions: rows, total: countResult.count };
 }
 
-export async function getCoursesForContribution() {
+export async function getCoursesForContribution(facultySlug?: string) {
   const { data: session } = await auth.getSession();
-  if (!session?.user?.id) return { courses: [] };
+  if (!session?.user?.id) return { courses: [], facultyName: null, programName: null };
 
-  // Get user's university from profile
+  // If a specific faculty was passed (user came from that faculty page), scope to it
+  if (facultySlug) {
+    const fac = await db
+      .select({ id: faculty.id, name: faculty.name })
+      .from(faculty)
+      .where(eq(faculty.slug, facultySlug))
+      .limit(1)
+      .then((rows) => rows[0]);
+
+    if (fac) {
+      const courses = await db
+        .select({ id: course.id, title: course.title })
+        .from(course)
+        .where(eq(course.facultyId, fac.id))
+        .orderBy(course.title);
+      return { courses, facultyName: fac.name, programName: null };
+    }
+  }
+
+  // Use user's profile: try program first, then faculty
   const profile = await db
-    .select({ university: userProfile.university, facultyId: userProfile.facultyId })
+    .select({
+      university: userProfile.university,
+      facultyId: userProfile.facultyId,
+      programId: userProfile.programId,
+    })
     .from(userProfile)
     .where(eq(userProfile.userId, session.user.id))
     .limit(1);
 
-  if (!profile[0]?.facultyId) {
-    // Return all courses if no faculty set
+  // Priority 1: user's program — show only courses for their specific program
+  if (profile[0]?.programId) {
+    const prog = await db
+      .select({ name: program.name })
+      .from(program)
+      .where(eq(program.id, profile[0].programId))
+      .limit(1)
+      .then((rows) => rows[0]);
+
     const courses = await db
+      .select({ id: course.id, title: course.title })
+      .from(course)
+      .where(eq(course.programId, profile[0].programId))
+      .orderBy(course.title);
+
+    // If program has courses, return them
+    if (courses.length > 0) {
+      return { courses, facultyName: null, programName: prog?.name || null };
+    }
+
+    // Program has no courses yet — fall through to faculty level
+  }
+
+  // Priority 2: user's faculty
+  if (profile[0]?.facultyId) {
+    const fac = await db
+      .select({ name: faculty.name })
+      .from(faculty)
+      .where(eq(faculty.id, profile[0].facultyId))
+      .limit(1)
+      .then((rows) => rows[0]);
+
+    const courses = await db
+      .select({ id: course.id, title: course.title })
+      .from(course)
+      .where(eq(course.facultyId, profile[0].facultyId))
+      .orderBy(course.title);
+
+    return { courses, facultyName: fac?.name || null, programName: null };
+  }
+
+  // No faculty/program set — return all courses
+  const courses = await db
+    .select({ id: course.id, title: course.title })
+    .from(course)
+    .orderBy(course.title)
+    .limit(100);
+  return { courses, facultyName: null, programName: null };
+}
+
+// ==================
+// Contribution Context & Deduplication
+// ==================
+
+function toTitleCase(str: string): string {
+  return str
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function slugify(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+export async function getContributionContext() {
+  const { data: session } = await auth.getSession();
+  if (!session?.user?.id) return null;
+
+  const profile = await db
+    .select({
+      facultyId: userProfile.facultyId,
+      programId: userProfile.programId,
+    })
+    .from(userProfile)
+    .where(eq(userProfile.userId, session.user.id))
+    .limit(1);
+
+  const facultyId = profile[0]?.facultyId || null;
+  const userProgramId = profile[0]?.programId || null;
+
+  if (!facultyId) {
+    // No faculty — return flat list of all courses
+    const allCourses = await db
       .select({ id: course.id, title: course.title })
       .from(course)
       .orderBy(course.title)
       .limit(100);
-    return { courses };
+    return { programs: [], courses: allCourses, userProgramId: null, userFacultyId: null };
   }
 
-  // Return courses for user's faculty
-  const courses = await db
+  // Get programs for user's faculty
+  const programs = await db
+    .select({ id: program.id, name: program.name })
+    .from(program)
+    .where(eq(program.facultyId, facultyId))
+    .orderBy(program.name);
+
+  // Get courses for user's program (if set)
+  let courses: { id: string; title: string }[] = [];
+  if (userProgramId) {
+    courses = await db
+      .select({ id: course.id, title: course.title })
+      .from(course)
+      .where(eq(course.programId, userProgramId))
+      .orderBy(course.title);
+  }
+
+  return { programs, courses, userProgramId, userFacultyId: facultyId };
+}
+
+export async function getCoursesForProgram(programId: number) {
+  const { data: session } = await auth.getSession();
+  if (!session?.user?.id) return [];
+
+  return db
     .select({ id: course.id, title: course.title })
     .from(course)
-    .where(eq(course.facultyId, profile[0].facultyId))
+    .where(eq(course.programId, programId))
     .orderBy(course.title);
+}
 
-  return { courses };
+export async function findOrCreateProgram(data: {
+  name: string;
+  facultyId: number;
+}): Promise<{ id: number; name: string; error?: undefined } | { error: string }> {
+  const { data: session } = await auth.getSession();
+  if (!session?.user?.id) return { error: "Not authenticated." };
+
+  // Contributor verification
+  const [ver] = await db
+    .select()
+    .from(contributorVerification)
+    .where(eq(contributorVerification.userId, session.user.id))
+    .limit(1);
+  if (!ver) return { error: "Not verified as a contributor." };
+
+  // Rate limit
+  const { rateLimit } = await import("@/lib/rate-limit");
+  const rl = await rateLimit(`find-or-create:${session.user.id}`, 30, 60);
+  if (!rl.allowed) return { error: "Too many requests. Please wait a moment." };
+
+  // Validate
+  const trimmed = data.name.trim();
+  if (!trimmed || trimmed.length < 2) return { error: "Program name is too short (min 2 characters)." };
+  if (trimmed.length > 200) return { error: "Program name is too long (max 200 characters)." };
+
+  const titleCased = toTitleCase(trimmed);
+
+  // Exact case-insensitive match (no LIKE wildcards)
+  const existing = await db
+    .select({ id: program.id, name: program.name })
+    .from(program)
+    .where(
+      and(
+        eq(program.facultyId, data.facultyId),
+        eq(sql`lower(${program.name})`, titleCased.toLowerCase())
+      )
+    )
+    .limit(1);
+
+  if (existing[0]) return existing[0];
+
+  // Create new program
+  const slug = `${slugify(titleCased)}-${crypto.randomUUID().slice(0, 8)}`;
+  const [row] = await db
+    .insert(program)
+    .values({
+      name: titleCased,
+      slug,
+      facultyId: data.facultyId,
+    })
+    .returning({ id: program.id, name: program.name });
+
+  return row;
+}
+
+export async function findOrCreateCourse(data: {
+  name: string;
+  programId: number;
+  facultyId: number;
+}): Promise<{ id: string; title: string; error?: undefined } | { error: string }> {
+  const { data: session } = await auth.getSession();
+  if (!session?.user?.id) return { error: "Not authenticated." };
+
+  // Contributor verification
+  const [ver] = await db
+    .select()
+    .from(contributorVerification)
+    .where(eq(contributorVerification.userId, session.user.id))
+    .limit(1);
+  if (!ver) return { error: "Not verified as a contributor." };
+
+  // Rate limit (shares bucket with findOrCreateProgram)
+  const { rateLimit } = await import("@/lib/rate-limit");
+  const rl = await rateLimit(`find-or-create:${session.user.id}`, 30, 60);
+  if (!rl.allowed) return { error: "Too many requests. Please wait a moment." };
+
+  // Validate
+  const trimmed = data.name.trim();
+  if (!trimmed || trimmed.length < 2) return { error: "Course name is too short (min 2 characters)." };
+  if (trimmed.length > 200) return { error: "Course name is too long (max 200 characters)." };
+
+  const titleCased = toTitleCase(trimmed);
+
+  // Exact case-insensitive match (no LIKE wildcards)
+  const existing = await db
+    .select({ id: course.id, title: course.title })
+    .from(course)
+    .where(
+      and(
+        eq(course.programId, data.programId),
+        eq(sql`lower(${course.title})`, titleCased.toLowerCase())
+      )
+    )
+    .limit(1);
+
+  if (existing[0]) return existing[0];
+
+  // Create new course
+  const id = crypto.randomUUID();
+  const slug = `${slugify(titleCased)}-${id.slice(0, 8)}`;
+  await db.insert(course).values({
+    id,
+    title: titleCased,
+    slug,
+    facultyId: data.facultyId,
+    programId: data.programId,
+    createdBy: session.user.id,
+  });
+
+  return { id, title: titleCased };
 }

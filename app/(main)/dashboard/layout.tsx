@@ -26,12 +26,17 @@ export default async function DashboardLayout({
 
   // Fetch profile for avatar
   const profiles = await db
-    .select({ avatarUrl: userProfile.avatarUrl, gender: userProfile.gender })
+    .select({
+      avatarUrl: userProfile.avatarUrl,
+      gender: userProfile.gender,
+      contributorVerifiedAt: userProfile.contributorVerifiedAt,
+    })
     .from(userProfile)
     .where(eq(userProfile.userId, session.user.id))
     .limit(1);
   const profile = profiles[0];
   const avatarUrl = getAvatarUrl(profile?.avatarUrl, profile?.gender);
+  const isContributor = !!profile?.contributorVerifiedAt;
 
   return (
     <div className="relative h-full w-full">
@@ -42,7 +47,7 @@ export default async function DashboardLayout({
       <div className="relative z-10 flex h-full flex-col">
         {/* Persistent top bar — stays across all dashboard routes */}
         <div className="shrink-0">
-          <DashboardTopBar userName={userName} avatarUrl={avatarUrl} />
+          <DashboardTopBar userName={userName} avatarUrl={avatarUrl} isContributor={isContributor} />
         </div>
 
         {/* Page content — cross-fades between dashboard routes */}

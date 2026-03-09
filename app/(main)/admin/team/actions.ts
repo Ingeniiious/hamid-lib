@@ -60,6 +60,12 @@ export async function inviteAdmin(email: string, roleId: number) {
   const session = await getAdminSession();
   await requirePermission(session, "team.manage");
 
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email || !emailRegex.test(email)) {
+    return { error: "Invalid email address." };
+  }
+
   // Only super-admins can invite as super-admin
   const targetRole = await db
     .select({ slug: adminRole.slug })

@@ -1,0 +1,1 @@
+ALTER TABLE "note" ADD COLUMN "paper_size" text DEFAULT 'a4' NOT NULL;

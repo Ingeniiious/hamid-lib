@@ -121,6 +121,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Insert or update (resubmission after rejection)
+  // Use atomic upsert to prevent race condition duplicates
   if (existing) {
     await db
       .update(enrollmentVerification)
@@ -139,16 +140,27 @@ export async function POST(request: NextRequest) {
       })
       .where(eq(enrollmentVerification.id, existing.id));
   } else {
-    await db.insert(enrollmentVerification).values({
-      userId: session.user.id,
-      professorId,
-      courseName,
-      semester,
-      proofFileKey: objectKey,
-      proofFileUrl: result.url,
-      proofFileName: file.name,
-      proofFileSize: file.size,
-    });
+    const inserted = await db
+      .insert(enrollmentVerification)
+      .values({
+        userId: session.user.id,
+        professorId,
+        courseName,
+        semester,
+        proofFileKey: objectKey,
+        proofFileUrl: result.url,
+        proofFileName: file.name,
+        proofFileSize: file.size,
+      })
+      .onConflictDoNothing()
+      .returning({ id: enrollmentVerification.id });
+
+    if (inserted.length === 0) {
+      return NextResponse.json(
+        { error: "You already have a pending or approved verification." },
+        { status: 400 }
+      );
+    }
   }
 
   return NextResponse.json({ success: true });

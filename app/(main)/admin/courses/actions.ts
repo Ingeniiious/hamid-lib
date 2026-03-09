@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { course, material, faculty } from "@/database/schema";
+import { course, material, faculty, program } from "@/database/schema";
 import { eq, sql, ilike, or, desc } from "drizzle-orm";
 import { getAdminSession, requirePermission } from "@/lib/admin/auth";
 import { logAdminAction } from "@/lib/admin/audit";
@@ -51,12 +51,15 @@ export async function listCourses({
       professor: course.professor,
       facultyId: course.facultyId,
       facultyName: faculty.name,
+      programId: course.programId,
+      programName: program.name,
       coverImage: course.coverImage,
       createdAt: course.createdAt,
       updatedAt: course.updatedAt,
     })
     .from(course)
-    .leftJoin(faculty, eq(course.facultyId, faculty.id));
+    .leftJoin(faculty, eq(course.facultyId, faculty.id))
+    .leftJoin(program, eq(course.programId, program.id));
 
   const countQuery = db
     .select({ count: sql<string>`count(*)` })
@@ -119,6 +122,8 @@ export async function getCourse(id: string) {
       professor: course.professor,
       facultyId: course.facultyId,
       facultyName: faculty.name,
+      programId: course.programId,
+      programName: program.name,
       coverImage: course.coverImage,
       createdAt: course.createdAt,
       updatedAt: course.updatedAt,
@@ -126,6 +131,7 @@ export async function getCourse(id: string) {
     })
     .from(course)
     .leftJoin(faculty, eq(course.facultyId, faculty.id))
+    .leftJoin(program, eq(course.programId, program.id))
     .where(eq(course.id, id))
     .limit(1);
 
@@ -161,6 +167,7 @@ export async function createCourse(data: {
   slug: string;
   description?: string;
   facultyId?: number;
+  programId?: number;
   semester?: string;
   professor?: string;
 }) {
@@ -175,6 +182,7 @@ export async function createCourse(data: {
     slug: data.slug,
     description: data.description || null,
     facultyId: data.facultyId || null,
+    programId: data.programId || null,
     semester: data.semester || null,
     professor: data.professor || null,
     createdBy: session.user.id,
@@ -198,6 +206,7 @@ export async function updateCourse(
     slug?: string;
     description?: string;
     facultyId?: number | null;
+    programId?: number | null;
     semester?: string;
     professor?: string;
   }
@@ -208,7 +217,13 @@ export async function updateCourse(
   await db
     .update(course)
     .set({
-      ...data,
+      title: data.title,
+      slug: data.slug,
+      description: data.description,
+      facultyId: data.facultyId,
+      programId: data.programId,
+      semester: data.semester,
+      professor: data.professor,
       updatedAt: new Date(),
     })
     .where(eq(course.id, id));
@@ -254,6 +269,23 @@ export async function getAllFaculties() {
     })
     .from(faculty)
     .orderBy(faculty.name);
+
+  return rows;
+}
+
+export async function getProgramsForFaculty(facultyId: number) {
+  const session = await getAdminSession();
+  await requirePermission(session, "courses.view");
+
+  const rows = await db
+    .select({
+      id: program.id,
+      name: program.name,
+      slug: program.slug,
+    })
+    .from(program)
+    .where(eq(program.facultyId, facultyId))
+    .orderBy(program.name);
 
   return rows;
 }

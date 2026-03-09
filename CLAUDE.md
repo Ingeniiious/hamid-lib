@@ -1,5 +1,21 @@
 # Hamid Library
 
+## PRIORITY RULES (ALWAYS FOLLOW — NEVER SKIP)
+
+1. **Database: ALWAYS use Neon MCP** — For ALL database operations (queries, migrations, schema inspection, docs lookup), ALWAYS use the Neon MCP tools (`mcp__Neon__run_sql`, `mcp__Neon__run_sql_transaction`, etc.) first. There is NO `DATABASE_URL` locally — `npm run db:migrate` will fail. Use Neon MCP for everything database-related.
+
+2. **Brand color: `#5227FF`** — All primary buttons, CTAs, and interactive accent elements use `bg-[#5227FF]` with `text-white hover:opacity-90 disabled:opacity-50`. This is the brand purple. Never use a different color for primary actions.
+
+3. **Center alignment for i18n** — ALL text, inputs, labels, dropdowns, and content blocks use **center/middle alignment** (`text-center`, `justify-center`, `items-center`, `mx-auto`). NO left-align, NO right-align. This is the i18n strategy: center alignment means the same layout works for LTR (English, Turkish) and RTL (Persian) without any `dir` switching. Applies to every page, every component.
+
+4. **Pill-shaped inputs & buttons** — All inputs, selects, and buttons use `rounded-full` (pill shape). Larger containers/cards use `rounded-2xl` or `rounded-3xl`. Never use sharp corners.
+
+5. **No mobile zoom on inputs** — Viewport is set to `maximumScale: 1, userScalable: false` in `app/layout.tsx` to prevent iOS Safari auto-zoom on input focus. Already configured globally — do not override.
+
+6. **Static assets: Use Cloudflare MCP or Wrangler for R2** — For uploading, listing, or managing files in the R2 bucket (`hamid-lib-assets`), use the Cloudflare MCP tools (`mcp__cloudflare-api__*`) or Wrangler CLI (`npx wrangler r2 object put ...`). Both have full access to R2 and other Cloudflare services.
+
+---
+
 ## Project Overview
 An open-source, community-driven university course library following a contribution-based model. Students contribute their own course documents, which are reviewed, moderated, and used as a foundation to create original study resources: examples, practices, presentations, study guides, and mock exams. The platform does NOT host university course materials directly (to avoid legal issues). All published content is original work created from verified student contributions. Free and open to university students.
 
@@ -55,8 +71,9 @@ An open-source, community-driven university course library following a contribut
 - Clean, simple, minimal UI (shadcn/ui style)
 - **Always design both desktop AND mobile-optimized layouts** — mobile-first responsive
 - No over-engineering — keep it simple
-- **Everything center-aligned** on student-facing pages (titles, components, content blocks)
-- Same centered layout for all languages — no RTL/LTR switching, just translate the text
+- **Everything center-aligned** — ALL text, inputs, labels, content use center alignment (see Priority Rule #3). This is the i18n strategy for handling RTL/LTR without switching.
+- **Brand color `#5227FF`** — all primary buttons and CTAs (see Priority Rule #2)
+- **Pill-shaped** — all inputs, selects, buttons use `rounded-full` (see Priority Rule #4)
 - Can use Pencil MCP for design/prototyping
 - **Title Case** everywhere — all headings, buttons, labels, nav items use Title Case
 - **No icons/emojis** unless absolutely needed — if icons are needed, use **Phosphor Duotone** only
@@ -280,7 +297,7 @@ Public-facing professor & course rating system. Students rate professors at spec
 
 ## Notes
 - **Next.js 16:** `middleware.ts` has been deprecated and renamed to `proxy.ts` — don't confuse them. Use `proxy.ts` for request interception/routing.
-- Targeting 10,000+ users in the first 6 months — build for scale from day one
+- **Target: 10,000+ users in first 6 months** — university-scale project aiming for university sponsorship and wide adoption. ALWAYS build for scale, never treat this as a small/hobby project.
 - Keep dependencies minimal
 - Path alias: `@/*` maps to project root
 - Hosted on Vercel Pro plan

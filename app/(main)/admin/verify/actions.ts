@@ -18,6 +18,15 @@ export async function verifyAdminOTP(code: string) {
   const { data: session } = await auth.getSession();
   if (!session?.user?.email) redirect("/auth");
 
+  // Verify caller is actually an admin before allowing OTP verification
+  const adminRows = await db
+    .select({ userId: adminUser.userId })
+    .from(adminUser)
+    .where(eq(adminUser.userId, session.user.id))
+    .limit(1);
+
+  if (!adminRows[0]) redirect("/dashboard");
+
   const result = await verifyOTP(session.user.email, code, "admin-login");
   if (result.error) return result;
 
