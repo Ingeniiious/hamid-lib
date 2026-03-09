@@ -1,3 +1,5 @@
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -18,10 +20,14 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-export default function AuthLayout({
+export default async function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // If already logged in, skip auth and go straight to dashboard
+  const { data: session } = await auth.getSession();
+  if (session) redirect("/dashboard");
+
   return <>{children}</>;
 }
