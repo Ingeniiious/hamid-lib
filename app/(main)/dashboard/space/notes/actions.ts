@@ -127,7 +127,12 @@ export async function updateNote(
     })
     .where(eq(note.id, noteId));
 
-  revalidatePath("/dashboard/space/notes");
+  // NOTE: No revalidatePath here — this action is called by the editor's
+  // auto-save every 1.5s. Calling revalidatePath triggers an RSC refresh
+  // of the current route, which on production (with network latency) hits
+  // the loading.tsx Suspense boundary, unmounting the Tldraw editor and
+  // losing the canvas state. The notes list page uses force-dynamic, so
+  // it always fetches fresh data on navigation anyway.
 }
 
 export async function deleteNote(noteId: string) {

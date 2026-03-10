@@ -107,7 +107,9 @@ export async function updateMindMap(
     .set({ ...data, updatedAt: new Date() })
     .where(eq(mindMap.id, mindMapId));
 
-  revalidatePath(MINDMAP_PATH);
+  // NOTE: No revalidatePath here — same reason as notes: auto-save every
+  // 1.5s would trigger RSC refresh → loading boundary → editor unmount.
+  // The list page uses force-dynamic so it always shows fresh data.
 }
 
 export async function deleteMindMap(mindMapId: string) {

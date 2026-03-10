@@ -45,80 +45,96 @@ function getExtension(mime: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const { data: session } = await auth.getSession();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  try {
+    const { data: session } = await auth.getSession();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  const formData = await request.formData();
-  const file = formData.get("file") as File | null;
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
 
-  if (!file) {
-    return NextResponse.json({ error: "No file provided." }, { status: 400 });
-  }
+    if (!file) {
+      return NextResponse.json({ error: "No file provided." }, { status: 400 });
+    }
 
-  if (file.size > MAX_FILE_SIZE) {
-    return NextResponse.json({ error: "File too large. Max 50MB." }, { status: 400 });
-  }
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: "File too large. Max 50MB." }, { status: 400 });
+    }
 
-  if (!ALLOWED_TYPES.has(file.type)) {
-    return NextResponse.json({ error: "File type not allowed." }, { status: 400 });
-  }
+    if (!ALLOWED_TYPES.has(file.type)) {
+      return NextResponse.json({ error: "File type not allowed." }, { status: 400 });
+    }
 
-  // Enforce per-user limits (file count + total storage)
-  const [usage] = await db
-    .select({
-      count: sql<number>`count(*)::int`,
-      totalSize: sql<number>`coalesce(sum(${portalPresentation.fileSize}), 0)::int`,
-    })
-    .from(portalPresentation)
-    .where(eq(portalPresentation.userId, session.user.id));
+    // Enforce per-user limits (file count + total storage)
+    const [usage] = await db
+      .select({
+        count: sql<number>`count(*)::int`,
+        totalSize: sql<number>`coalesce(sum(${portalPresentation.fileSize}), 0)::int`,
+      })
+      .from(portalPresentation)
+      .where(eq(portalPresentation.userId, session.user.id));
 
-  if (usage.count >= MAX_FILES_PER_USER) {
+    if (usage.count >= MAX_FILES_PER_USER) {
+      return NextResponse.json(
+        { error: `You can have at most ${MAX_FILES_PER_USER} files. Delete one to upload more.` },
+        { status: 400 }
+      );
+    }
+
+    if (usage.totalSize + file.size > MAX_STORAGE_PER_USER) {
+      const usedMB = (usage.totalSize / (1024 * 1024)).toFixed(1);
+      return NextResponse.json(
+        { error: `Storage limit reached (${usedMB}/100 MB). Delete files to free up space.` },
+        { status: 400 }
+      );
+    }
+
+    // Watermark the file before uploading (PDFs + images)
+    let watermarkedBuffer: Uint8Array;
+    let finalMime: string;
+    try {
+      const rawBuffer = new Uint8Array(await file.arrayBuffer());
+      const result = await watermarkFile(rawBuffer, file.type);
+      watermarkedBuffer = result.buffer;
+      finalMime = result.mimeType;
+    } catch (wmErr) {
+      console.error("Watermark failed:", file.type, file.name, wmErr);
+      // Fall back to uploading without watermark
+      watermarkedBuffer = new Uint8Array(await file.arrayBuffer());
+      finalMime = file.type;
+    }
+
+    // Hash the object key — no userId or filename in the path
+    const hash = randomBytes(32).toString("hex");
+    const ext = getExtension(finalMime);
+    const objectKey = `portal/${hash}${ext}`;
+
+    const result = await uploadToR2(watermarkedBuffer, objectKey, finalMime);
+
+    if (!result.success) {
+      console.error("R2 upload failed:", result.error);
+      return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
+    }
+
+    const [row] = await db
+      .insert(portalPresentation)
+      .values({
+        userId: session.user.id,
+        fileName: file.name,
+        fileKey: objectKey,
+        fileUrl: result.url,
+        fileSize: watermarkedBuffer.length,
+        fileType: finalMime,
+      })
+      .returning();
+
+    return NextResponse.json({ presentation: row });
+  } catch (err) {
+    console.error("Portal upload error:", err);
     return NextResponse.json(
-      { error: `You can have at most ${MAX_FILES_PER_USER} files. Delete one to upload more.` },
-      { status: 400 }
+      { error: "Something went wrong. Please try again." },
+      { status: 500 }
     );
   }
-
-  if (usage.totalSize + file.size > MAX_STORAGE_PER_USER) {
-    const usedMB = (usage.totalSize / (1024 * 1024)).toFixed(1);
-    return NextResponse.json(
-      { error: `Storage limit reached (${usedMB}/100 MB). Delete files to free up space.` },
-      { status: 400 }
-    );
-  }
-
-  // Watermark the file before uploading (PDFs + images)
-  const rawBuffer = new Uint8Array(await file.arrayBuffer());
-  const { buffer: watermarkedBuffer, mimeType: finalMime } = await watermarkFile(
-    rawBuffer,
-    file.type
-  );
-
-  // Hash the object key — no userId or filename in the path
-  const hash = randomBytes(32).toString("hex");
-  const ext = getExtension(finalMime);
-  const objectKey = `portal/${hash}${ext}`;
-
-  const result = await uploadToR2(watermarkedBuffer, objectKey, finalMime);
-
-  if (!result.success) {
-    console.error("R2 upload failed:", result.error);
-    return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
-  }
-
-  const [row] = await db
-    .insert(portalPresentation)
-    .values({
-      userId: session.user.id,
-      fileName: file.name,
-      fileKey: objectKey,
-      fileUrl: result.url,
-      fileSize: watermarkedBuffer.length,
-      fileType: finalMime,
-    })
-    .returning();
-
-  return NextResponse.json({ presentation: row });
 }
