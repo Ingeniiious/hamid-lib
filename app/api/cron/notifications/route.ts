@@ -210,15 +210,40 @@ export async function GET(request: NextRequest) {
 
     const subscriptions = subsMap.get(event.userId)!;
 
+    // Build location context for the notification body
+    const locationParts: string[] = [];
+    if (event.locationType === "online" && event.url) {
+      locationParts.push("Online");
+    } else {
+      if (event.campus) locationParts.push(event.campus);
+      if (event.room) locationParts.push(event.room);
+    }
+    const locationStr = locationParts.length > 0 ? ` — ${locationParts.join(", ")}` : "";
+
     const body =
       alertMinutes === 0
-        ? `Starting now — ${event.startTime}`
-        : `In ${formatMinutes(alertMinutes + travelMinutes)} — ${event.startTime}`;
+        ? `Starting now — ${event.startTime}${locationStr}`
+        : `In ${formatMinutes(alertMinutes + travelMinutes)} — ${event.startTime}${locationStr}`;
+
+    // Category label for notification title (e.g., "Class: Math 101")
+    const categoryLabels: Record<string, string> = {
+      class: "Class",
+      exam: "Exam",
+      deadline: "Deadline",
+      reminder: "Reminder",
+    };
+    const categoryLabel = categoryLabels[event.category] || "";
+    const title = categoryLabel ? `${categoryLabel}: ${event.title}` : event.title;
+
+    // For online events, tapping the notification opens the meeting URL directly
+    const notifUrl = event.locationType === "online" && event.url
+      ? event.url
+      : "/dashboard/me/calendar";
 
     const payload = {
-      title: event.title,
+      title,
       body,
-      url: "/dashboard/me/calendar",
+      url: notifUrl,
       tag: `event-${event.id}-${alertMinutes}`,
       category: event.category,
     };
@@ -390,7 +415,7 @@ export async function GET(request: NextRequest) {
   const istanbulTime = getLocalDateTime(now, DEFAULT_TZ);
   const istanbulMinuteOfHour = istanbulTime.localMinutes - istanbulTime.localHours * 60;
   let automationResults = { processed: 0, sent: 0, skipped: 0 };
-  if (istanbulTime.localHours === 9 && istanbulMinuteOfHour === 0) {
+  if (istanbulTime.localHours === 9 && istanbulMinuteOfHour < 5) {
     try {
       automationResults = await processAutomations();
     } catch (err) {
