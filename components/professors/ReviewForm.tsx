@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { submitReview } from "@/app/(public)/professors/actions";
 import { REVIEW_TAGS } from "@/lib/professor-constants";
+import { useTranslation } from "@/lib/i18n";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -20,6 +21,8 @@ export function ReviewForm({
   onSuccess: () => void;
   onCancel: () => void;
 }) {
+  const { locale, t } = useTranslation();
+  const titleDir = locale === "fa" ? "rtl" : undefined;
   const [overallRating, setOverallRating] = useState(0);
   const [difficultyRating, setDifficultyRating] = useState(0);
   const [wouldTakeAgain, setWouldTakeAgain] = useState<boolean | null>(null);
@@ -39,9 +42,9 @@ export function ReviewForm({
     e.preventDefault();
     setError("");
 
-    if (overallRating === 0) return setError("Please select an overall rating.");
-    if (difficultyRating === 0) return setError("Please select a difficulty rating.");
-    if (wouldTakeAgain === null) return setError("Please select if you would take this professor again.");
+    if (overallRating === 0) return setError(t("professors.selectOverallRating"));
+    if (difficultyRating === 0) return setError(t("professors.selectDifficultyRating"));
+    if (wouldTakeAgain === null) return setError(t("professors.selectWouldTakeAgain"));
 
     setSubmitting(true);
     const result = await submitReview({
@@ -69,20 +72,20 @@ export function ReviewForm({
       transition={{ duration: 0.5, ease }}
       className="rounded-xl border bg-white/80 p-6 shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/80"
     >
-      <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
-        Rate {professorName}
+      <h3 dir={titleDir} className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
+        {t("professors.rateProfessor")} {professorName}
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Course Name */}
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Course Name (optional)
+            {t("professors.courseNameOptional")}
           </label>
           <Input
             value={courseName}
             onChange={(e) => setCourseName(e.target.value)}
-            placeholder="e.g. Introduction to Psychology"
+            placeholder={t("professors.courseNamePlaceholder")}
             maxLength={200}
           />
         </div>
@@ -90,7 +93,7 @@ export function ReviewForm({
         {/* Overall Rating */}
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Overall Rating
+            {t("professors.overallRatingLabel")}
           </label>
           <RatingPicker value={overallRating} onChange={setOverallRating} />
         </div>
@@ -98,7 +101,7 @@ export function ReviewForm({
         {/* Difficulty Rating */}
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Difficulty
+            {t("professors.difficultyRatingLabel")}
           </label>
           <RatingPicker value={difficultyRating} onChange={setDifficultyRating} />
         </div>
@@ -106,7 +109,7 @@ export function ReviewForm({
         {/* Would Take Again */}
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Would You Take This Professor Again?
+            {t("professors.wouldTakeAgainQuestion")}
           </label>
           <div className="flex gap-3">
             <button
@@ -118,7 +121,7 @@ export function ReviewForm({
                   : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
               }`}
             >
-              Yes
+              {t("professors.yes")}
             </button>
             <button
               type="button"
@@ -129,7 +132,7 @@ export function ReviewForm({
                   : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
               }`}
             >
-              No
+              {t("professors.no")}
             </button>
           </div>
         </div>
@@ -137,7 +140,7 @@ export function ReviewForm({
         {/* Tags */}
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Tags (select up to 5)
+            {t("professors.tagsLabel")}
           </label>
           <div className="flex flex-wrap gap-1.5">
             {REVIEW_TAGS.map((tag) => (
@@ -160,12 +163,12 @@ export function ReviewForm({
         {/* Review Text */}
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Review (optional)
+            {t("professors.reviewOptional")}
           </label>
           <textarea
             value={reviewText}
             onChange={(e) => setReviewText(e.target.value)}
-            placeholder="Share your experience with this professor..."
+            placeholder={t("professors.reviewPlaceholder")}
             maxLength={2000}
             rows={4}
             className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
@@ -181,15 +184,15 @@ export function ReviewForm({
 
         <div className="flex gap-3">
           <Button type="submit" disabled={submitting}>
-            {submitting ? "Submitting..." : "Submit Review"}
+            {submitting ? t("professors.submitting") : t("professors.submitReview")}
           </Button>
           <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
+            {t("common.cancel")}
           </Button>
         </div>
 
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          Your review will be visible after moderation.
+          {t("professors.reviewModeration")}
         </p>
       </form>
     </motion.div>

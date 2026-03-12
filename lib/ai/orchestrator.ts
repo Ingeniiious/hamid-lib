@@ -22,6 +22,7 @@ import {
 import { complete } from "@/lib/ai/client";
 import { calculateStepCost } from "@/lib/ai/cost";
 import { getPrompt } from "@/lib/ai/prompts";
+import { createGenerationSteps, processGenerationStep } from "@/lib/ai/publisher";
 import type {
   ModelSlug,
   ModelRole,
@@ -46,6 +47,7 @@ const ROLE_TO_JOB_STATUS: Record<ModelRole, PipelineStatus> = {
   enricher: "enriching",
   validator: "validating",
   fact_checker: "fact_checking",
+  generator: "generating",
 };
 
 /** Roles whose output carries a verdict that can reject the whole job. */
@@ -53,6 +55,28 @@ const GATING_ROLES: ModelRole[] = ["reviewer", "validator", "fact_checker"];
 
 /** Roles that return JSON (gating roles + enricher). */
 const JSON_ROLES: ModelRole[] = ["reviewer", "validator", "fact_checker", "enricher"];
+
+/** Roles that can be skipped on failure without killing the job.
+ *  Creator is the ONLY non-skippable role — without initial content, there's nothing to review. */
+const SKIPPABLE_ROLES: ModelRole[] = ["reviewer", "enricher", "validator", "fact_checker", "generator"];
+
+/** Error patterns that indicate a permanent failure — no point retrying. */
+const PERMANENT_ERROR_PATTERNS = [
+  "api key",
+  "apikey",
+  "unauthorized",
+  "forbidden",
+  "invalid.*key",
+  "authentication",
+  "not set",       // "OPENAI_API_KEY is not set"
+  "permission",
+];
+
+/** Check if an error is permanent (won't resolve on retry). */
+function isPermanentError(errorMessage: string): boolean {
+  const lower = errorMessage.toLowerCase();
+  return PERMANENT_ERROR_PATTERNS.some((p) => new RegExp(p).test(lower));
+}
 
 /**
  * Turn a raw ai_model_config row into a typed ModelConfig.
@@ -135,7 +159,13 @@ export async function processNextStep(): Promise<{
     .limit(1);
 
   if (!modelRow) {
-    await failStep(step.id, job.id, `Model config not found or disabled: ${step.modelSlug}`);
+    const stepRole = step.role as ModelRole;
+    const msg = `Model config not found or disabled: ${step.modelSlug}`;
+    if (SKIPPABLE_ROLES.includes(stepRole)) {
+      await skipStep(step.id, job.id, msg);
+      return { jobId: job.id, step: step.stepOrder, status: "skipped" };
+    }
+    await failStep(step.id, job.id, msg);
     return { jobId: job.id, step: step.stepOrder, status: "failed" };
   }
 
@@ -170,6 +200,72 @@ export async function processNextStep(): Promise<{
       updatedAt: new Date(),
     })
     .where(eq(pipelineJob.id, job.id));
+
+  // ── Generator steps — delegate to publisher ────────────────────────────
+  if (role === "generator") {
+    const genStartTime = Date.now();
+    console.log(`[ai-pipeline] Job ${job.id} gen step ${step.stepOrder} (${step.modelSlug}) started`);
+
+    try {
+      const genResult = await Promise.race([
+        processGenerationStep(step, job, {
+          slug: config.slug,
+          maxOutputTokens: config.maxOutputTokens,
+          costPerInputToken: config.costPerInputToken,
+          costPerOutputToken: config.costPerOutputToken,
+          config: config.config,
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`Generator timed out after ${AI_CALL_TIMEOUT_MS}ms`)),
+            AI_CALL_TIMEOUT_MS
+          )
+        ),
+      ]);
+
+      const durationMs = Date.now() - genStartTime;
+
+      // Save step result
+      await db
+        .update(pipelineStep)
+        .set({
+          status: "completed",
+          output: { generated: true, contentType: step.inputSummary?.replace("generate:", "") },
+          inputTokens: genResult.inputTokens,
+          outputTokens: genResult.outputTokens,
+          costUsd: genResult.costUsd.toFixed(6),
+          completedAt: new Date(),
+          durationMs,
+        })
+        .where(eq(pipelineStep.id, step.id));
+
+      console.log(
+        `[ai-pipeline] Job ${job.id} gen step ${step.stepOrder} completed — ` +
+        `${genResult.inputTokens}+${genResult.outputTokens} tokens, $${genResult.costUsd.toFixed(6)}`
+      );
+
+      // Update job totals
+      await db
+        .update(pipelineJob)
+        .set({
+          currentStep: step.stepOrder,
+          totalInputTokens: sql`${pipelineJob.totalInputTokens} + ${genResult.inputTokens}`,
+          totalOutputTokens: sql`${pipelineJob.totalOutputTokens} + ${genResult.outputTokens}`,
+          totalCostUsd: sql`${pipelineJob.totalCostUsd} + ${genResult.costUsd.toFixed(6)}::numeric`,
+          updatedAt: new Date(),
+        })
+        .where(eq(pipelineJob.id, job.id));
+
+      // Check completion
+      const completionStatus = await checkJobCompletion(step, job);
+      return { jobId: job.id, step: step.stepOrder, status: completionStatus };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      console.log(`[ai-pipeline] Job ${job.id} gen step ${step.stepOrder} failed: ${errorMsg}`);
+      const action = await handleStepFailure(step, job, errorMsg);
+      return { jobId: job.id, step: step.stepOrder, status: action };
+    }
+  }
 
   // 5. Gather context: source content + all previous completed step outputs
   const previousSteps = await db
@@ -254,8 +350,8 @@ export async function processNextStep(): Promise<{
     if (TRUNCATION_REASONS.includes(response.finishReason)) {
       const errorMsg = `Output truncated (finish_reason=${response.finishReason}) — model hit token limit (${config.maxOutputTokens}). Consider increasing max_output_tokens for ${step.modelSlug}.`;
       console.log(`[ai-pipeline] Job ${job.id} step ${step.stepOrder} truncated: ${errorMsg}`);
-      await handleStepFailure(step, job, errorMsg);
-      return { jobId: job.id, step: step.stepOrder, status: "failed" };
+      const action = await handleStepFailure(step, job, errorMsg);
+      return { jobId: job.id, step: step.stepOrder, status: action };
     }
 
     // Parse output
@@ -276,8 +372,8 @@ export async function processNextStep(): Promise<{
         // Model returned invalid JSON for a JSON role — treat as failure
         const errorMsg = `Model returned invalid JSON for ${isGatingRole ? "gating" : "enricher"} step`;
         console.log(`[ai-pipeline] Job ${job.id} step ${step.stepOrder} failed: ${errorMsg}`);
-        await handleStepFailure(step, job, errorMsg);
-        return { jobId: job.id, step: step.stepOrder, status: "failed" };
+        const action = await handleStepFailure(step, job, errorMsg);
+        return { jobId: job.id, step: step.stepOrder, status: action };
       }
     }
 
@@ -329,65 +425,94 @@ export async function processNextStep(): Promise<{
       return { jobId: job.id, step: step.stepOrder, status: "rejected" };
     }
 
-    // 10. Check if all steps are now done — FIX 4: wrap in transaction
-    const completionResult = await db.transaction(async (tx) => {
-      const [remaining] = await tx
-        .select({ count: sql<number>`count(*)` })
-        .from(pipelineStep)
-        .where(
-          and(
-            eq(pipelineStep.jobId, job.id),
-            inArray(pipelineStep.status, ["pending", "running"])
-          )
-        );
-
-      if (Number(remaining.count) === 0) {
-        // All steps done — transition through publishing → completed
-        await tx
-          .update(pipelineJob)
-          .set({
-            status: "publishing",
-            updatedAt: new Date(),
-          })
-          .where(eq(pipelineJob.id, job.id));
-
-        // For now, transition immediately to completed.
-        // A future iteration will handle actual content publishing here.
-        await tx
-          .update(pipelineJob)
-          .set({
-            status: "completed",
-            completedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(pipelineJob.id, job.id));
-
-        return "completed" as const;
-      }
-
-      return "step_completed" as const;
-    });
-
-    if (completionResult === "completed") {
-      // FIX 5: Log job completion with total cost
-      const [updatedJob] = await db
-        .select({ totalCostUsd: pipelineJob.totalCostUsd })
-        .from(pipelineJob)
-        .where(eq(pipelineJob.id, job.id))
-        .limit(1);
-      console.log(`[ai-pipeline] Job ${job.id} completed — total $${updatedJob?.totalCostUsd ?? "unknown"}`);
-
-      return { jobId: job.id, step: step.stepOrder, status: "completed" };
-    }
-
-    return { jobId: job.id, step: step.stepOrder, status: "step_completed" };
+    // 10. Check if all steps are done (teacher → generation transition, or final completion)
+    const completionStatus = await checkJobCompletion(step, job);
+    return { jobId: job.id, step: step.stepOrder, status: completionStatus };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
-    // FIX 5: Log step failure
     console.log(`[ai-pipeline] Job ${job.id} step ${step.stepOrder} failed: ${errorMsg}`);
-    await handleStepFailure(step, job, errorMsg);
-    return { jobId: job.id, step: step.stepOrder, status: "failed" };
+    const action = await handleStepFailure(step, job, errorMsg);
+    return { jobId: job.id, step: step.stepOrder, status: action };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Job completion check — shared by teacher and generator paths
+// ---------------------------------------------------------------------------
+
+/**
+ * After a step completes, check if the job should transition:
+ * - Teacher steps done (stepOrder < 100) → create generation steps
+ * - Generation steps done (stepOrder ≥ 100) → mark job completed
+ * - Steps still pending → return "step_completed"
+ */
+async function checkJobCompletion(
+  step: typeof pipelineStep.$inferSelect,
+  job: typeof pipelineJob.$inferSelect,
+): Promise<string> {
+  // Count remaining pending/running steps
+  const [remaining] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(pipelineStep)
+    .where(
+      and(
+        eq(pipelineStep.jobId, job.id),
+        inArray(pipelineStep.status, ["pending", "running"])
+      )
+    );
+
+  if (Number(remaining.count) > 0) {
+    return "step_completed";
+  }
+
+  // All current steps done — check which phase just completed
+  // Teacher steps have stepOrder < 100, generator steps start at 100+
+  if (step.stepOrder < 100) {
+    // Teacher phase done — create generation steps
+    const genCount = await createGenerationSteps(job.id);
+    if (genCount > 0) {
+      console.log(
+        `[ai-pipeline] Job ${job.id} teacher phase complete — ${genCount} generation steps queued`
+      );
+      return "generating";
+    }
+
+    // genCount === 0 could mean another invocation already created them (race condition)
+    // Re-check to be safe
+    const [recheck] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(pipelineStep)
+      .where(
+        and(
+          eq(pipelineStep.jobId, job.id),
+          inArray(pipelineStep.status, ["pending", "running"])
+        )
+      );
+    if (Number(recheck.count) > 0) {
+      return "step_completed";
+    }
+  }
+
+  // All done — mark completed
+  await db
+    .update(pipelineJob)
+    .set({
+      status: "completed",
+      completedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(pipelineJob.id, job.id));
+
+  const [updatedJob] = await db
+    .select({ totalCostUsd: pipelineJob.totalCostUsd })
+    .from(pipelineJob)
+    .where(eq(pipelineJob.id, job.id))
+    .limit(1);
+  console.log(
+    `[ai-pipeline] Job ${job.id} completed — total $${updatedJob?.totalCostUsd ?? "unknown"}`
+  );
+
+  return "completed";
 }
 
 // ---------------------------------------------------------------------------
@@ -398,24 +523,63 @@ async function handleStepFailure(
   step: typeof pipelineStep.$inferSelect,
   job: typeof pipelineJob.$inferSelect,
   errorMessage: string
-) {
+): Promise<"retrying" | "skipped" | "failed"> {
+  const role = step.role as ModelRole;
+  const isSkippable = SKIPPABLE_ROLES.includes(role);
+
+  // ── Permanent errors: don't waste retries ──────────────────────────────
+  // Auth errors, missing API keys, etc. won't resolve on retry.
+  if (isPermanentError(errorMessage)) {
+    console.log(`[ai-pipeline] Job ${job.id} step ${step.stepOrder} (${role}/${step.modelSlug}) PERMANENT ERROR: ${errorMessage}`);
+    if (isSkippable) {
+      await skipStep(step.id, job.id, `PERMANENT: ${errorMessage}`);
+      return "skipped";
+    }
+    await failStep(step.id, job.id, `PERMANENT: ${errorMessage}`);
+    return "failed";
+  }
+
+  // ── Transient errors: retry with backoff ───────────────────────────────
   const newRetryCount = step.retryCount + 1;
 
-  // FIX 3: Use job.maxRetries from DB instead of hardcoded constant
   if (newRetryCount >= job.maxRetries) {
-    await failStep(step.id, job.id, errorMessage);
-  } else {
-    // Reset to pending so the next cron invocation retries it
-    await db
-      .update(pipelineStep)
-      .set({
-        status: "pending",
-        retryCount: newRetryCount,
-        errorMessage,
-        startedAt: null,
-      })
-      .where(eq(pipelineStep.id, step.id));
+    // Max retries exhausted — skip if possible, fail if not
+    console.log(`[ai-pipeline] Job ${job.id} step ${step.stepOrder} (${role}/${step.modelSlug}) exhausted ${job.maxRetries} retries`);
+    if (isSkippable) {
+      await skipStep(step.id, job.id, `${job.maxRetries} retries exhausted: ${errorMessage}`);
+      return "skipped";
+    }
+    await failStep(step.id, job.id, `${job.maxRetries} retries exhausted: ${errorMessage}`);
+    return "failed";
   }
+
+  // Reset to pending so the next cron invocation retries it
+  console.log(`[ai-pipeline] Job ${job.id} step ${step.stepOrder} (${role}/${step.modelSlug}) RETRYING ${newRetryCount}/${job.maxRetries}: ${errorMessage}`);
+  await db
+    .update(pipelineStep)
+    .set({
+      status: "pending",
+      retryCount: newRetryCount,
+      errorMessage,
+      startedAt: null,
+    })
+    .where(eq(pipelineStep.id, step.id));
+
+  return "retrying";
+}
+
+async function skipStep(stepId: number, jobId: string, errorMessage: string) {
+  await db
+    .update(pipelineStep)
+    .set({
+      status: "skipped",
+      errorMessage: `SKIPPED: ${errorMessage}`,
+      completedAt: new Date(),
+    })
+    .where(eq(pipelineStep.id, stepId));
+
+  console.log(`[ai-pipeline] Job ${jobId} step ${stepId} SKIPPED — ${errorMessage}`);
+  // Job stays alive — next cron invocation picks up the next pending step
 }
 
 async function failStep(stepId: number, jobId: string, errorMessage: string) {

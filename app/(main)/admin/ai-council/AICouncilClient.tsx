@@ -13,6 +13,7 @@ import {
   ArrowsClockwise,
   UploadSimple,
   CircleNotch,
+  ArrowCounterClockwise,
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -130,6 +131,8 @@ const statusBadge: Record<string, string> = {
     "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
   fact_checking:
     "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  generating:
+    "bg-[#5227FF]/10 text-[#5227FF] dark:bg-[#5227FF]/20 dark:text-[#8B6FFF]",
   publishing:
     "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
   completed:
@@ -1252,6 +1255,24 @@ const ALL_CONTENT_TYPES: { value: string; label: string }[] = [
   { value: "interactive_section", label: "Interactive Section" },
 ];
 
+interface RecentFile {
+  id: number;
+  fileName: string | null;
+  fileType: string | null;
+  fileSize: number | null;
+  fileUrl: string | null;
+  createdAt: string;
+}
+
+function mimeToLabel(mime: string | null): string {
+  if (!mime) return "FILE";
+  if (mime.includes("pdf")) return "PDF";
+  if (mime.includes("wordprocessing") || mime.includes("docx")) return "DOCX";
+  if (mime.includes("presentation") || mime.includes("pptx")) return "PPTX";
+  if (mime.includes("image")) return mime.split("/").pop()?.toUpperCase() ?? "IMG";
+  return "FILE";
+}
+
 function TestLabTab() {
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -1266,7 +1287,25 @@ function TestLabTab() {
     pipelineJobId?: string;
     fileUrl?: string;
     error?: string;
+    reused?: boolean;
   } | null>(null);
+
+  // Recent files for reuse
+  const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(true);
+  const [selectedContribution, setSelectedContribution] =
+    useState<RecentFile | null>(null);
+
+  // Fetch recent files on mount
+  useEffect(() => {
+    fetch("/api/admin/ai-council/recent-files")
+      .then((r) => r.json())
+      .then((data) => {
+        setRecentFiles(data.files || []);
+        setLoadingRecent(false);
+      })
+      .catch(() => setLoadingRecent(false));
+  }, []);
 
   const toggleType = (type: string) => {
     setSelectedTypes((prev) => {
@@ -1281,20 +1320,47 @@ function TestLabTab() {
     setSelectedTypes(new Set(ALL_CONTENT_TYPES.map((t) => t.value)));
   const clearAll = () => setSelectedTypes(new Set());
 
+  const selectRecentFile = (rf: RecentFile) => {
+    setSelectedContribution(rf);
+    setFile(null); // Clear new file when picking a recent one
+  };
+
+  const handleNewFile = (f: File) => {
+    setFile(f);
+    setSelectedContribution(null); // Clear recent selection when uploading new
+  };
+
+  const hasInput = !!file || !!selectedContribution;
+
   const handleUpload = async () => {
-    if (!file || selectedTypes.size === 0) return;
+    if (!hasInput || selectedTypes.size === 0) return;
     setUploading(true);
     setResult(null);
 
     try {
-      const form = new FormData();
-      form.append("file", file);
-      form.append("outputTypes", [...selectedTypes].join(","));
+      let res: Response;
 
-      const res = await fetch("/api/admin/ai-council/test-upload", {
-        method: "POST",
-        body: form,
-      });
+      if (selectedContribution) {
+        // Reuse existing file — no R2 upload
+        res = await fetch("/api/admin/ai-council/test-rerun", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contributionId: selectedContribution.id,
+            outputTypes: [...selectedTypes].join(","),
+          }),
+        });
+      } else {
+        // Upload new file
+        const form = new FormData();
+        form.append("file", file!);
+        form.append("outputTypes", [...selectedTypes].join(","));
+
+        res = await fetch("/api/admin/ai-council/test-upload", {
+          method: "POST",
+          body: form,
+        });
+      }
 
       const data = await res.json();
 
@@ -1302,6 +1368,12 @@ function TestLabTab() {
         setResult({ success: false, error: data.error });
       } else {
         setResult({ success: true, ...data });
+        // Refresh recent files list after new upload
+        if (!selectedContribution) {
+          fetch("/api/admin/ai-council/recent-files")
+            .then((r) => r.json())
+            .then((d) => setRecentFiles(d.files || []));
+        }
       }
     } catch (e) {
       setResult({
@@ -1317,7 +1389,7 @@ function TestLabTab() {
     e.preventDefault();
     setDragOver(false);
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile) setFile(droppedFile);
+    if (droppedFile) handleNewFile(droppedFile);
   };
 
   return (
@@ -1328,11 +1400,83 @@ function TestLabTab() {
         transition={{ duration: 0.5, ease }}
       >
         <p className="text-center text-xs text-gray-900/50 dark:text-white/50">
-          Upload a PDF, DOCX, PPTX, or image to test the full extraction +
-          council pipeline. The file will go through the same flow as a real
-          student contribution.
+          Upload a new file or reuse an existing one to test the full extraction
+          + council pipeline.
         </p>
       </motion.div>
+
+      {/* Recent Test Files */}
+      {!loadingRecent && recentFiles.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, ease, delay: 0.05 }}
+          className="rounded-2xl border border-gray-900/10 bg-white/50 p-4 backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
+        >
+          <div className="mb-3 flex items-center justify-center gap-2">
+            <ArrowCounterClockwise
+              weight="duotone"
+              className="h-4 w-4 text-gray-900/40 dark:text-white/40"
+            />
+            <h3 className="text-xs font-medium text-gray-900/70 dark:text-white/70">
+              Recent Test Files
+            </h3>
+          </div>
+          <div className="flex flex-wrap justify-center gap-2">
+            {recentFiles.map((rf) => {
+              const isSelected = selectedContribution?.id === rf.id;
+              return (
+                <button
+                  key={rf.id}
+                  onClick={() =>
+                    isSelected
+                      ? setSelectedContribution(null)
+                      : selectRecentFile(rf)
+                  }
+                  className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs transition-all ${
+                    isSelected
+                      ? "bg-[#5227FF] text-white shadow-sm"
+                      : "bg-gray-900/5 text-gray-900/60 hover:bg-gray-900/10 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10"
+                  }`}
+                >
+                  <FileText
+                    weight="duotone"
+                    className={`h-3.5 w-3.5 ${isSelected ? "text-white/80" : ""}`}
+                  />
+                  <span className="max-w-[140px] truncate font-medium">
+                    {rf.fileName ?? "Unnamed"}
+                  </span>
+                  <span
+                    className={`text-[10px] ${isSelected ? "text-white/60" : "text-gray-900/40 dark:text-white/40"}`}
+                  >
+                    {mimeToLabel(rf.fileType)}
+                    {rf.fileSize
+                      ? ` · ${(rf.fileSize / 1024 / 1024).toFixed(1)}MB`
+                      : ""}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {selectedContribution && (
+            <p className="mt-2.5 text-center text-[10px] text-[#5227FF] dark:text-[#8B6FFF]">
+              Reusing &ldquo;{selectedContribution.fileName}&rdquo; &mdash; no
+              new upload to R2
+            </p>
+          )}
+        </motion.div>
+      )}
+
+      {/* Divider */}
+      {!loadingRecent && recentFiles.length > 0 && (
+        <div className="flex items-center justify-center gap-3">
+          <div className="h-px w-12 bg-gray-900/10 dark:bg-white/10" />
+          <span className="text-[10px] text-gray-900/30 dark:text-white/30">
+            Or Upload New
+          </span>
+          <div className="h-px w-12 bg-gray-900/10 dark:bg-white/10" />
+        </div>
+      )}
 
       {/* File Drop Zone */}
       <motion.div
@@ -1352,7 +1496,9 @@ function TestLabTab() {
               ? "border-[#5227FF] bg-[#5227FF]/5"
               : file
                 ? "border-green-400 bg-green-50/50 dark:border-green-500/40 dark:bg-green-900/10"
-                : "border-gray-900/10 bg-white/50 hover:border-gray-900/20 dark:border-white/15 dark:bg-white/5 dark:hover:border-white/25"
+                : selectedContribution
+                  ? "border-gray-900/5 bg-white/30 dark:border-white/5 dark:bg-white/3"
+                  : "border-gray-900/10 bg-white/50 hover:border-gray-900/20 dark:border-white/15 dark:bg-white/5 dark:hover:border-white/25"
           }`}
         >
           <input
@@ -1361,7 +1507,7 @@ function TestLabTab() {
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f) setFile(f);
+              if (f) handleNewFile(f);
             }}
           />
           {file ? (
@@ -1387,10 +1533,12 @@ function TestLabTab() {
             <>
               <UploadSimple
                 weight="duotone"
-                className="h-8 w-8 text-gray-900/30 dark:text-white/30"
+                className={`h-8 w-8 ${selectedContribution ? "text-gray-900/15 dark:text-white/15" : "text-gray-900/30 dark:text-white/30"}`}
               />
               <div className="text-center">
-                <div className="text-sm font-medium text-gray-900/70 dark:text-white/70">
+                <div
+                  className={`text-sm font-medium ${selectedContribution ? "text-gray-900/40 dark:text-white/40" : "text-gray-900/70 dark:text-white/70"}`}
+                >
                   Drop File Here Or Click To Browse
                 </div>
                 <div className="text-xs text-gray-900/40 dark:text-white/40">
@@ -1461,18 +1609,26 @@ function TestLabTab() {
       >
         <Button
           onClick={handleUpload}
-          disabled={!file || selectedTypes.size === 0 || uploading}
+          disabled={!hasInput || selectedTypes.size === 0 || uploading}
           className="rounded-full bg-[#5227FF] px-8 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
           {uploading ? (
             <span className="flex items-center gap-2">
               <CircleNotch weight="bold" className="h-4 w-4 animate-spin" />
-              Uploading &amp; Creating Jobs...
+              {selectedContribution
+                ? "Creating Jobs From Existing File..."
+                : "Uploading & Creating Jobs..."}
             </span>
           ) : (
             <span className="flex items-center gap-2">
-              <Lightning weight="duotone" className="h-4 w-4" />
-              Start Pipeline Test
+              {selectedContribution ? (
+                <ArrowCounterClockwise weight="duotone" className="h-4 w-4" />
+              ) : (
+                <Lightning weight="duotone" className="h-4 w-4" />
+              )}
+              {selectedContribution
+                ? "Rerun Pipeline Test"
+                : "Start Pipeline Test"}
             </span>
           )}
         </Button>
@@ -1497,7 +1653,9 @@ function TestLabTab() {
                 className="mx-auto h-8 w-8 text-green-600 dark:text-green-400"
               />
               <div className="text-sm font-medium text-green-700 dark:text-green-300">
-                Jobs Created Successfully
+                {result.reused
+                  ? "Jobs Created From Existing File"
+                  : "Jobs Created Successfully"}
               </div>
               <div className="flex flex-wrap justify-center gap-2">
                 {result.extractionJobId && (
@@ -1641,7 +1799,8 @@ function StatusBadge({ status }: { status: string }) {
     status === "running" ||
     status === "extracting" ||
     status === "downloading" ||
-    status === "classifying";
+    status === "classifying" ||
+    status === "generating";
 
   const badge = (
     <Badge variant="secondary" className={colors ?? ""}>

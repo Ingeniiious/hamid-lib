@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useTranslation } from "@/lib/i18n";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -19,6 +20,8 @@ export function EnrollmentForm({
   onSuccess: () => void;
   onCancel: () => void;
 }) {
+  const { locale, t } = useTranslation();
+  const titleDir = locale === "fa" ? "rtl" : undefined;
   const [courseName, setCourseName] = useState("");
   const [semester, setSemester] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -30,7 +33,7 @@ export function EnrollmentForm({
     const selected = e.target.files?.[0];
     if (!selected) return;
     if (selected.size > MAX_FILE_SIZE) {
-      setError("File too large. Max 10MB.");
+      setError(t("professors.fileTooLarge"));
       return;
     }
     setFile(selected);
@@ -41,9 +44,9 @@ export function EnrollmentForm({
     e.preventDefault();
     setError("");
 
-    if (!courseName.trim()) return setError("Course name is required.");
-    if (!semester.trim()) return setError("Semester is required.");
-    if (!file) return setError("Please upload proof of enrollment (transcript, schedule, etc.).");
+    if (!courseName.trim()) return setError(t("professors.courseNameError"));
+    if (!semester.trim()) return setError(t("professors.semesterError"));
+    if (!file) return setError(t("professors.uploadProofError"));
 
     setSubmitting(true);
 
@@ -61,12 +64,12 @@ export function EnrollmentForm({
       const data = await res.json();
 
       if (!res.ok || data.error) {
-        setError(data.error || "Submission failed. Please try again.");
+        setError(data.error || t("professors.submissionFailed"));
       } else {
         onSuccess();
       }
     } catch {
-      setError("Network error. Please try again.");
+      setError(t("professors.networkError"));
     } finally {
       setSubmitting(false);
     }
@@ -79,22 +82,22 @@ export function EnrollmentForm({
       transition={{ duration: 0.5, ease }}
       className="rounded-xl border bg-white/80 p-6 shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/80"
     >
-      <h3 className="mb-1 text-lg font-medium text-gray-900 dark:text-white">
-        Verify Enrollment
+      <h3 dir={titleDir} className="mb-1 text-lg font-medium text-gray-900 dark:text-white">
+        {t("professors.verifyEnrollmentTitle")}
       </h3>
       <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-        Prove you took a class with {professorName} to leave a review. Upload your transcript, class schedule, or enrollment confirmation.
+        {t("professors.verifyEnrollmentDescription").replace("{name}", professorName)}
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Course Name
+            {t("professors.courseNameRequired")}
           </label>
           <Input
             value={courseName}
             onChange={(e) => setCourseName(e.target.value)}
-            placeholder="e.g. Introduction to Psychology"
+            placeholder={t("professors.courseNamePlaceholder")}
             maxLength={200}
             required
           />
@@ -102,12 +105,12 @@ export function EnrollmentForm({
 
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Semester
+            {t("professors.semester")}
           </label>
           <Input
             value={semester}
             onChange={(e) => setSemester(e.target.value)}
-            placeholder="e.g. Spring 2026"
+            placeholder={t("professors.semesterPlaceholder")}
             maxLength={50}
             required
           />
@@ -115,10 +118,10 @@ export function EnrollmentForm({
 
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Proof Of Enrollment
+            {t("professors.proofOfEnrollment")}
           </label>
           <p className="mb-2 text-xs text-gray-400 dark:text-gray-500">
-            Upload a screenshot or PDF of your transcript, class schedule, or enrollment confirmation showing the professor&apos;s name and the course. Max 10MB. Accepted: PDF, PNG, JPG, WebP.
+            {t("professors.proofDescription")}
           </p>
           <input
             ref={fileRef}
@@ -140,15 +143,15 @@ export function EnrollmentForm({
 
         <div className="flex gap-3">
           <Button type="submit" disabled={submitting}>
-            {submitting ? "Submitting..." : "Submit Verification"}
+            {submitting ? t("professors.submitting") : t("professors.submitVerification")}
           </Button>
           <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
+            {t("common.cancel")}
           </Button>
         </div>
 
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          Your proof will be reviewed by a moderator. You&apos;ll be able to rate the professor once approved.
+          {t("professors.proofReviewNote")}
         </p>
       </form>
     </motion.div>

@@ -1,5 +1,6 @@
 import { searchProfessors, getTopProfessors } from "./actions";
 import { ProfessorSearch } from "@/components/professors/ProfessorSearch";
+import { ProfessorsPageHeader } from "@/components/professors/ProfessorsPageHeader";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -37,14 +38,7 @@ export default async function ProfessorsPage({
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-12 sm:px-6">
-      <div className="mb-10 text-center">
-        <h1 className="font-display text-3xl font-light tracking-tight text-gray-900 dark:text-white sm:text-4xl">
-          Rate My Professor
-        </h1>
-        <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
-          Search for a professor to see ratings and reviews from verified students
-        </p>
-      </div>
+      <ProfessorsPageHeader />
 
       <ProfessorSearch
         initialQuery={query}

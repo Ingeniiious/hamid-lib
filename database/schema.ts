@@ -658,7 +658,7 @@ export const pipelineJob = pgTable("pipeline_job", {
   outputTypes: jsonb("output_types").notNull(),          // requested output types: ["study_guide", "flashcards", ...]
   errorMessage: text("error_message"),
   retryCount: integer("retry_count").notNull().default(0),
-  maxRetries: integer("max_retries").notNull().default(3),
+  maxRetries: integer("max_retries").notNull().default(5),
   // Cost tracking
   totalInputTokens: integer("total_input_tokens").notNull().default(0),
   totalOutputTokens: integer("total_output_tokens").notNull().default(0),
@@ -796,7 +796,7 @@ export const extractionJob = pgTable("extraction_job", {
   // Error handling
   errorMessage: text("error_message"),
   retryCount: integer("retry_count").notNull().default(0),
-  maxRetries: integer("max_retries").notNull().default(3),
+  maxRetries: integer("max_retries").notNull().default(5),
   // Linking to AI Council pipeline
   pipelineJobId: uuid("pipeline_job_id").references(() => pipelineJob.id, { onDelete: "set null" }),
   // Timestamps

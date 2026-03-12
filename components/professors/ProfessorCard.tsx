@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { useTranslation } from "@/lib/i18n";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -39,6 +40,7 @@ function ratingColor(avg: number) {
 }
 
 export function ProfessorCard({ professor, index }: Props) {
+  const { t } = useTranslation();
   const { rating } = professor;
 
   return (
@@ -79,13 +81,13 @@ export function ProfessorCard({ professor, index }: Props) {
               {rating.avg > 0 ? rating.avg.toFixed(1) : "N/A"}
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500">
-              {rating.count} review{rating.count !== 1 ? "s" : ""}
+              {rating.count} {rating.count !== 1 ? t("professors.reviews") : t("professors.review")}
             </p>
           </div>
         </div>
         {rating.count > 0 && (
           <div className="mt-3 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-            <span>{rating.wouldTakeAgain}% would take again</span>
+            <span>{rating.wouldTakeAgain}% {t("professors.wouldTakeAgainPct")}</span>
           </div>
         )}
       </Link>

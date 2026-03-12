@@ -502,39 +502,87 @@ function buildSourceContent(
   return sections.join("\n\n");
 }
 
+/**
+ * Auto-create a pipeline job ONLY when ALL extractions for this course are done.
+ * A course can have multiple files (PDFs, DOCX, PPTX, etc.) uploaded at once or
+ * over time. We wait for every extraction to complete, then combine all their
+ * sourceContent into one pipeline job so the AI Council reviews everything together.
+ */
 async function autoCreatePipelineJob(
   job: typeof extractionJob.$inferSelect
 ): Promise<void> {
   try {
-    // Get the source content from the completed extraction job
-    const [completedJob] = await db
+    // Check if there are any sibling extractions still in progress for this course
+    const [pending] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(extractionJob)
+      .where(
+        and(
+          eq(extractionJob.courseId, job.courseId),
+          not(inArray(extractionJob.status, ["completed", "failed"]))
+        )
+      );
+
+    if (Number(pending.count) > 0) {
+      console.log(
+        `[extraction] Job ${job.id} done, but ${pending.count} sibling extraction(s) still in progress for course ${job.courseId} — waiting`
+      );
+      return;
+    }
+
+    // All extractions for this course are terminal — gather completed ones
+    const completedJobs = await db
       .select({
+        id: extractionJob.id,
         sourceContent: extractionJob.sourceContent,
         contributionId: extractionJob.contributionId,
+        fileName: extractionJob.fileName,
       })
       .from(extractionJob)
-      .where(eq(extractionJob.id, job.id))
-      .limit(1);
+      .where(
+        and(
+          eq(extractionJob.courseId, job.courseId),
+          eq(extractionJob.status, "completed"),
+          sql`${extractionJob.pipelineJobId} IS NULL` // not already linked to a pipeline
+        )
+      )
+      .orderBy(asc(extractionJob.createdAt));
 
-    if (!completedJob?.sourceContent) return;
+    if (completedJobs.length === 0) return;
 
-    // Create pipeline job with default output types
-    const pipelineJobId = await createPipelineJob({
-      courseId: job.courseId,
-      contributionIds: [job.contributionId],
-      outputTypes: ["study_guide", "flashcards", "quiz"],
-      startedBy: "extraction-pipeline",
-      sourceContent: completedJob.sourceContent,
-    });
+    // Combine sourceContent from all completed extractions
+    const combinedSource = completedJobs
+      .filter((j) => j.sourceContent)
+      .map((j) => j.sourceContent!)
+      .join("\n\n---\n\n");
 
-    // Link the pipeline job to the extraction job
-    await db
-      .update(extractionJob)
-      .set({ pipelineJobId: pipelineJobId, updatedAt: new Date() })
-      .where(eq(extractionJob.id, job.id));
+    if (!combinedSource) return;
+
+    const contributionIds = completedJobs.map((j) => j.contributionId);
 
     console.log(
-      `[extraction] Auto-created pipeline job ${pipelineJobId} for extraction ${job.id}`
+      `[extraction] Creating pipeline job for course ${job.courseId} — ${completedJobs.length} file(s): ${completedJobs.map((j) => j.fileName).join(", ")}`
+    );
+
+    // Create ONE pipeline job with ALL sources combined
+    const pipelineJobId = await createPipelineJob({
+      courseId: job.courseId,
+      contributionIds,
+      outputTypes: ["study_guide", "flashcards", "quiz"],
+      startedBy: "extraction-pipeline",
+      sourceContent: combinedSource,
+    });
+
+    // Link ALL completed extraction jobs to this pipeline job
+    for (const completedJob of completedJobs) {
+      await db
+        .update(extractionJob)
+        .set({ pipelineJobId: pipelineJobId, updatedAt: new Date() })
+        .where(eq(extractionJob.id, completedJob.id));
+    }
+
+    console.log(
+      `[extraction] Auto-created pipeline job ${pipelineJobId} for ${completedJobs.length} extraction(s)`
     );
   } catch (e) {
     console.log(
@@ -604,7 +652,6 @@ export async function createExtractionJob(params: {
       extractionTokens: 0,
       extractionCostUsd: "0",
       retryCount: 0,
-      maxRetries: 3,
     })
     .returning({ id: extractionJob.id });
 

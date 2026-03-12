@@ -3,10 +3,7 @@ import { auth } from "@/lib/auth";
 import { faculty, course, userProfile } from "@/database/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import { CourseGrid } from "@/components/CourseGrid";
-import { BackButton } from "@/components/BackButton";
-import { PageHeader } from "@/components/PageHeader";
-import { ContributorCTA } from "@/components/ContributorCTA";
+import { FacultyCoursesContent } from "@/components/FacultyCoursesContent";
 import type { Metadata } from "next";
 
 type Props = {
@@ -73,54 +70,17 @@ export default async function FacultyCoursesPage({ params }: Props) {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Fixed header */}
-      <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
-        <PageHeader
-          title={fac.name}
-          subtitle={`${courses.length} ${courses.length === 1 ? "Course" : "Courses"}`}
-        />
-      </div>
-
-      {/* Scrollable content */}
-      <div
-        className="min-h-0 flex-1 overflow-y-auto px-6 pb-24"
-        style={{
-          maskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
-          WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 64px)",
-        }}
-      >
-        <div className="mx-auto max-w-5xl pt-8">
-          {courses.length === 0 ? (
-            <ContributorCTA
-              heading="No Courses Yet"
-              subtext={`Be the first to request a course for ${fac.name}. Contribute your materials and we'll create study resources.`}
-              href={`/dashboard/contribute?facultySlug=${facultySlug}`}
-              imageHeight={200}
-              variant="full"
-              isContributor={isContributor}
-            />
-          ) : (
-            <>
-              <CourseGrid
-                courses={courses}
-                hrefPrefix={`/dashboard/courses/${facultySlug}`}
-              />
-
-              {/* Persistent CTA below course grid */}
-              <ContributorCTA
-                heading="Can't Find Your Course?"
-                subtext="Help us grow this library. Contribute your notes and materials."
-                href={`/dashboard/contribute?facultySlug=${facultySlug}`}
-                imageHeight={120}
-                variant="compact"
-                isContributor={isContributor}
-              />
-            </>
-          )}
-        </div>
-      </div>
-      <BackButton href="/dashboard/courses" label="All Faculties" floating />
-    </div>
+    <FacultyCoursesContent
+      faculty={{ id: fac.id, name: fac.name, slug: fac.slug }}
+      courses={courses.map((c) => ({
+        id: c.id,
+        title: c.title,
+        slug: c.slug,
+        professor: c.professor,
+        semester: c.semester,
+      }))}
+      facultySlug={facultySlug}
+      isContributor={isContributor}
+    />
   );
 }

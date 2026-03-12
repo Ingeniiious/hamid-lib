@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useTranslation } from "@/lib/i18n";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -23,6 +24,7 @@ function ratingBg(rating: number) {
 }
 
 export function ReviewCard({ review }: { review: Review }) {
+  const { t } = useTranslation();
   const date = new Date(review.createdAt).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
@@ -51,8 +53,8 @@ export function ReviewCard({ review }: { review: Review }) {
       </div>
 
       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-        <span>Difficulty: {review.difficultyRating}/5</span>
-        <span>{review.wouldTakeAgain ? "Would take again" : "Would not take again"}</span>
+        <span>{t("professors.difficultyLabel")} {review.difficultyRating}/5</span>
+        <span>{review.wouldTakeAgain ? t("professors.wouldTakeAgainYes") : t("professors.wouldTakeAgainNo")}</span>
       </div>
 
       {review.reviewText && (

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/lib/i18n";
 
 const AVATARS = [
   "https://lib.thevibecodedcompany.com/images/ghost-teacher.webp",
@@ -71,6 +72,8 @@ function ratingTextColor(avg: number) {
 }
 
 export function ProfessorProfile({ professor }: { professor: Professor }) {
+  const { locale, t } = useTranslation();
+  const titleDir = locale === "fa" ? "rtl" : undefined;
   const { stats } = professor;
   const maxDistribution = Math.max(...stats.distribution, 1);
   const [eligibility, setEligibility] = useState<Eligibility | null>(null);
@@ -106,7 +109,7 @@ export function ProfessorProfile({ professor }: { professor: Professor }) {
           href="/professors"
           className="text-sm text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
         >
-          &larr; Back To Professors
+          &larr; {t("professors.backToProfessors")}
         </Link>
       </motion.div>
 
@@ -151,10 +154,10 @@ export function ProfessorProfile({ professor }: { professor: Professor }) {
             {stats.avgOverall > 0 ? stats.avgOverall.toFixed(1) : "N/A"}
           </p>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Overall Rating
+            {t("professors.overallRating")}
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            {stats.reviewCount} review{stats.reviewCount !== 1 ? "s" : ""}
+            {stats.reviewCount} {stats.reviewCount !== 1 ? t("professors.reviews") : t("professors.review")}
           </p>
         </div>
 
@@ -164,10 +167,10 @@ export function ProfessorProfile({ professor }: { professor: Professor }) {
             {stats.avgDifficulty > 0 ? stats.avgDifficulty.toFixed(1) : "N/A"}
           </p>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Difficulty
+            {t("professors.difficulty")}
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            out of 5
+            {t("professors.outOf5")}
           </p>
         </div>
 
@@ -177,7 +180,7 @@ export function ProfessorProfile({ professor }: { professor: Professor }) {
             {stats.reviewCount > 0 ? `${stats.wouldTakeAgainPct}%` : "N/A"}
           </p>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Would Take Again
+            {t("professors.wouldTakeAgain")}
           </p>
         </div>
       </motion.div>
@@ -190,8 +193,8 @@ export function ProfessorProfile({ professor }: { professor: Professor }) {
           transition={{ duration: 0.6, delay: 0.15, ease }}
           className="mb-8 rounded-xl border bg-white/80 p-5 shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/80"
         >
-          <h2 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
-            Rating Distribution
+          <h2 dir={titleDir} className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {t("professors.ratingDistribution")}
           </h2>
           <div className="space-y-2">
             {[5, 4, 3, 2, 1].map((star) => {
@@ -254,13 +257,13 @@ export function ProfessorProfile({ professor }: { professor: Professor }) {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.25, ease }}
       >
-        <h2 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
-          Student Reviews
+        <h2 dir={titleDir} className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
+          {t("professors.studentReviews")}
         </h2>
         {professor.reviews.length === 0 ? (
           <div className="rounded-xl border bg-white/80 p-8 text-center shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/80">
             <p className="text-gray-500 dark:text-gray-400">
-              No reviews yet. Be the first to rate this professor.
+              {t("professors.noReviews")}
             </p>
           </div>
         ) : (
@@ -284,6 +287,8 @@ function ReviewEligibilityBanner({
   onRate: () => void;
   onVerifyEnrollment: () => void;
 }) {
+  const { t } = useTranslation();
+
   if (!eligibility) {
     return (
       <div className="rounded-xl border bg-white/80 p-5 text-center shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/80">
@@ -296,39 +301,39 @@ function ReviewEligibilityBanner({
     return (
       <div className="rounded-xl border bg-white/80 p-5 text-center shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/80">
         <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
-          Your enrollment is verified. Share your experience.
+          {t("professors.enrollmentVerified")}
         </p>
-        <Button onClick={onRate}>Rate This Professor</Button>
+        <Button onClick={onRate}>{t("professors.rateThisProfessor")}</Button>
       </div>
     );
   }
 
   const messages: Record<string, { text: string; action?: { label: string; onClick?: () => void; href?: string } }> = {
     not_logged_in: {
-      text: "Sign in to rate this professor.",
-      action: { label: "Sign In", href: "/auth" },
+      text: t("professors.signInToRate"),
+      action: { label: t("professors.signIn"), href: "/auth" },
     },
     not_contributor: {
-      text: "You need to verify your university email before you can rate professors.",
-      action: { label: "Verify Now", href: "/dashboard/contribute" },
+      text: t("professors.verifyEmail"),
+      action: { label: t("professors.verifyNow"), href: "/dashboard/contribute" },
     },
     no_enrollment: {
-      text: "You need to verify that you took a class with this professor before you can leave a review.",
-      action: { label: "Verify Enrollment", onClick: onVerifyEnrollment },
+      text: t("professors.noEnrollment"),
+      action: { label: t("professors.verifyEnrollment"), onClick: onVerifyEnrollment },
     },
     enrollment_pending: {
-      text: "Your enrollment verification is being reviewed. You'll be able to rate once approved.",
+      text: t("professors.enrollmentPending"),
     },
     enrollment_rejected: {
-      text: `Your enrollment verification was rejected${eligibility.reason === "enrollment_rejected" && "reviewNote" in eligibility ? `: ${eligibility.reviewNote}` : ""}. You can resubmit with correct documentation.`,
-      action: { label: "Resubmit Verification", onClick: onVerifyEnrollment },
+      text: `${t("professors.enrollmentRejected")}${eligibility.reason === "enrollment_rejected" && "reviewNote" in eligibility ? `: ${eligibility.reviewNote}` : ""}`,
+      action: { label: t("professors.resubmitVerification"), onClick: onVerifyEnrollment },
     },
     already_reviewed: {
-      text: "You have already reviewed this professor.",
+      text: t("professors.alreadyReviewed"),
     },
   };
 
-  const msg = messages[eligibility.reason] || { text: "Unable to rate at this time." };
+  const msg = messages[eligibility.reason] || { text: t("professors.unableToRate") };
 
   return (
     <div className="rounded-xl border bg-white/80 p-5 text-center shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/80">

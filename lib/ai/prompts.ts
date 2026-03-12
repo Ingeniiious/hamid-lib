@@ -327,6 +327,22 @@ Rules:
 // User prompts per role
 // ---------------------------------------------------------------------------
 
+/**
+ * Find the best available output from previous steps.
+ * If the preferred role was skipped, falls back through the chain
+ * so downstream steps always have content to work with.
+ */
+function getLatestOutput(
+  previousOutputs: { role: string; output: string }[],
+  ...preferredRoles: string[]
+): string {
+  for (const role of preferredRoles) {
+    const output = previousOutputs.find((o) => o.role === role)?.output;
+    if (output) return output;
+  }
+  return "";
+}
+
 function creatorUser(sourceContent: string): string {
   return `Source material:\n\n${sourceContent}`;
 }
@@ -335,8 +351,7 @@ function reviewerUser(
   sourceContent: string,
   previousOutputs: { role: string; output: string }[]
 ): string {
-  const creatorOutput =
-    previousOutputs.find((o) => o.role === "creator")?.output ?? "";
+  const creatorOutput = getLatestOutput(previousOutputs, "creator");
 
   return `Original source material:\n\n${sourceContent}\n\n---\n\nGenerated content to review:\n\n${creatorOutput}`;
 }
@@ -345,30 +360,79 @@ function enricherUser(
   sourceContent: string,
   previousOutputs: { role: string; output: string }[]
 ): string {
-  const reviewerOutput =
-    previousOutputs.find((o) => o.role === "reviewer")?.output ?? "";
+  // Falls back to creator output if reviewer was skipped
+  const contentToEnrich = getLatestOutput(previousOutputs, "reviewer", "creator");
 
-  return `Original source material:\n\n${sourceContent}\n\n---\n\nReviewed content to enrich:\n\n${reviewerOutput}`;
+  return `Original source material:\n\n${sourceContent}\n\n---\n\nContent to enrich:\n\n${contentToEnrich}`;
 }
 
 function validatorUser(
   sourceContent: string,
   previousOutputs: { role: string; output: string }[]
 ): string {
-  const enricherOutput =
-    previousOutputs.find((o) => o.role === "enricher")?.output ?? "";
+  // Falls back through the chain if enricher or reviewer was skipped
+  const contentToValidate = getLatestOutput(previousOutputs, "enricher", "reviewer", "creator");
 
-  return `Original source material:\n\n${sourceContent}\n\n---\n\nEnriched content to validate:\n\n${enricherOutput}`;
+  return `Original source material:\n\n${sourceContent}\n\n---\n\nContent to validate:\n\n${contentToValidate}`;
 }
 
 function factCheckerUser(
   sourceContent: string,
   previousOutputs: { role: string; output: string }[]
 ): string {
-  const validatorOutput =
-    previousOutputs.find((o) => o.role === "validator")?.output ?? "";
+  // Falls back through the chain if validator, enricher, or reviewer was skipped
+  const contentToCheck = getLatestOutput(previousOutputs, "validator", "enricher", "reviewer", "creator");
 
-  return `Content to fact-check:\n\n${validatorOutput}\n\n---\n\nOriginal source material for reference:\n\n${sourceContent}`;
+  return `Content to fact-check:\n\n${contentToCheck}\n\n---\n\nOriginal source material for reference:\n\n${sourceContent}`;
+}
+
+// ---------------------------------------------------------------------------
+// Generator prompts (used by publisher after teacher verification)
+// ---------------------------------------------------------------------------
+
+function generatorSystem(contentType: ContentType): string {
+  const label = CONTENT_TYPE_LABELS[contentType];
+  const schema = CONTENT_TYPE_SCHEMAS[contentType];
+
+  return `You are an expert educational content generator. Your task is to produce a high-quality ${label} from verified, fact-checked educational content.
+
+The content you receive has been reviewed and verified by an expert panel of AI teachers — treat it as authoritative source material.
+
+Output requirements:
+- Output ONLY valid JSON. No markdown, no code fences, no commentary outside the JSON.
+- The JSON must match this schema exactly:
+
+${schema}
+
+Content rules:
+- Use the verified content as your primary source — it has been reviewed and fact-checked by multiple experts.
+- Cover all major topics from the verified content proportionally.
+- Use clear, precise academic language accessible to university students.
+- Do not fabricate information not present in the verified content or original source.
+- All text should be educational in tone — informative, neutral, and student-friendly.
+- Ensure the output is comprehensive and production-ready.`;
+}
+
+function generatorUser(
+  contentType: ContentType,
+  verifiedContent: string,
+  sourceContent: string
+): string {
+  const label = CONTENT_TYPE_LABELS[contentType];
+
+  return `Verified content (reviewed and fact-checked by expert panel):
+
+${verifiedContent}
+
+---
+
+Original source material for reference:
+
+${sourceContent}
+
+---
+
+Generate a complete ${label} from the above content. Output ONLY valid JSON matching the required schema.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -381,6 +445,21 @@ function factCheckerUser(
  */
 export function getContentTypeSchema(contentType: ContentType): string {
   return CONTENT_TYPE_SCHEMAS[contentType];
+}
+
+/**
+ * Build system + user prompts for a generator step.
+ * Used by the publisher after the 5-teacher verification pipeline completes.
+ */
+export function getGeneratorPrompt(
+  contentType: ContentType,
+  verifiedContent: string,
+  sourceContent: string
+): { system: string; user: string } {
+  return {
+    system: generatorSystem(contentType),
+    user: generatorUser(contentType, verifiedContent, sourceContent),
+  };
 }
 
 /**
@@ -430,6 +509,11 @@ export function getPrompt(
         system: factCheckerSystem(contentType),
         user: factCheckerUser(sourceContent, outputs),
       };
+
+    case "generator":
+      throw new Error(
+        "Generator role uses getGeneratorPrompt() — do not call getPrompt() for generators"
+      );
 
     default: {
       const _exhaustive: never = role;

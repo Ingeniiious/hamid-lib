@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { ProfessorCard } from "./ProfessorCard";
+import { useTranslation } from "@/lib/i18n";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -35,6 +36,7 @@ export function ProfessorSearch({
   topProfessors: ProfessorSummary[];
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [query, setQuery] = useState(initialQuery);
   const [isPending, startTransition] = useTransition();
 
@@ -60,7 +62,7 @@ export function ProfessorSearch({
       >
         <Input
           type="search"
-          placeholder="Search by professor name, university, or department..."
+          placeholder={t("professors.searchPlaceholder")}
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           className="h-11 rounded-lg bg-white/80 text-base shadow-sm backdrop-blur dark:bg-gray-900/80"
@@ -69,19 +71,19 @@ export function ProfessorSearch({
 
       {isPending && (
         <div className="mb-6 text-center text-sm text-gray-500 dark:text-gray-400">
-          Searching...
+          {t("professors.searching")}
         </div>
       )}
 
       {showingSearch && searchResult && (
         <p className="mb-6 text-center text-sm text-gray-600 dark:text-gray-400">
-          {searchResult.total} professor{searchResult.total !== 1 ? "s" : ""} found
+          {searchResult.total} {searchResult.total !== 1 ? t("professors.professorsFound") : t("professors.professorFound")}
         </p>
       )}
 
       {!showingSearch && professors.length > 0 && (
         <p className="mb-6 text-center text-sm text-gray-600 dark:text-gray-400">
-          Top Rated Professors
+          {t("professors.topRated")}
         </p>
       )}
 
@@ -93,10 +95,10 @@ export function ProfessorSearch({
           className="py-20 text-center"
         >
           <p className="text-lg text-gray-500 dark:text-gray-400">
-            No professors found
+            {t("professors.noProfessors")}
           </p>
           <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">
-            Try a different search term
+            {t("professors.tryDifferent")}
           </p>
         </motion.div>
       ) : (
@@ -119,11 +121,11 @@ export function ProfessorSearch({
               }}
               className="rounded-md bg-gray-100 px-4 py-2 text-sm transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
             >
-              Previous
+              {t("professors.previous")}
             </button>
           )}
           <span className="px-3 text-sm text-gray-600 dark:text-gray-400">
-            Page {initialPage} of {searchResult.totalPages}
+            {t("professors.pageOf")} {initialPage} {t("professors.of")} {searchResult.totalPages}
           </span>
           {initialPage < searchResult.totalPages && (
             <button
@@ -135,7 +137,7 @@ export function ProfessorSearch({
               }}
               className="rounded-md bg-gray-100 px-4 py-2 text-sm transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
             >
-              Next
+              {t("professors.next")}
             </button>
           )}
         </div>

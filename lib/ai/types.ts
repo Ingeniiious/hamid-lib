@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 export type ModelSlug = "kimi" | "chatgpt" | "claude" | "gemini" | "grok";
-export type ModelRole = "creator" | "reviewer" | "enricher" | "validator" | "fact_checker";
+export type ModelRole = "creator" | "reviewer" | "enricher" | "validator" | "fact_checker" | "generator";
 
 export type PipelineStatus =
   | "pending"
@@ -13,6 +13,7 @@ export type PipelineStatus =
   | "validating"
   | "fact_checking"
   | "publishing"
+  | "generating"
   | "completed"
   | "failed"
   | "cancelled";
