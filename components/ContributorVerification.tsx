@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GrainientButton } from "@/components/GrainientButton";
 import { FadeImage, preloadImages } from "@/components/FadeImage";
+import { useTranslation } from "@/lib/i18n";
 import {
   sendContributorOTP,
   verifyContributorOTP,
@@ -24,6 +25,7 @@ const IMAGES = {
 type Step = "email-input" | "otp-verify" | "success" | "manual-review";
 
 export function ContributorVerification() {
+  const { t } = useTranslation();
   const [step, setStep] = useState<Step>("email-input");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -65,8 +67,7 @@ export function ContributorVerification() {
         setStep("success");
       } else {
         setReviewMessage(
-          result.message ||
-            "We need to manually verify this email domain. You'll hear from us soon."
+          result.message || t("contribute.manualReview")
         );
         setStep("manual-review");
       }
@@ -87,17 +88,16 @@ export function ContributorVerification() {
           >
             <div className="rounded-2xl border border-gray-900/10 bg-white/50 p-8 backdrop-blur-xl dark:border-white/15 dark:bg-white/10">
               <h2 className="font-display text-2xl font-light text-gray-900 dark:text-white">
-                Become A Contributor
+                {t("contribute.becomeContributor")}
               </h2>
               <p className="mt-3 text-sm text-gray-900/50 dark:text-white/50">
-                Enter your university email and we&apos;ll send you a
-                verification code.
+                {t("contribute.enterUniversityEmail")}
               </p>
 
               <div className="mt-8 space-y-4">
                 <Input
                   type="email"
-                  placeholder="you@university.edu"
+                  placeholder={t("contribute.universityEmailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSendOTP()}
@@ -116,7 +116,7 @@ export function ContributorVerification() {
                   disabled={isPending || !email.includes("@")}
                   className="w-full rounded-full bg-[#5227FF] font-medium text-white hover:opacity-90 disabled:opacity-50"
                 >
-                  {isPending ? "Sending..." : "Send Verification Code"}
+                  {isPending ? t("common.sending") : t("contribute.sendVerificationCode")}
                 </Button>
               </div>
             </div>
@@ -140,10 +140,10 @@ export function ContributorVerification() {
 
             <div className="rounded-2xl border border-gray-900/10 bg-white/50 p-8 backdrop-blur-xl dark:border-white/15 dark:bg-white/10">
               <h2 className="font-display text-2xl font-light text-gray-900 dark:text-white">
-                Check Your Email
+                {t("contribute.checkYourEmail")}
               </h2>
               <p className="mt-3 text-sm text-gray-900/50 dark:text-white/50">
-                We sent a 6-digit code to{" "}
+                {t("contribute.weSentCode")}{" "}
                 <span className="font-medium text-gray-900/70 dark:text-white/70">
                   {email}
                 </span>
@@ -174,7 +174,7 @@ export function ContributorVerification() {
 
                 {isPending && (
                   <p className="text-sm text-gray-900/50 dark:text-white/50">
-                    Verifying...
+                    {t("contribute.verifying")}
                   </p>
                 )}
 
@@ -186,7 +186,7 @@ export function ContributorVerification() {
                   }}
                   className="text-sm text-gray-900/40 underline hover:text-gray-900/60 dark:text-white/40 dark:hover:text-white/60"
                 >
-                  Use A Different Email
+                  {t("contribute.useDifferentEmail")}
                 </button>
               </div>
             </div>
@@ -210,7 +210,7 @@ export function ContributorVerification() {
               />
 
               <h2 className="mt-6 font-display text-2xl font-light text-gray-900 dark:text-white">
-                You&apos;re Verified!
+                {t("contribute.youreVerified")}
               </h2>
               {universityName && (
                 <p className="mt-2 text-sm text-gray-900/40 dark:text-white/40">
@@ -218,8 +218,7 @@ export function ContributorVerification() {
                 </p>
               )}
               <p className="mt-3 text-sm text-gray-900/50 dark:text-white/50">
-                Here&apos;s your contributor badge. It&apos;ll appear next to
-                your name across Libraryyy.
+                {t("contribute.contributorBadgeMessage")}
               </p>
 
               <div className="mt-4 inline-flex items-center gap-2 text-sm text-gray-900/60 dark:text-white/60">
@@ -228,7 +227,7 @@ export function ContributorVerification() {
                   alt="Badge"
                   className="h-5 w-5 object-contain"
                 />
-                <span>Verified Contributor</span>
+                <span>{t("contribute.verifiedContributor")}</span>
               </div>
 
               <div className="mt-6">
@@ -236,7 +235,7 @@ export function ContributorVerification() {
                   href="#"
                   onClick={() => window.location.reload()}
                 >
-                  Start Contributing
+                  {t("contribute.startContributing")}
                 </GrainientButton>
               </div>
             </div>
@@ -269,13 +268,13 @@ export function ContributorVerification() {
                 </svg>
               </div>
               <h2 className="font-display text-2xl font-light text-gray-900 dark:text-white">
-                Almost There!
+                {t("contribute.almostThere")}
               </h2>
               <p className="mt-3 text-sm text-gray-900/60 dark:text-white/60">
                 {reviewMessage}
               </p>
               <p className="mt-4 text-xs text-gray-900/40 dark:text-white/40">
-                Email verified:{" "}
+                {t("contribute.emailVerified")}{" "}
                 <span className="font-medium">{email}</span>
               </p>
               <Button
@@ -283,7 +282,7 @@ export function ContributorVerification() {
                 variant="outline"
                 className="mt-6 w-full"
               >
-                Back To Dashboard
+                {t("common.backToDashboard")}
               </Button>
             </div>
           </motion.div>

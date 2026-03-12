@@ -2,31 +2,27 @@
 
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
+import { useTranslation } from "@/lib/i18n";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
-const statusConfig = {
-  pending: {
-    label: "Pending",
-    className:
-      "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  },
-  approved: {
-    label: "Approved",
-    className:
-      "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  },
-  rejected: {
-    label: "Rejected",
-    className:
-      "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  },
-  under_review: {
-    label: "Under Review",
-    className:
-      "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  },
+const statusStyles = {
+  pending:
+    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  approved:
+    "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  rejected:
+    "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  under_review:
+    "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
 } as const;
+
+const statusKeys: Record<string, string> = {
+  pending: "contribute.statusPending",
+  approved: "contribute.statusApproved",
+  rejected: "contribute.statusRejected",
+  under_review: "contribute.statusUnderReview",
+};
 
 interface ContributionCardProps {
   contribution: {
@@ -47,8 +43,12 @@ export function ContributionCard({
   contribution: c,
   index,
 }: ContributionCardProps) {
-  const status =
-    statusConfig[c.status as keyof typeof statusConfig] || statusConfig.pending;
+  const { t, locale } = useTranslation();
+  const style =
+    statusStyles[c.status as keyof typeof statusStyles] || statusStyles.pending;
+  const statusLabel = t(statusKeys[c.status] || "contribute.statusPending");
+
+  const dateLocale = locale === "fa" ? "fa-IR" : locale === "tr" ? "tr-TR" : "en-US";
 
   return (
     <motion.div
@@ -78,8 +78,8 @@ export function ContributionCard({
             )}
           </div>
         </div>
-        <Badge variant="secondary" className={status.className}>
-          {status.label}
+        <Badge variant="secondary" className={style}>
+          {statusLabel}
         </Badge>
       </div>
 
@@ -98,7 +98,7 @@ export function ContributionCard({
       )}
 
       <p className="mt-2 text-[11px] text-gray-900/30 dark:text-white/30">
-        {new Date(c.createdAt).toLocaleDateString("en-US", {
+        {new Date(c.createdAt).toLocaleDateString(dateLocale, {
           month: "short",
           day: "numeric",
           year: "numeric",

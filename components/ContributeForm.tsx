@@ -18,6 +18,7 @@ import {
   findOrCreateProgram,
   findOrCreateCourse,
 } from "@/app/(main)/dashboard/contribute/actions";
+import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
@@ -44,6 +45,7 @@ export function ContributeForm({
   userFacultyId,
   initialCourseId,
 }: ContributeFormProps) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>("file");
   const [programSelection, setProgramSelection] = useState<string>(
     userProgramId ? String(userProgramId) : ""
@@ -160,14 +162,14 @@ export function ContributeForm({
         }
         resetForm();
       } catch {
-        setError("Something went wrong. Please try again.");
+        setError(t("common.error"));
       }
     });
   }
 
   async function handleFileSubmit() {
     if (!file || !title.trim()) {
-      setError("Title and file are required.");
+      setError(t("common.error"));
       return;
     }
     setError("");
@@ -191,12 +193,12 @@ export function ContributeForm({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Upload failed.");
+        setError(data.error || t("common.error"));
         return;
       }
       resetForm();
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("common.error"));
     } finally {
       setUploading(false);
     }
@@ -238,11 +240,10 @@ export function ContributeForm({
             </svg>
           </div>
           <h3 className="font-display text-xl font-light text-gray-900 dark:text-white">
-            Contribution Submitted!
+            {t("contribute.contributionSubmitted")}
           </h3>
           <p className="mt-2 text-sm text-gray-900/50 dark:text-white/50">
-            Your contribution is pending review. You&apos;ll be notified once
-            it&apos;s approved.
+            {t("contribute.pendingReview")}
           </p>
           <div className="mt-6 flex gap-3">
             <Button
@@ -250,10 +251,10 @@ export function ContributeForm({
               variant="outline"
               className="flex-1"
             >
-              Submit Another
+              {t("contribute.submitAnother")}
             </Button>
             <Button asChild className="flex-1">
-              <Link href="/dashboard/contribute/my">My Contributions</Link>
+              <Link href="/dashboard/contribute/my">{t("contribute.myContributions")}</Link>
             </Button>
           </div>
         </div>
@@ -290,7 +291,7 @@ export function ContributeForm({
                     : "text-gray-900/50 hover:text-gray-900 dark:text-white/50 dark:hover:text-white"
                 }`}
               >
-                File Upload
+                {t("contribute.fileUpload")}
               </button>
               <button
                 onClick={() => setMode("text")}
@@ -300,7 +301,7 @@ export function ContributeForm({
                     : "text-gray-900/50 hover:text-gray-900 dark:text-white/50 dark:hover:text-white"
                 }`}
               >
-                Text Notes
+                {t("contribute.textNotes")}
               </button>
             </div>
           </motion.div>
@@ -318,11 +319,11 @@ export function ContributeForm({
                   transition={{ duration: 0.25, ease }}
                 >
                   <label className="mb-1.5 block text-center text-sm font-medium text-gray-900/70 dark:text-white/70">
-                    Program
+                    {t("contribute.program")}
                   </label>
                   <Select value={programSelection} onValueChange={setProgramSelection}>
                     <SelectTrigger className={selectTriggerClass}>
-                      <SelectValue placeholder="Select A Program" />
+                      <SelectValue placeholder={t("contribute.selectProgram")} />
                     </SelectTrigger>
                     <SelectContent>
                       {programs.map((p) => (
@@ -330,7 +331,7 @@ export function ContributeForm({
                           {p.name}
                         </SelectItem>
                       ))}
-                      <SelectItem value="other">Other (Type Manually)</SelectItem>
+                      <SelectItem value="other">{t("contribute.otherManual")}</SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -345,7 +346,7 @@ export function ContributeForm({
                         transition={{ duration: 0.25, ease }}
                       >
                         <Input
-                          placeholder="Type Program Name"
+                          placeholder={t("contribute.typeProgramName")}
                           value={otherProgramName}
                           onChange={(e) => setOtherProgramName(e.target.value)}
                           disabled={busy}
@@ -364,11 +365,11 @@ export function ContributeForm({
               transition={{ layout: { duration: 0.3, ease } }}
             >
               <label className="mb-1.5 block text-center text-sm font-medium text-gray-900/70 dark:text-white/70">
-                Course
+                {t("contribute.course")}
               </label>
               {isOtherProgram ? (
                 <Input
-                  placeholder="Type Course Name"
+                  placeholder={t("contribute.typeCourseName")}
                   value={otherCourseName}
                   onChange={(e) => setOtherCourseName(e.target.value)}
                   disabled={busy}
@@ -385,10 +386,10 @@ export function ContributeForm({
                       <SelectValue
                         placeholder={
                           loadingCourses
-                            ? "Loading Courses..."
+                            ? t("contribute.loadingCourses")
                             : hasPrograms && !programSelection
-                              ? "Select A Program First"
-                              : "Select A Course"
+                              ? t("contribute.selectProgramFirst")
+                              : t("contribute.selectCourse")
                         }
                       />
                     </SelectTrigger>
@@ -399,7 +400,7 @@ export function ContributeForm({
                         </SelectItem>
                       ))}
                       {(programSelection || !hasPrograms) && (
-                        <SelectItem value="other">Other (Type Manually)</SelectItem>
+                        <SelectItem value="other">{t("contribute.otherManual")}</SelectItem>
                       )}
                     </SelectContent>
                   </Select>
@@ -415,7 +416,7 @@ export function ContributeForm({
                         transition={{ duration: 0.25, ease }}
                       >
                         <Input
-                          placeholder="Type Course Name"
+                          placeholder={t("contribute.typeCourseName")}
                           value={otherCourseName}
                           onChange={(e) => setOtherCourseName(e.target.value)}
                           disabled={busy}
@@ -434,10 +435,10 @@ export function ContributeForm({
               transition={{ layout: { duration: 0.3, ease } }}
             >
               <label className="mb-1.5 block text-center text-sm font-medium text-gray-900/70 dark:text-white/70">
-                Title
+                {t("contribute.titleLabel")}
               </label>
               <Input
-                placeholder="e.g. Midterm Notes Chapter 3"
+                placeholder={t("contribute.titlePlaceholder")}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 disabled={busy}
@@ -451,10 +452,10 @@ export function ContributeForm({
               transition={{ layout: { duration: 0.3, ease } }}
             >
               <label className="mb-1.5 block text-center text-sm font-medium text-gray-900/70 dark:text-white/70">
-                Description (Optional)
+                {t("contribute.descriptionLabel")}
               </label>
               <Input
-                placeholder="Brief context about this contribution"
+                placeholder={t("contribute.descriptionPlaceholder")}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={busy}
@@ -474,7 +475,7 @@ export function ContributeForm({
                   transition={{ duration: 0.25, ease }}
                 >
                   <label className="mb-1.5 block text-center text-sm font-medium text-gray-900/70 dark:text-white/70">
-                    File
+                    {t("contribute.fileLabel")}
                   </label>
                   <div
                     className="flex min-h-[120px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-900/10 bg-gray-900/[0.02] p-6 transition-colors hover:border-gray-900/20 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-white/20"
@@ -494,10 +495,10 @@ export function ContributeForm({
                     ) : (
                       <div className="text-center">
                         <p className="text-sm text-gray-900/50 dark:text-white/50">
-                          Click To Upload Or Drag And Drop
+                          {t("contribute.clickToUpload")}
                         </p>
                         <p className="mt-1 text-xs text-gray-900/30 dark:text-white/30">
-                          PDF, Images, Office Docs, TXT (Max 50MB)
+                          {t("contribute.fileTypes")}
                         </p>
                       </div>
                     )}
@@ -520,10 +521,10 @@ export function ContributeForm({
                   transition={{ duration: 0.25, ease }}
                 >
                   <label className="mb-1.5 block text-center text-sm font-medium text-gray-900/70 dark:text-white/70">
-                    Content
+                    {t("contribute.contentLabel")}
                   </label>
                   <Textarea
-                    placeholder="Paste or type your notes, summaries, explanations..."
+                    placeholder={t("contribute.textPlaceholder")}
                     value={textContent}
                     onChange={(e) => setTextContent(e.target.value)}
                     rows={8}
@@ -565,7 +566,7 @@ export function ContributeForm({
                 }
                 className="w-full rounded-full bg-[#5227FF] font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
-                {busy ? "Submitting..." : "Submit Contribution"}
+                {busy ? t("contribute.submitting") : t("contribute.submitContribution")}
               </Button>
             </motion.div>
           </div>
@@ -580,7 +581,7 @@ export function ContributeForm({
               href="/dashboard/contribute/my"
               className="text-gray-900/40 underline hover:text-gray-900/60 dark:text-white/40 dark:hover:text-white/60"
             >
-              My Contributions
+              {t("contribute.myContributions")}
             </Link>
           </motion.div>
         </motion.div>

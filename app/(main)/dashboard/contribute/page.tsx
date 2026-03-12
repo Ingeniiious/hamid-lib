@@ -90,14 +90,14 @@ export default async function ContributePage({ searchParams }: Props) {
     }
   }
 
-  const subtitle = verified
-    ? "Share course materials with the community"
-    : "Verify your university email to get started";
+  const subtitleKey = verified
+    ? "contribute.shareWithCommunity"
+    : "contribute.verifyToStart";
 
   return (
     <div className="flex h-full flex-col">
       <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
-        <PageHeader title="Contribute" subtitle={subtitle} />
+        <PageHeader titleKey="contribute.title" subtitleKey={subtitleKey} />
       </div>
 
       <div
@@ -122,7 +122,7 @@ export default async function ContributePage({ searchParams }: Props) {
           )}
         </div>
       </div>
-      <BackButton href="/dashboard" label="Back" floating useBack />
+      <BackButton href="/dashboard" labelKey="common.back" floating useBack />
     </div>
   );
 }

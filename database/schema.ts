@@ -200,6 +200,7 @@ export const notificationCampaign = pgTable("notification_campaign", {
 }, (table) => [
   index("notif_campaign_status_idx").on(table.status),
   index("notif_campaign_scheduled_idx").on(table.scheduledAt),
+  index("notif_campaign_created_desc_idx").on(table.createdAt.desc()),
 ]);
 
 // Automated notification triggers

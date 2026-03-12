@@ -5,20 +5,25 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { FloatingBackButtonSetter } from "@/components/FloatingBackButton";
+import { useTranslation } from "@/lib/i18n";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 const BACK_IMG = "https://lib.thevibecodedcompany.com/images/back.webp";
 
 interface BackButtonProps {
   href: string;
-  label: string;
+  label?: string;
+  /** i18n key — takes precedence over `label` when provided */
+  labelKey?: string;
   invisible?: boolean;
   floating?: boolean;
   closeTab?: boolean;
   useBack?: boolean;
 }
 
-export function BackButton({ href, label, invisible, floating, closeTab, useBack }: BackButtonProps) {
+export function BackButton({ href, label, labelKey, invisible, floating, closeTab, useBack }: BackButtonProps) {
+  const { t } = useTranslation();
+  const resolvedLabel = labelKey ? t(labelKey) : label || t("common.back");
   const [imgFailed, setImgFailed] = useState(false);
   const router = useRouter();
 
@@ -38,7 +43,7 @@ export function BackButton({ href, label, invisible, floating, closeTab, useBack
     return (
       <FloatingBackButtonSetter
         href={href}
-        label={label}
+        label={resolvedLabel}
         useBack={useBack}
         closeTab={closeTab}
       />

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { BackButton } from "@/components/BackButton";
 import { ContributionCard } from "@/components/ContributionCard";
+import { MyContributionsStrings } from "./Strings";
 import { getMyContributions } from "../actions";
 import type { Metadata } from "next";
 
@@ -28,7 +29,7 @@ export default async function MyContributionsPage({
     <div className="flex h-full flex-col">
       <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
         <PageHeader
-          title="My Contributions"
+          titleKey="contribute.myContributions"
           subtitle={`${total} ${total === 1 ? "Contribution" : "Contributions"}`}
         />
       </div>
@@ -43,14 +44,7 @@ export default async function MyContributionsPage({
       >
         <div className="mx-auto max-w-2xl pt-8">
           {contributions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center pt-32 text-center">
-              <h2 className="font-display text-xl font-light text-gray-900 dark:text-white">
-                No Contributions Yet
-              </h2>
-              <p className="mt-2 text-sm text-gray-900/50 dark:text-white/50">
-                Your submitted contributions will appear here.
-              </p>
-            </div>
+            <MyContributionsStrings variant="empty" />
           ) : (
             <div className="space-y-3">
               {contributions.map((c, i) => (
@@ -61,31 +55,11 @@ export default async function MyContributionsPage({
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-2">
-              {page > 1 && (
-                <a
-                  href={`/dashboard/contribute/my?page=${page - 1}`}
-                  className="rounded-lg border border-gray-900/10 px-3 py-1.5 text-sm text-gray-900/60 hover:bg-gray-900/5 dark:border-white/10 dark:text-white/60 dark:hover:bg-white/5"
-                >
-                  Previous
-                </a>
-              )}
-              <span className="text-sm text-gray-900/40 dark:text-white/40">
-                Page {page} of {totalPages}
-              </span>
-              {page < totalPages && (
-                <a
-                  href={`/dashboard/contribute/my?page=${page + 1}`}
-                  className="rounded-lg border border-gray-900/10 px-3 py-1.5 text-sm text-gray-900/60 hover:bg-gray-900/5 dark:border-white/10 dark:text-white/60 dark:hover:bg-white/5"
-                >
-                  Next
-                </a>
-              )}
-            </div>
+            <MyContributionsStrings variant="pagination" page={page} totalPages={totalPages} />
           )}
         </div>
       </div>
-      <BackButton href="/dashboard/contribute" label="Contribute" floating />
+      <BackButton href="/dashboard/contribute" labelKey="contribute.title" floating />
     </div>
   );
 }

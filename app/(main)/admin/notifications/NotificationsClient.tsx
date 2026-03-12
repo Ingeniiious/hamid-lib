@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   getTemplates,
+  listTemplates,
   createTemplate,
   updateTemplate,
   deleteTemplate,
@@ -85,7 +86,7 @@ interface AutomationRow {
   sendTime: string;
   templateId: number;
   enabled: boolean;
-  createdAt: Date;
+  createdAt: string;
   templateName: string;
   templateTitle: string;
   templateBody: string;
@@ -274,7 +275,7 @@ function SendTab() {
   const [selectedProgram, setSelectedProgram] = useState<number | null>(null);
 
   useEffect(() => {
-    getTemplates().then((t) => setTemplates(t as Template[]));
+    getTemplates().then((t) => setTemplates(t as Template[])).catch(() => {});
     getUniversities().then(setUniversities).catch(() => {});
     getFaculties().then(setFaculties).catch(() => {});
   }, []);
@@ -670,6 +671,8 @@ function SendTab() {
 
 function TemplatesTab() {
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [isPending, startTransition] = useTransition();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Template | null>(null);
@@ -686,10 +689,15 @@ function TemplatesTab() {
 
   const load = useCallback(() => {
     startTransition(async () => {
-      const t = await getTemplates();
-      setTemplates(t as Template[]);
+      try {
+        const result = await listTemplates({ page });
+        setTemplates(result.templates as Template[]);
+        setTotalPages(result.totalPages);
+      } catch {
+        // Silently handle — avoids crashing the page
+      }
     });
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     load();
@@ -830,9 +838,9 @@ function TemplatesTab() {
       <DataTable<Template>
         columns={columns}
         data={templates}
-        page={1}
-        totalPages={1}
-        onPageChange={() => {}}
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
         loading={isPending && templates.length === 0}
         emptyMessage="No templates yet."
       />
@@ -992,9 +1000,13 @@ function AutomationsTab() {
 
   const load = useCallback(() => {
     startTransition(async () => {
-      const [a, t] = await Promise.all([getAutomations(), getTemplates()]);
-      setAutomations(a as AutomationRow[]);
-      setTemplates(t as Template[]);
+      try {
+        const [a, t] = await Promise.all([getAutomations(), getTemplates()]);
+        setAutomations(a as AutomationRow[]);
+        setTemplates(t as Template[]);
+      } catch {
+        // Silently handle — avoids crashing the page
+      }
     });
   }, []);
 
@@ -1346,9 +1358,13 @@ function HistoryTab() {
 
   const load = useCallback(() => {
     startTransition(async () => {
-      const result = await listCampaigns({ page });
-      setCampaigns(result.campaigns as CampaignRow[]);
-      setTotalPages(result.totalPages);
+      try {
+        const result = await listCampaigns({ page });
+        setCampaigns(result.campaigns as CampaignRow[]);
+        setTotalPages(result.totalPages);
+      } catch {
+        // Silently handle
+      }
     });
   }, [page]);
 

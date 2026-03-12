@@ -19,7 +19,7 @@ export async function getNotificationStats() {
   const session = await getAdminSession();
   await requirePermission(session, "notifications.view");
 
-  const [stats] = await db.execute<{
+  const rows = await db.execute<{
     total_subscriptions: string;
     unique_users: string;
     active_automations: string;
@@ -32,11 +32,13 @@ export async function getNotificationStats() {
       (SELECT count(*) FROM notification_template) as total_templates
   `);
 
+  const stats = rows[0];
+
   return {
-    totalSubscriptions: parseInt(stats.total_subscriptions),
-    uniqueUsers: parseInt(stats.unique_users),
-    activeAutomations: parseInt(stats.active_automations),
-    totalTemplates: parseInt(stats.total_templates),
+    totalSubscriptions: parseInt(stats?.total_subscriptions ?? "0"),
+    uniqueUsers: parseInt(stats?.unique_users ?? "0"),
+    activeAutomations: parseInt(stats?.active_automations ?? "0"),
+    totalTemplates: parseInt(stats?.total_templates ?? "0"),
   };
 }
 
@@ -46,9 +48,58 @@ export async function getTemplates() {
   const session = await getAdminSession();
   await requirePermission(session, "notifications.view");
   return db
-    .select()
+    .select({
+      id: notificationTemplate.id,
+      name: notificationTemplate.name,
+      title: notificationTemplate.title,
+      body: notificationTemplate.body,
+      url: notificationTemplate.url,
+      translations: notificationTemplate.translations,
+    })
     .from(notificationTemplate)
     .orderBy(desc(notificationTemplate.updatedAt));
+}
+
+export async function listTemplates({
+  page = 1,
+  limit = 15,
+}: {
+  page?: number;
+  limit?: number;
+} = {}) {
+  const session = await getAdminSession();
+  await requirePermission(session, "notifications.view");
+
+  const offset = (page - 1) * limit;
+
+  const rows = await db.execute<{
+    id: number;
+    name: string;
+    title: string;
+    body: string;
+    url: string | null;
+    translations: string | null;
+    totalCount: string;
+  }>(sql`
+    SELECT
+      id, name, title, body, url,
+      translations::text as translations,
+      count(*) OVER() as "totalCount"
+    FROM notification_template
+    ORDER BY updated_at DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `);
+
+  const total = Number(rows[0]?.totalCount ?? 0);
+
+  return {
+    templates: rows.map(({ totalCount: _, translations: t, ...r }) => ({
+      ...r,
+      translations: t ? JSON.parse(t) : null,
+    })),
+    total,
+    totalPages: Math.ceil(total / limit),
+  };
 }
 
 export async function createTemplate(data: {
@@ -104,7 +155,7 @@ export async function deleteTemplate(id: number) {
 
 export async function listCampaigns({
   page = 1,
-  limit = 25,
+  limit = 15,
 }: {
   page?: number;
   limit?: number;
@@ -206,7 +257,7 @@ export async function executeCampaign(campaignId: number) {
 export async function getAutomations() {
   const session = await getAdminSession();
   await requirePermission(session, "notifications.view");
-  return db
+  const rows = await db
     .select({
       id: notificationAutomation.id,
       name: notificationAutomation.name,
@@ -226,6 +277,8 @@ export async function getAutomations() {
       eq(notificationAutomation.templateId, notificationTemplate.id)
     )
     .orderBy(desc(notificationAutomation.createdAt));
+  // Convert Date to ISO string for safe RSC serialization
+  return rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }));
 }
 
 export async function createAutomation(data: {
