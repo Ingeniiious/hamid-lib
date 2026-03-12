@@ -21,6 +21,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { CaretUpDown, Check } from "@phosphor-icons/react";
 import {
   getCalendarEvents,
@@ -959,18 +960,25 @@ export function CalendarView() {
               <h3 className="text-center font-display text-lg font-light text-gray-900 dark:text-white">
                 {editingEvent ? t("calendar.editEvent") : t("calendar.newEvent")}
               </h3>
-              {editingEvent ? (
-                <input
-                  type="date"
-                  value={formDate}
-                  onChange={(e) => setFormDate(e.target.value)}
-                  className="mx-auto mt-1 block h-8 rounded-full border border-gray-900/10 bg-gray-900/5 px-4 text-center text-xs text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 dark:border-white/10 dark:bg-white/10 dark:text-white/50 dark:focus-visible:ring-white/30"
-                />
-              ) : (
-                <p className="mt-0.5 text-center text-xs text-gray-400 dark:text-white/40">
-                  {formDate && format(parseISO(formDate), "EEEE, MMMM d, yyyy")}
-                </p>
-              )}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <p className="mt-0.5 cursor-pointer text-center text-xs text-gray-400 transition-colors hover:text-gray-600 dark:text-white/40 dark:hover:text-white/60">
+                    {formDate && format(parseISO(formDate), "EEEE, MMMM d, yyyy")}
+                  </p>
+                </PopoverTrigger>
+                {editingEvent && (
+                  <PopoverContent className="w-auto p-0" align="center">
+                    <DatePicker
+                      mode="single"
+                      selected={formDate ? parseISO(formDate) : undefined}
+                      onSelect={(date) => {
+                        if (date) setFormDate(format(date, "yyyy-MM-dd"));
+                      }}
+                      defaultMonth={formDate ? parseISO(formDate) : undefined}
+                    />
+                  </PopoverContent>
+                )}
+              </Popover>
 
               <div className="mt-4 flex flex-col gap-3">
                 <input

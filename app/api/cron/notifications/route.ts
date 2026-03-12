@@ -8,8 +8,9 @@ import {
   notificationAutomationLog,
   notificationTemplate,
   userProfile,
+  task,
 } from "@/database/schema";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, ne, sql, inArray } from "drizzle-orm";
 import { sqlInList } from "@/lib/db";
 import { sendPushNotification } from "@/lib/web-push";
 import { processScheduledCampaigns } from "@/lib/campaign-scheduler";
@@ -276,6 +277,160 @@ export async function GET(request: NextRequest) {
       .where(inArray(pushSubscription.id, expiredSubIds));
   }
 
+  // ── 1.5 Task reminders (timezone-aware, 9 AM local) ─────────
+  let tasksSent = 0;
+  const taskExpiredSubIds: number[] = [];
+  try {
+    const tasksWithReminders = await db
+      .select()
+      .from(task)
+      .where(
+        and(
+          ne(task.reminder, "none"),
+          eq(task.notify, true),
+          eq(task.status, "pending")
+        )
+      );
+
+    if (tasksWithReminders.length > 0) {
+      const taskUserIds = [...new Set(tasksWithReminders.map((t) => t.userId))];
+
+      // Reuse timezone/subs from calendar if available, otherwise query
+      const missingTzUserIds = taskUserIds.filter((id) => !userTzMap.has(id));
+      if (missingTzUserIds.length > 0) {
+        const taskProfiles = await db
+          .select({ userId: userProfile.userId, timezone: userProfile.timezone })
+          .from(userProfile)
+          .where(inArray(userProfile.userId, missingTzUserIds));
+        for (const p of taskProfiles) {
+          userTzMap.set(p.userId, p.timezone || DEFAULT_TZ);
+        }
+      }
+
+      const missingSubUserIds = taskUserIds.filter((id) => !subsMap.has(id));
+      if (missingSubUserIds.length > 0) {
+        const taskSubs = await db
+          .select()
+          .from(pushSubscription)
+          .where(inArray(pushSubscription.userId, missingSubUserIds));
+        for (const sub of taskSubs) {
+          const list = subsMap.get(sub.userId) || [];
+          list.push(sub);
+          subsMap.set(sub.userId, list);
+        }
+      }
+
+      const TASK_NOTIFY_MINUTES = 9 * 60; // 9:00 AM local time
+
+      for (const tk of tasksWithReminders) {
+        const tz = userTzMap.get(tk.userId) || DEFAULT_TZ;
+        const { localDate, localMinutes: currentMinutes } = getLocalDateTime(now, tz);
+
+        // Only fire at 9 AM local time (within 90-second window)
+        if (TASK_NOTIFY_MINUTES > currentMinutes || TASK_NOTIFY_MINUTES < currentMinutes - 1.5) {
+          continue;
+        }
+
+        const subs = subsMap.get(tk.userId);
+        if (!subs || subs.length === 0) continue;
+
+        // Determine if this reminder should fire today + build dedup key
+        let shouldFire = false;
+        let dedupKey = "";
+
+        switch (tk.reminder) {
+          case "at_deadline":
+            // Only on the due date itself
+            if (tk.dueDate && tk.dueDate === localDate) {
+              shouldFire = true;
+              dedupKey = `task:${tk.id}`;
+            }
+            break;
+
+          case "daily":
+            shouldFire = true;
+            dedupKey = `task:${tk.id}:${localDate}`;
+            break;
+
+          case "weekly": {
+            // Fire on the same day-of-week as the due date (or Monday if none)
+            const todayDate = new Date(localDate + "T00:00:00");
+            const todayDay = todayDate.getDay();
+            const targetDay = tk.dueDate
+              ? new Date(tk.dueDate + "T00:00:00").getDay()
+              : 1; // Monday default
+            if (todayDay === targetDay) {
+              shouldFire = true;
+              dedupKey = `task:${tk.id}:${localDate}`;
+            }
+            break;
+          }
+        }
+
+        if (!shouldFire) continue;
+
+        // Claim-first dedup — atomic INSERT ON CONFLICT DO NOTHING
+        const claimed = await db
+          .insert(notificationLog)
+          .values({ eventId: dedupKey, alertMinutes: 0 })
+          .onConflictDoNothing()
+          .returning({ id: notificationLog.id });
+
+        if (claimed.length === 0) continue;
+
+        // Build notification body based on due date proximity
+        let taskBody = "Reminder";
+        if (tk.dueDate) {
+          const todayMs = new Date(localDate + "T00:00:00").getTime();
+          const dueMs = new Date(tk.dueDate + "T00:00:00").getTime();
+          const diffDays = Math.round((dueMs - todayMs) / 86400000);
+          if (diffDays < 0) {
+            taskBody = `Overdue by ${Math.abs(diffDays)} day${Math.abs(diffDays) > 1 ? "s" : ""}`;
+          } else if (diffDays === 0) {
+            taskBody = "Due Today";
+          } else if (diffDays === 1) {
+            taskBody = "Due Tomorrow";
+          } else {
+            taskBody = `Due in ${diffDays} days`;
+          }
+        }
+
+        const taskPayload = {
+          title: `Task: ${tk.title}`,
+          body: taskBody,
+          url: "/dashboard/space/tasks",
+          tag: `task-${tk.id}-${tk.reminder}`,
+          category: "task",
+        };
+
+        await Promise.allSettled(
+          subs.map((sub) =>
+            sendPushNotification(
+              { endpoint: sub.endpoint, p256dh: sub.p256dh!, auth: sub.auth! },
+              taskPayload
+            ).then((result) => {
+              if (!result.success && result.statusCode === 410) {
+                taskExpiredSubIds.push(sub.id);
+              }
+              return result;
+            })
+          )
+        );
+
+        tasksSent++;
+      }
+    }
+  } catch {
+    // Don't block other notifications
+  }
+
+  // Cleanup expired task push subscriptions
+  if (taskExpiredSubIds.length > 0) {
+    await db
+      .delete(pushSubscription)
+      .where(inArray(pushSubscription.id, taskExpiredSubIds));
+  }
+
   // ── 2. Post-exam follow-up (same event data, timezone-aware) ─
   let examFollowUps = 0;
   const examExpiredSubIds: number[] = [];
@@ -430,6 +585,7 @@ export async function GET(request: NextRequest) {
     eventsChecked: events.length,
     sent,
     skipped,
+    tasksSent,
     examFollowUps,
     campaigns: campaignResults.length,
     automations: automationResults,
