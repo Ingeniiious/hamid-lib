@@ -23,6 +23,16 @@ export async function GET(request: Request) {
       });
     }
 
+    // Self-invoke: immediately process next step instead of waiting for cron tick.
+    // The cron (every 2 min) is now just a safety net for stuck/retried jobs.
+    if (result.status !== "failed" && result.status !== "completed") {
+      const baseUrl = new URL(request.url).origin;
+      fetch(`${baseUrl}/api/cron/ai-pipeline`, {
+        method: "GET",
+        headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
+      }).catch(() => {});
+    }
+
     return NextResponse.json({
       status: "processed",
       data: result,

@@ -145,6 +145,13 @@ export async function POST(request: NextRequest) {
       })
       .returning({ id: extractionJob.id });
 
+    // Auto-trigger extraction cron — don't wait for 2-min Vercel cron
+    const baseUrl = new URL(request.url).origin;
+    fetch(`${baseUrl}/api/cron/extraction`, {
+      method: "GET",
+      headers: { authorization: `Bearer ${process.env.CRON_SECRET ?? ""}` },
+    }).catch(() => {});
+
     return NextResponse.json({
       success: true,
       mode: "extraction-pipeline",

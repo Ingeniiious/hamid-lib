@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Extraction Pipeline Cron Handler
-// Runs every 2 minutes via Vercel cron.
-// Each invocation processes one phase of one extraction job.
+// Runs every 2 minutes via Vercel cron (safety net).
+// Self-invokes after each successful step for instant chaining.
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
@@ -24,6 +24,22 @@ export async function GET(request: Request) {
 
     if (!result) {
       return NextResponse.json({ message: "No extraction jobs to process" });
+    }
+
+    const baseUrl = new URL(request.url).origin;
+
+    if (result.status === "completed") {
+      // Extraction done — kick off the AI pipeline immediately
+      fetch(`${baseUrl}/api/cron/ai-pipeline`, {
+        method: "GET",
+        headers: { authorization: `Bearer ${cronSecret}` },
+      }).catch(() => {});
+    } else if (result.status !== "failed") {
+      // More extraction phases to go — self-invoke for next phase
+      fetch(`${baseUrl}/api/cron/extraction`, {
+        method: "GET",
+        headers: { authorization: `Bearer ${cronSecret}` },
+      }).catch(() => {});
     }
 
     return NextResponse.json({

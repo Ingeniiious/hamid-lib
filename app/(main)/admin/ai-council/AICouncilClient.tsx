@@ -14,6 +14,8 @@ import {
   UploadSimple,
   CircleNotch,
   ArrowCounterClockwise,
+  CaretDown,
+  X,
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1295,6 +1297,7 @@ function TestLabTab() {
   const [loadingRecent, setLoadingRecent] = useState(true);
   const [selectedContribution, setSelectedContribution] =
     useState<RecentFile | null>(null);
+  const [recentOpen, setRecentOpen] = useState(false);
 
   // Fetch recent files on mount
   useEffect(() => {
@@ -1323,6 +1326,7 @@ function TestLabTab() {
   const selectRecentFile = (rf: RecentFile) => {
     setSelectedContribution(rf);
     setFile(null); // Clear new file when picking a recent one
+    setRecentOpen(false); // Close dropdown after selection
   };
 
   const handleNewFile = (f: File) => {
@@ -1405,149 +1409,178 @@ function TestLabTab() {
         </p>
       </motion.div>
 
-      {/* Recent Test Files */}
-      {!loadingRecent && recentFiles.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, ease, delay: 0.05 }}
-          className="rounded-2xl border border-gray-900/10 bg-white/50 p-4 backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
-        >
-          <div className="mb-3 flex items-center justify-center gap-2">
-            <ArrowCounterClockwise
-              weight="duotone"
-              className="h-4 w-4 text-gray-900/40 dark:text-white/40"
-            />
-            <h3 className="text-xs font-medium text-gray-900/70 dark:text-white/70">
-              Recent Test Files
-            </h3>
-          </div>
-          <div className="flex flex-wrap justify-center gap-2">
-            {recentFiles.map((rf) => {
-              const isSelected = selectedContribution?.id === rf.id;
-              return (
-                <button
-                  key={rf.id}
-                  onClick={() =>
-                    isSelected
-                      ? setSelectedContribution(null)
-                      : selectRecentFile(rf)
-                  }
-                  className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs transition-all ${
-                    isSelected
-                      ? "bg-[#5227FF] text-white shadow-sm"
-                      : "bg-gray-900/5 text-gray-900/60 hover:bg-gray-900/10 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10"
-                  }`}
-                >
-                  <FileText
-                    weight="duotone"
-                    className={`h-3.5 w-3.5 ${isSelected ? "text-white/80" : ""}`}
-                  />
-                  <span className="max-w-[140px] truncate font-medium">
-                    {rf.fileName ?? "Unnamed"}
-                  </span>
-                  <span
-                    className={`text-[10px] ${isSelected ? "text-white/60" : "text-gray-900/40 dark:text-white/40"}`}
-                  >
-                    {mimeToLabel(rf.fileType)}
-                    {rf.fileSize
-                      ? ` · ${(rf.fileSize / 1024 / 1024).toFixed(1)}MB`
-                      : ""}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {selectedContribution && (
-            <p className="mt-2.5 text-center text-[10px] text-[#5227FF] dark:text-[#8B6FFF]">
-              Reusing &ldquo;{selectedContribution.fileName}&rdquo; &mdash; no
-              new upload to R2
-            </p>
-          )}
-        </motion.div>
-      )}
-
-      {/* Divider */}
-      {!loadingRecent && recentFiles.length > 0 && (
-        <div className="flex items-center justify-center gap-3">
-          <div className="h-px w-12 bg-gray-900/10 dark:bg-white/10" />
-          <span className="text-[10px] text-gray-900/30 dark:text-white/30">
-            Or Upload New
-          </span>
-          <div className="h-px w-12 bg-gray-900/10 dark:bg-white/10" />
-        </div>
-      )}
-
-      {/* File Drop Zone */}
+      {/* Source: Upload new OR reuse existing */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, ease, delay: 0.1 }}
+        className="space-y-3"
       >
-        <label
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-10 transition-colors ${
-            dragOver
-              ? "border-[#5227FF] bg-[#5227FF]/5"
-              : file
-                ? "border-green-400 bg-green-50/50 dark:border-green-500/40 dark:bg-green-900/10"
-                : selectedContribution
-                  ? "border-gray-900/5 bg-white/30 dark:border-white/5 dark:bg-white/3"
-                  : "border-gray-900/10 bg-white/50 hover:border-gray-900/20 dark:border-white/15 dark:bg-white/5 dark:hover:border-white/25"
-          }`}
-        >
-          <input
-            type="file"
-            accept=".pdf,.docx,.pptx,.png,.jpg,.jpeg,.webp"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) handleNewFile(f);
-            }}
-          />
-          {file ? (
-            <>
-              <FileText
-                weight="duotone"
-                className="h-8 w-8 text-green-600 dark:text-green-400"
-              />
-              <div className="text-center">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  {file.name}
-                </div>
-                <div className="text-xs text-gray-900/50 dark:text-white/50">
-                  {(file.size / 1024 / 1024).toFixed(2)} MB &middot;{" "}
-                  {file.type.split("/").pop()?.toUpperCase()}
-                </div>
-              </div>
-              <span className="text-xs text-gray-900/40 dark:text-white/40">
-                Click Or Drop To Replace
+        {/* Selected file indicator (either new upload or reused) */}
+        {selectedContribution && (
+          <div className="flex items-center justify-center gap-2 rounded-2xl border border-[#5227FF]/20 bg-[#5227FF]/5 px-4 py-3 dark:border-[#5227FF]/30 dark:bg-[#5227FF]/10">
+            <ArrowCounterClockwise
+              weight="duotone"
+              className="h-4 w-4 shrink-0 text-[#5227FF] dark:text-[#8B6FFF]"
+            />
+            <div className="min-w-0 text-center">
+              <span className="text-xs font-medium text-[#5227FF] dark:text-[#8B6FFF]">
+                Reusing:{" "}
               </span>
-            </>
-          ) : (
-            <>
-              <UploadSimple
-                weight="duotone"
-                className={`h-8 w-8 ${selectedContribution ? "text-gray-900/15 dark:text-white/15" : "text-gray-900/30 dark:text-white/30"}`}
-              />
-              <div className="text-center">
-                <div
-                  className={`text-sm font-medium ${selectedContribution ? "text-gray-900/40 dark:text-white/40" : "text-gray-900/70 dark:text-white/70"}`}
-                >
-                  Drop File Here Or Click To Browse
+              <span className="text-xs text-gray-900 dark:text-white">
+                {selectedContribution.fileName}
+              </span>
+              <span className="text-[10px] text-gray-900/40 dark:text-white/40">
+                {" "}
+                &middot; {mimeToLabel(selectedContribution.fileType)}
+                {selectedContribution.fileSize
+                  ? ` · ${(selectedContribution.fileSize / 1024 / 1024).toFixed(1)}MB`
+                  : ""}
+              </span>
+            </div>
+            <button
+              onClick={() => setSelectedContribution(null)}
+              className="shrink-0 rounded-full p-1 text-gray-900/40 transition-colors hover:bg-gray-900/5 hover:text-gray-900/60 dark:text-white/40 dark:hover:bg-white/5 dark:hover:text-white/60"
+            >
+              <X weight="bold" className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+
+        {/* File Drop Zone (hidden text when reusing) */}
+        {!selectedContribution && (
+          <label
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-10 transition-colors ${
+              dragOver
+                ? "border-[#5227FF] bg-[#5227FF]/5"
+                : file
+                  ? "border-green-400 bg-green-50/50 dark:border-green-500/40 dark:bg-green-900/10"
+                  : "border-gray-900/10 bg-white/50 hover:border-gray-900/20 dark:border-white/15 dark:bg-white/5 dark:hover:border-white/25"
+            }`}
+          >
+            <input
+              type="file"
+              accept=".pdf,.docx,.pptx,.png,.jpg,.jpeg,.webp"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleNewFile(f);
+              }}
+            />
+            {file ? (
+              <>
+                <FileText
+                  weight="duotone"
+                  className="h-8 w-8 text-green-600 dark:text-green-400"
+                />
+                <div className="text-center">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    {file.name}
+                  </div>
+                  <div className="text-xs text-gray-900/50 dark:text-white/50">
+                    {(file.size / 1024 / 1024).toFixed(2)} MB &middot;{" "}
+                    {file.type.split("/").pop()?.toUpperCase()}
+                  </div>
                 </div>
-                <div className="text-xs text-gray-900/40 dark:text-white/40">
-                  PDF, DOCX, PPTX, PNG, JPEG, WebP
+                <span className="text-xs text-gray-900/40 dark:text-white/40">
+                  Click Or Drop To Replace
+                </span>
+              </>
+            ) : (
+              <>
+                <UploadSimple
+                  weight="duotone"
+                  className="h-8 w-8 text-gray-900/30 dark:text-white/30"
+                />
+                <div className="text-center">
+                  <div className="text-sm font-medium text-gray-900/70 dark:text-white/70">
+                    Drop File Here Or Click To Browse
+                  </div>
+                  <div className="text-xs text-gray-900/40 dark:text-white/40">
+                    PDF, DOCX, PPTX, PNG, JPEG, WebP
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
-        </label>
+              </>
+            )}
+          </label>
+        )}
+
+        {/* Reuse existing file dropdown */}
+        {!loadingRecent && recentFiles.length > 0 && !file && (
+          <div className="relative">
+            <button
+              onClick={() => setRecentOpen((v) => !v)}
+              className="mx-auto flex items-center justify-center gap-2 rounded-full bg-gray-900/5 px-4 py-2 text-xs font-medium text-gray-900/60 transition-colors hover:bg-gray-900/10 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10"
+            >
+              <ArrowCounterClockwise weight="duotone" className="h-3.5 w-3.5" />
+              {selectedContribution
+                ? "Change File"
+                : `Reuse Existing File (${recentFiles.length})`}
+              <motion.span
+                animate={{ rotate: recentOpen ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <CaretDown weight="bold" className="h-3 w-3" />
+              </motion.span>
+            </button>
+
+            {recentOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.15 }}
+                className="mt-2 max-h-48 overflow-y-auto rounded-2xl border border-gray-900/10 bg-white/90 shadow-lg backdrop-blur-xl dark:border-white/15 dark:bg-gray-900/90"
+              >
+                {recentFiles.map((rf) => {
+                  const isSelected = selectedContribution?.id === rf.id;
+                  return (
+                    <button
+                      key={rf.id}
+                      onClick={() => selectRecentFile(rf)}
+                      className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors first:rounded-t-2xl last:rounded-b-2xl ${
+                        isSelected
+                          ? "bg-[#5227FF]/10 dark:bg-[#5227FF]/20"
+                          : "hover:bg-gray-900/5 dark:hover:bg-white/5"
+                      }`}
+                    >
+                      <FileText
+                        weight="duotone"
+                        className={`h-4 w-4 shrink-0 ${
+                          isSelected
+                            ? "text-[#5227FF] dark:text-[#8B6FFF]"
+                            : "text-gray-900/30 dark:text-white/30"
+                        }`}
+                      />
+                      <div className="min-w-0 flex-1 text-center">
+                        <div
+                          className={`truncate text-xs font-medium ${
+                            isSelected
+                              ? "text-[#5227FF] dark:text-[#8B6FFF]"
+                              : "text-gray-900 dark:text-white"
+                          }`}
+                        >
+                          {rf.fileName ?? "Unnamed"}
+                        </div>
+                      </div>
+                      <span className="shrink-0 text-[10px] text-gray-900/40 dark:text-white/40">
+                        {mimeToLabel(rf.fileType)}
+                        {rf.fileSize
+                          ? ` · ${(rf.fileSize / 1024 / 1024).toFixed(1)}MB`
+                          : ""}
+                      </span>
+                    </button>
+                  );
+                })}
+              </motion.div>
+            )}
+          </div>
+        )}
       </motion.div>
 
       {/* Output Type Selector */}
@@ -1634,149 +1667,497 @@ function TestLabTab() {
         </Button>
       </motion.div>
 
-      {/* Result */}
-      {result && (
+      {/* Error result */}
+      {result && !result.success && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.4, ease }}
-          className={`rounded-2xl border p-5 text-center ${
-            result.success
-              ? "border-green-400/30 bg-green-50/50 dark:border-green-500/20 dark:bg-green-900/10"
-              : "border-red-400/30 bg-red-50/50 dark:border-red-500/20 dark:bg-red-900/10"
-          }`}
+          className="rounded-2xl border border-red-400/30 bg-red-50/50 p-5 text-center dark:border-red-500/20 dark:bg-red-900/10"
         >
-          {result.success ? (
-            <div className="space-y-3">
-              <CheckCircle
-                weight="duotone"
-                className="mx-auto h-8 w-8 text-green-600 dark:text-green-400"
-              />
-              <div className="text-sm font-medium text-green-700 dark:text-green-300">
-                {result.reused
-                  ? "Jobs Created From Existing File"
-                  : "Jobs Created Successfully"}
-              </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                {result.extractionJobId && (
-                  <span className="rounded-full bg-green-100 px-3 py-1 text-[10px] font-mono text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                    Extraction: {result.extractionJobId.slice(0, 8)}...
-                  </span>
-                )}
-                {result.pipelineJobId && (
-                  <span className="rounded-full bg-green-100 px-3 py-1 text-[10px] font-mono text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                    Pipeline: {result.pipelineJobId.slice(0, 8)}...
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-green-600/70 dark:text-green-400/70">
-                {result.mode === "extraction-pipeline"
-                  ? "File queued for extraction. The cron will pick it up within 2 minutes, then auto-create the council pipeline job."
-                  : "Pipeline job created directly. The cron will start processing within 2 minutes."}
-              </p>
-              <p className="text-[10px] text-gray-900/40 dark:text-white/40">
-                Switch to the{" "}
-                {result.mode === "extraction-pipeline"
-                  ? "Extraction Jobs"
-                  : "Pipeline Jobs"}{" "}
-                tab to monitor progress.
-              </p>
+          <div className="space-y-2">
+            <div className="text-sm font-medium text-red-700 dark:text-red-300">
+              Upload Failed
             </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="text-sm font-medium text-red-700 dark:text-red-300">
-                Upload Failed
-              </div>
-              <p className="text-xs text-red-600/70 dark:text-red-400/70">
-                {result.error}
-              </p>
+            <p className="text-xs text-red-600/70 dark:text-red-400/70">
+              {result.error}
+            </p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Live Pipeline Tracker */}
+      <LivePipelineTracker
+        extractionJobId={result?.extractionJobId ?? null}
+        pipelineJobId={result?.pipelineJobId ?? null}
+        isActive={!!result?.success}
+      />
+    </div>
+  );
+}
+
+// ===========================================================================
+// Live Pipeline Tracker
+// ===========================================================================
+
+interface LiveStatus {
+  extraction: {
+    id: string;
+    status: string;
+    currentPhase: number;
+    fileName: string;
+    errorMessage: string | null;
+    pipelineJobId: string | null;
+    extractionTokens: number;
+    extractionCostUsd: string;
+  } | null;
+  pipeline: {
+    id: string;
+    status: string;
+    currentStep: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    totalCostUsd: string;
+    errorMessage: string | null;
+  } | null;
+  steps: {
+    id: number;
+    modelSlug: string;
+    role: string;
+    stepOrder: number;
+    status: string;
+    verdict: string | null;
+    inputTokens: number;
+    outputTokens: number;
+    costUsd: string;
+    durationMs: number | null;
+    errorMessage: string | null;
+  }[];
+}
+
+type StageStatus = "pending" | "active" | "completed" | "failed" | "skipped";
+
+function LivePipelineTracker({
+  extractionJobId,
+  pipelineJobId,
+  isActive,
+}: {
+  extractionJobId: string | null;
+  pipelineJobId: string | null;
+  isActive: boolean;
+}) {
+  const [liveData, setLiveData] = useState<LiveStatus | null>(null);
+  const [startTime] = useState(Date.now());
+  const [elapsed, setElapsed] = useState(0);
+
+  // Poll live status every 3 seconds
+  useEffect(() => {
+    if (!isActive || (!extractionJobId && !pipelineJobId)) return;
+
+    let cancelled = false;
+
+    const poll = async () => {
+      const params = new URLSearchParams();
+      if (extractionJobId) params.set("extractionId", extractionJobId);
+      if (pipelineJobId) params.set("pipelineId", pipelineJobId);
+
+      try {
+        const res = await fetch(
+          `/api/admin/ai-council/live-status?${params}`
+        );
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          setLiveData(data);
+        }
+      } catch {}
+    };
+
+    poll();
+    const interval = setInterval(poll, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isActive, extractionJobId, pipelineJobId]);
+
+  // Elapsed time ticker
+  useEffect(() => {
+    if (!isActive) return;
+    const interval = setInterval(() => setElapsed(Date.now() - startTime), 1000);
+    return () => clearInterval(interval);
+  }, [isActive, startTime]);
+
+  // Always show the tracker (static when no job, live when active)
+  const extractionStatus: StageStatus = !liveData?.extraction
+    ? isActive
+      ? "active"
+      : "pending"
+    : liveData.extraction.status === "completed"
+      ? "completed"
+      : liveData.extraction.status === "failed"
+        ? "failed"
+        : ["downloading", "extracting", "classifying"].includes(
+              liveData.extraction.status
+            )
+          ? "active"
+          : "pending";
+
+  // Build step status map from live data
+  const modelSlugs = ["kimi", "chatgpt", "claude", "gemini", "grok"];
+  const stepMap = new Map(
+    (liveData?.steps ?? [])
+      .filter((s) => s.stepOrder < 100) // teacher steps only
+      .map((s) => [s.modelSlug, s])
+  );
+  const genSteps = (liveData?.steps ?? []).filter((s) => s.stepOrder >= 100);
+
+  const getTeacherStatus = (slug: string): StageStatus => {
+    const step = stepMap.get(slug);
+    if (!step) return "pending";
+    if (step.status === "completed") return "completed";
+    if (step.status === "running") return "active";
+    if (step.status === "failed") return "failed";
+    if (step.status === "skipped") return "skipped";
+    return "pending";
+  };
+
+  const getGenStatus = (): StageStatus => {
+    if (genSteps.length === 0) return "pending";
+    if (genSteps.every((s) => s.status === "completed" || s.status === "skipped"))
+      return "completed";
+    if (genSteps.some((s) => s.status === "running")) return "active";
+    if (genSteps.some((s) => s.status === "failed")) return "failed";
+    if (genSteps.some((s) => s.status === "pending")) return "pending";
+    return "pending";
+  };
+
+  const isDone =
+    liveData?.pipeline?.status === "completed" ||
+    liveData?.pipeline?.status === "failed";
+
+  const stageColor = (s: StageStatus) => {
+    switch (s) {
+      case "completed":
+        return "ring-2 ring-green-400 dark:ring-green-500";
+      case "active":
+        return "ring-2 ring-[#5227FF] dark:ring-[#8B6FFF]";
+      case "failed":
+        return "ring-2 ring-red-400 dark:ring-red-500";
+      case "skipped":
+        return "opacity-40";
+      default:
+        return "ring-1 ring-gray-900/10 dark:ring-white/10";
+    }
+  };
+
+  const dotColor = (s: StageStatus) => {
+    switch (s) {
+      case "completed":
+        return "bg-green-400";
+      case "active":
+        return "bg-[#5227FF]";
+      case "failed":
+        return "bg-red-400";
+      case "skipped":
+        return "bg-gray-300 dark:bg-gray-600";
+      default:
+        return "bg-gray-200 dark:bg-gray-700";
+    }
+  };
+
+  const lineColor = (s: StageStatus) => {
+    switch (s) {
+      case "completed":
+        return "bg-green-400/60";
+      case "active":
+        return "bg-[#5227FF]/40";
+      default:
+        return "bg-gray-900/10 dark:bg-white/10";
+    }
+  };
+
+  const formatElapsed = (ms: number) => {
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+  };
+
+  // Build pipeline stages
+  const stages: {
+    key: string;
+    label: string;
+    status: StageStatus;
+    image?: string;
+    icon?: "upload" | "extract" | "generate" | "done";
+    detail?: string;
+  }[] = [
+    {
+      key: "upload",
+      label: "Upload",
+      status: isActive ? "completed" : "pending",
+      icon: "upload",
+    },
+    {
+      key: "extract",
+      label: "Extract",
+      status: extractionStatus,
+      icon: "extract",
+      detail:
+        extractionStatus === "active" && liveData?.extraction
+          ? `Phase ${liveData.extraction.currentPhase}`
+          : undefined,
+    },
+    ...modelSlugs.map((slug) => ({
+      key: slug,
+      label: MODEL_INFO[slug]?.role ?? slug,
+      status: getTeacherStatus(slug),
+      image: MODEL_INFO[slug]?.image,
+      detail: (() => {
+        const step = stepMap.get(slug);
+        if (!step) return undefined;
+        if (step.durationMs) return formatDuration(step.durationMs);
+        if (step.status === "running") return "Running...";
+        return undefined;
+      })(),
+    })),
+    {
+      key: "generate",
+      label: "Generate",
+      status: getGenStatus(),
+      icon: "generate",
+      detail:
+        genSteps.length > 0
+          ? `${genSteps.filter((s) => s.status === "completed").length}/${genSteps.length}`
+          : undefined,
+    },
+    {
+      key: "done",
+      label: "Done",
+      status: isDone ? (liveData?.pipeline?.status === "completed" ? "completed" : "failed") : "pending",
+      icon: "done",
+    },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5, ease, delay: 0.4 }}
+      className="rounded-2xl border border-gray-900/10 bg-white/50 p-5 backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
+    >
+      <div className="mb-4 flex items-center justify-center gap-3">
+        <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+          Pipeline Flow
+        </h3>
+        {isActive && !isDone && (
+          <motion.span
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className="rounded-full bg-[#5227FF]/10 px-2.5 py-0.5 text-[10px] font-medium text-[#5227FF] dark:bg-[#5227FF]/20 dark:text-[#8B6FFF]"
+          >
+            Live &middot; {formatElapsed(elapsed)}
+          </motion.span>
+        )}
+        {isDone && liveData?.pipeline && (
+          <span
+            className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium ${
+              liveData.pipeline.status === "completed"
+                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+            }`}
+          >
+            {liveData.pipeline.status === "completed" ? "Completed" : "Failed"}
+            {" · "}${Number(liveData.pipeline.totalCostUsd).toFixed(4)}
+          </span>
+        )}
+      </div>
+
+      {/* Pipeline stages */}
+      <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-0">
+        {stages.map((stage, idx) => (
+          <div key={stage.key} className="flex items-center">
+            <div className="flex flex-col items-center gap-1">
+              {/* Stage circle */}
+              {stage.image ? (
+                <div className="relative">
+                  <img
+                    src={stage.image}
+                    alt={stage.label}
+                    className={`h-10 w-10 rounded-full object-cover transition-all ${stageColor(stage.status)}`}
+                  />
+                  {stage.status === "active" && (
+                    <motion.div
+                      animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                      className="absolute inset-0 rounded-full ring-2 ring-[#5227FF] dark:ring-[#8B6FFF]"
+                    />
+                  )}
+                  {/* Status dot */}
+                  <div
+                    className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white dark:border-gray-900 ${dotColor(stage.status)}`}
+                  />
+                </div>
+              ) : (
+                <div className="relative">
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-full transition-all ${
+                      stage.status === "completed"
+                        ? "bg-green-100 dark:bg-green-900/30"
+                        : stage.status === "active"
+                          ? "bg-[#5227FF]/10 dark:bg-[#5227FF]/20"
+                          : stage.status === "failed"
+                            ? "bg-red-100 dark:bg-red-900/30"
+                            : "bg-gray-900/5 dark:bg-white/5"
+                    } ${stageColor(stage.status)}`}
+                  >
+                    {stage.icon === "upload" && (
+                      <UploadSimple
+                        weight="duotone"
+                        className={`h-5 w-5 ${
+                          stage.status === "completed"
+                            ? "text-green-600 dark:text-green-400"
+                            : "text-gray-900/50 dark:text-white/50"
+                        }`}
+                      />
+                    )}
+                    {stage.icon === "extract" && (
+                      <Files
+                        weight="duotone"
+                        className={`h-5 w-5 ${
+                          stage.status === "completed"
+                            ? "text-green-600 dark:text-green-400"
+                            : stage.status === "active"
+                              ? "text-[#5227FF] dark:text-[#8B6FFF]"
+                              : "text-gray-900/50 dark:text-white/50"
+                        }`}
+                      />
+                    )}
+                    {stage.icon === "generate" && (
+                      <Lightning
+                        weight="duotone"
+                        className={`h-5 w-5 ${
+                          stage.status === "completed"
+                            ? "text-green-600 dark:text-green-400"
+                            : stage.status === "active"
+                              ? "text-[#5227FF] dark:text-[#8B6FFF]"
+                              : "text-gray-900/50 dark:text-white/50"
+                        }`}
+                      />
+                    )}
+                    {stage.icon === "done" && (
+                      <CheckCircle
+                        weight="duotone"
+                        className={`h-5 w-5 ${
+                          stage.status === "completed"
+                            ? "text-green-600 dark:text-green-400"
+                            : stage.status === "failed"
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-gray-900/50 dark:text-white/50"
+                        }`}
+                      />
+                    )}
+                  </div>
+                  {stage.status === "active" && (
+                    <motion.div
+                      animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0, 0.4] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                      className="absolute inset-0 rounded-full ring-2 ring-[#5227FF] dark:ring-[#8B6FFF]"
+                    />
+                  )}
+                </div>
+              )}
+              {/* Label */}
+              <span
+                className={`text-[10px] ${
+                  stage.status === "completed"
+                    ? "font-medium text-green-600 dark:text-green-400"
+                    : stage.status === "active"
+                      ? "font-medium text-[#5227FF] dark:text-[#8B6FFF]"
+                      : stage.status === "failed"
+                        ? "font-medium text-red-600 dark:text-red-400"
+                        : "text-gray-900/50 dark:text-white/50"
+                }`}
+              >
+                {stage.label}
+              </span>
+              {/* Detail line */}
+              {stage.detail && (
+                <span className="text-[9px] text-gray-900/40 dark:text-white/40">
+                  {stage.detail}
+                </span>
+              )}
             </div>
+            {/* Connector line */}
+            {idx < stages.length - 1 && (
+              <>
+                <div
+                  className={`hidden h-px w-4 sm:block ${lineColor(stage.status)}`}
+                />
+                <div
+                  className={`block h-3 w-px sm:hidden ${lineColor(stage.status)}`}
+                />
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Status message */}
+      {isActive && liveData && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="mt-4 text-center"
+        >
+          {liveData.extraction &&
+            !["completed", "failed"].includes(liveData.extraction.status) && (
+              <p className="text-xs text-gray-900/60 dark:text-white/60">
+                Extracting: {liveData.extraction.fileName}
+                {liveData.extraction.currentPhase > 0 &&
+                  ` (Phase ${liveData.extraction.currentPhase})`}
+              </p>
+            )}
+          {liveData.pipeline &&
+            !["completed", "failed"].includes(liveData.pipeline.status) && (
+              <p className="text-xs text-gray-900/60 dark:text-white/60">
+                {titleCase(liveData.pipeline.status.replace(/_/g, " "))}
+                {" · "}
+                {formatTokens(
+                  liveData.pipeline.totalInputTokens +
+                    liveData.pipeline.totalOutputTokens
+                )}{" "}
+                tokens · ${Number(liveData.pipeline.totalCostUsd).toFixed(4)}
+              </p>
+            )}
+          {(liveData.pipeline?.errorMessage ||
+            liveData.extraction?.errorMessage) && (
+            <p className="mt-1 text-[10px] text-red-500">
+              {liveData.pipeline?.errorMessage ??
+                liveData.extraction?.errorMessage}
+            </p>
           )}
         </motion.div>
       )}
 
-      {/* Pipeline Flow Visual */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, ease, delay: 0.4 }}
-        className="rounded-2xl border border-gray-900/10 bg-white/50 p-5 backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
-      >
-        <h3 className="mb-4 text-center text-sm font-medium text-gray-900 dark:text-white">
-          Pipeline Flow
-        </h3>
-        <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-0">
-          {/* Upload step */}
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-900/5 dark:bg-white/5">
-              <UploadSimple
-                weight="duotone"
-                className="h-5 w-5 text-gray-900/50 dark:text-white/50"
-              />
-            </div>
-            <span className="text-[10px] text-gray-900/50 dark:text-white/50">
-              Upload
-            </span>
-          </div>
-
-          <div className="hidden h-px w-6 bg-gray-900/10 dark:bg-white/10 sm:block" />
-          <div className="block h-4 w-px bg-gray-900/10 dark:bg-white/10 sm:hidden" />
-
-          {/* Extraction step */}
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-900/5 dark:bg-white/5">
-              <Files
-                weight="duotone"
-                className="h-5 w-5 text-gray-900/50 dark:text-white/50"
-              />
-            </div>
-            <span className="text-[10px] text-gray-900/50 dark:text-white/50">
-              Extract
-            </span>
-          </div>
-
-          <div className="hidden h-px w-4 bg-gray-900/10 dark:bg-white/10 sm:block" />
-          <div className="block h-4 w-px bg-gray-900/10 dark:bg-white/10 sm:hidden" />
-
-          {/* 5 teacher avatars */}
-          {Object.entries(MODEL_INFO).map(([slug, model], idx) => (
-            <div key={slug} className="flex items-center">
-              <div className="flex flex-col items-center gap-1">
-                <img
-                  src={model.image}
-                  alt={model.name}
-                  className="h-10 w-10 rounded-full object-cover"
-                />
-                <span className="text-[10px] text-gray-900/50 dark:text-white/50">
-                  {model.role}
-                </span>
-              </div>
-              {idx < 4 && (
-                <>
-                  <div className="hidden h-px w-4 bg-gray-900/10 dark:bg-white/10 sm:block" />
-                </>
-              )}
-            </div>
-          ))}
-
-          <div className="hidden h-px w-4 bg-gray-900/10 dark:bg-white/10 sm:block" />
-          <div className="block h-4 w-px bg-gray-900/10 dark:bg-white/10 sm:hidden" />
-
-          {/* Published */}
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/20">
-              <CheckCircle
-                weight="duotone"
-                className="h-5 w-5 text-green-600 dark:text-green-400"
-              />
-            </div>
-            <span className="text-[10px] text-green-600 dark:text-green-400">
-              Publish
-            </span>
-          </div>
+      {/* Manual trigger button */}
+      {isActive && !isDone && (
+        <div className="mt-3 text-center">
+          <button
+            onClick={() => {
+              fetch("/api/cron/extraction", {
+                headers: { authorization: `Bearer ${"-"}` },
+              }).catch(() => {});
+              fetch("/api/cron/ai-pipeline", {
+                headers: { authorization: `Bearer ${"-"}` },
+              }).catch(() => {});
+            }}
+            className="rounded-full bg-gray-900/5 px-3 py-1 text-[10px] font-medium text-gray-900/50 transition-colors hover:bg-gray-900/10 dark:bg-white/5 dark:text-white/50 dark:hover:bg-white/10"
+          >
+            Nudge Processing
+          </button>
         </div>
-      </motion.div>
-    </div>
+      )}
+    </motion.div>
   );
 }
 
