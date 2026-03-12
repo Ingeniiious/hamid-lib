@@ -598,6 +598,33 @@ export const mindMap = pgTable("mind_map", {
 ]);
 
 // ==================
+// My Space — Tasks
+// ==================
+
+export const task = pgTable("task", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  dueDate: text("due_date"),                    // YYYY-MM-DD (optional)
+  courseId: text("course_id").references(() => course.id, { onDelete: "set null" }),
+  priority: text("priority").notNull().default("medium"), // low, medium, high
+  status: text("status").notNull().default("pending"),    // pending, completed
+  subtasks: jsonb("subtasks").$type<{ id: string; title: string; completed: boolean }[]>(),
+  reminder: text("reminder").notNull().default("none"),   // none, at_deadline, daily, weekly
+  notify: boolean("notify").notNull().default(true),
+  displayOrder: integer("display_order").notNull().default(0),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("task_user_id_idx").on(table.userId),
+  index("task_user_status_idx").on(table.userId, table.status),
+  index("task_due_date_idx").on(table.dueDate),
+  index("task_course_id_idx").on(table.courseId),
+]);
+
+// ==================
 // AI Teachers' Council
 // Multi-model pipeline that processes student contributions into verified study content
 // ==================

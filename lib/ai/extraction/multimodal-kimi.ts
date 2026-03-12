@@ -28,6 +28,7 @@ function getClient(): OpenAI {
       apiKey,
       baseURL: "https://api.moonshot.ai/v1",
       timeout: 50_000,
+      maxRetries: 0, // Disable SDK auto-retry — extraction orchestrator handles retries
     });
   }
   return client;
@@ -37,6 +38,7 @@ interface KimiMultimodalResponse {
   content: string;
   inputTokens: number;
   outputTokens: number;
+  finishReason: string;
 }
 
 /**
@@ -74,10 +76,21 @@ async function kimiMultimodal(
   );
 
   const choice = response.choices[0];
+
+  // Check for truncation — finish_reason "length" means max_completion_tokens was hit
+  if (choice?.finish_reason === "length") {
+    throw new Error(
+      `Kimi multimodal output truncated (finish_reason=length). ` +
+      `Output hit max_completion_tokens limit (16384). ` +
+      `Input tokens: ${response.usage?.prompt_tokens ?? 0}`
+    );
+  }
+
   return {
     content: choice?.message?.content ?? "",
     inputTokens: response.usage?.prompt_tokens ?? 0,
     outputTokens: response.usage?.completion_tokens ?? 0,
+    finishReason: choice?.finish_reason ?? "unknown",
   };
 }
 
@@ -85,6 +98,8 @@ async function kimiMultimodal(
 // Image Classification
 // ---------------------------------------------------------------------------
 
+// IMPORTANT: Kimi K2.5 JSON mode only generates JSON Objects, NOT JSON Arrays.
+// Always wrap arrays inside a root object like { "results": [...] }.
 const CLASSIFICATION_PROMPT = `You are an image classifier for an educational content extraction system.
 Classify each image into exactly one category:
 
@@ -94,13 +109,20 @@ Classify each image into exactly one category:
 - "table_image": A table captured as an image
 - "decorative": Logos, headers, decorative elements, icons, backgrounds — no educational value
 
-For each image, respond with a JSON object containing:
-- "classification": one of the categories above
-- "description": a brief text description of the image content (for content_diagram, photo_notes, table_image)
-- "latex": LaTeX representation if the image is an equation (for equation type only)
+Always respond with a JSON object in this exact format:
+{
+  "results": [
+    {
+      "image": 1,
+      "classification": "content_diagram",
+      "description": "A flowchart showing...",
+      "latex": null
+    }
+  ]
+}
 
-If multiple images are provided, respond with a JSON array of objects.
-Always respond in valid JSON.`;
+Each entry in "results" must have: "image" (number), "classification", "description" (null for decorative), "latex" (null unless equation).
+For a single image, still use the "results" array with one entry.`;
 
 /**
  * Classify a batch of images using Kimi K2.5 multimodal.
@@ -141,7 +163,7 @@ export async function classifyImages(
 
     contentParts.push({
       type: "text",
-      text: `Classify ${batch.length === 1 ? "this image" : `these ${batch.length} images`}. Respond with ${batch.length === 1 ? "a JSON object" : "a JSON array of objects"}.`,
+      text: `Classify ${batch.length === 1 ? "this image" : `these ${batch.length} images`}. Respond with a JSON object containing a "results" array.`,
     });
 
     try {
@@ -154,9 +176,11 @@ export async function classifyImages(
       totalInputTokens += response.inputTokens;
       totalOutputTokens += response.outputTokens;
 
-      // Parse the classification response
+      // Parse the classification response — Kimi K2.5 JSON mode always returns an object
       const parsed = JSON.parse(response.content);
-      const results = Array.isArray(parsed) ? parsed : [parsed];
+      const results: Record<string, unknown>[] = Array.isArray(parsed?.results)
+        ? parsed.results
+        : Array.isArray(parsed) ? parsed : [parsed];
 
       for (let j = 0; j < batch.length && j < results.length; j++) {
         const result = results[j];
@@ -164,8 +188,8 @@ export async function classifyImages(
           ...batch[j],
           classification: (result.classification ??
             "decorative") as ImageClassification,
-          description: result.description,
-          latex: result.latex,
+          description: result.description as string | undefined,
+          latex: result.latex as string | undefined,
         });
       }
     } catch (e) {

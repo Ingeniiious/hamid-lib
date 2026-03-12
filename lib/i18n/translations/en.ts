@@ -319,6 +319,53 @@ export const en = {
     am: "AM",
     pm: "PM",
   },
+  tasks: {
+    pageTitle: "Tasks",
+    pageSubtitle: "Keep track of your homework and to-do items.",
+    addTask: "Add Task",
+    newTask: "New Task",
+    editTask: "Edit Task",
+    deleteTask: "Delete Task",
+    deleteConfirm: "Are you sure you want to delete this task?",
+    titlePlaceholder: "Task title...",
+    descriptionPlaceholder: "Description (optional)",
+    noDueDate: "No Due Date",
+    noCourse: "No Course",
+    selectCourse: "Select Course",
+    addSubtask: "Add Subtask",
+    subtaskPlaceholder: "Subtask title...",
+    // Priority
+    priority: "Priority",
+    low: "Low",
+    medium: "Medium",
+    high: "High",
+    // Status
+    pending: "Pending",
+    completed: "Completed",
+    markComplete: "Mark Complete",
+    markPending: "Mark Pending",
+    // Reminders
+    reminder: "Reminder",
+    reminderNone: "No Reminder",
+    reminderAtDeadline: "At Deadline",
+    reminderDaily: "Daily",
+    reminderWeekly: "Weekly",
+    notifyOn: "Push Notification On",
+    notifyOff: "Push Notification Off",
+    // Dates
+    dueDate: "Due Date",
+    dueToday: "Due Today",
+    dueTomorrow: "Due Tomorrow",
+    overdue: "Overdue",
+    daysLeft: "days left",
+    // Empty state
+    noTasks: "No Tasks Yet",
+    noTasksDescription: "Add your first task to start tracking your homework.",
+    // Filters
+    all: "All",
+    active: "Active",
+    done: "Done",
+  },
 } as const;
 
 /** Recursively widen literal string types to `string` so translations can differ */

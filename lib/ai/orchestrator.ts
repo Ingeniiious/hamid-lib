@@ -248,6 +248,16 @@ export async function processNextStep(): Promise<{
     const durationMs = Date.now() - startTime;
     const costUsd = calculateStepCost(response.inputTokens, response.outputTokens, config);
 
+    // Check for truncated output — each provider uses different finish_reason values:
+    // OpenAI/Kimi/Grok: "length", Anthropic: "max_tokens" or "model_context_window_exceeded", Gemini: "MAX_TOKENS"
+    const TRUNCATION_REASONS = ["length", "max_tokens", "MAX_TOKENS", "model_context_window_exceeded"];
+    if (TRUNCATION_REASONS.includes(response.finishReason)) {
+      const errorMsg = `Output truncated (finish_reason=${response.finishReason}) — model hit token limit (${config.maxOutputTokens}). Consider increasing max_output_tokens for ${step.modelSlug}.`;
+      console.log(`[ai-pipeline] Job ${job.id} step ${step.stepOrder} truncated: ${errorMsg}`);
+      await handleStepFailure(step, job, errorMsg);
+      return { jobId: job.id, step: step.stepOrder, status: "failed" };
+    }
+
     // Parse output
     let parsed: Record<string, unknown> | null = null;
     let verdict: string | null = null;

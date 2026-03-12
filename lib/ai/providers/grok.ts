@@ -12,6 +12,7 @@ function getClient(): OpenAI {
       apiKey,
       baseURL: "https://api.x.ai/v1",
       timeout: 50_000, // 50s — leaves 10s headroom for Vercel's 60s limit
+      maxRetries: 0, // Disable SDK auto-retry — orchestrator handles retries
     });
   }
   return client;

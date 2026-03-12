@@ -11,6 +11,7 @@ function getClient(): OpenAI {
     client = new OpenAI({
       apiKey,
       timeout: 50_000, // 50s — leaves 10s headroom for Vercel's 60s limit
+      maxRetries: 0, // Disable SDK auto-retry — orchestrator handles retries
     });
   }
   return client;
@@ -21,14 +22,19 @@ export async function complete(
 ): Promise<AICompletionResponse> {
   const ai = getClient();
 
+  // OpenAI replaced "system" role with "developer" — map it for the Chat Completions API.
+  // "developer" messages are prioritized ahead of "user" messages per the OpenAI model spec.
+  const messages = request.messages.map((m) => ({
+    role: m.role === "system" ? ("developer" as const) : m.role,
+    content: m.content,
+  }));
+
   const response = await ai.chat.completions.create({
     model: "gpt-5.4",
-    messages: request.messages.map((m) => ({
-      role: m.role,
-      content: m.content,
-    })),
+    messages,
     temperature: request.temperature ?? 0.2,
-    max_tokens: request.maxTokens ?? 16384,
+    // max_tokens is DEPRECATED and incompatible with o-series models — use max_completion_tokens
+    max_completion_tokens: request.maxTokens ?? 16384,
     ...(request.responseFormat === "json" && {
       response_format: { type: "json_object" as const },
     }),

@@ -8,7 +8,7 @@ function getClient(): Anthropic {
   if (!client) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
-    client = new Anthropic({ apiKey, timeout: 50_000 });
+    client = new Anthropic({ apiKey, timeout: 50_000, maxRetries: 0 });
   }
   return client;
 }
