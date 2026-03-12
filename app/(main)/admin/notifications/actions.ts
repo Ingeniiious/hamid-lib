@@ -212,6 +212,7 @@ export async function getAutomations() {
       name: notificationAutomation.name,
       trigger: notificationAutomation.trigger,
       triggerDays: notificationAutomation.triggerDays,
+      sendTime: notificationAutomation.sendTime,
       templateId: notificationAutomation.templateId,
       enabled: notificationAutomation.enabled,
       createdAt: notificationAutomation.createdAt,
@@ -231,6 +232,7 @@ export async function createAutomation(data: {
   name: string;
   trigger: string;
   triggerDays?: number;
+  sendTime?: string;
   templateId: number;
   enabled?: boolean;
 }) {
@@ -242,6 +244,7 @@ export async function createAutomation(data: {
       name: data.name,
       trigger: data.trigger,
       triggerDays: data.triggerDays ?? null,
+      sendTime: data.sendTime || "09:00",
       templateId: data.templateId,
       enabled: data.enabled ?? true,
     })
@@ -255,6 +258,7 @@ export async function updateAutomation(
     name: string;
     trigger: string;
     triggerDays?: number;
+    sendTime?: string;
     templateId: number;
     enabled?: boolean;
   }
@@ -267,6 +271,7 @@ export async function updateAutomation(
       name: data.name,
       trigger: data.trigger,
       triggerDays: data.triggerDays ?? null,
+      sendTime: data.sendTime || "09:00",
       templateId: data.templateId,
       enabled: data.enabled ?? true,
     })

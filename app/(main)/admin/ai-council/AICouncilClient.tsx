@@ -366,6 +366,34 @@ export function AICouncilClient() {
     [expandedJobId, fetchSteps]
   );
 
+  // Handle cancel / retry for extraction + pipeline jobs
+  const handleJobAction = useCallback(
+    async (action: "cancel" | "retry", type: "extraction" | "pipeline", jobId: string) => {
+      try {
+        const res = await fetch("/api/admin/ai-council/job-actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, type, jobId }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          console.error("Job action failed:", data.error ?? res.statusText);
+          return;
+        }
+        // Refresh the relevant list
+        if (type === "extraction") fetchExtractionJobs();
+        else {
+          fetchPipelineJobs();
+          if (expandedJobId === jobId) fetchSteps(jobId);
+        }
+        fetchStats();
+      } catch (e) {
+        console.error("Job action error:", e);
+      }
+    },
+    [fetchExtractionJobs, fetchPipelineJobs, fetchStats, fetchSteps, expandedJobId]
+  );
+
   const tabs: { key: TabId; label: string }[] = [
     { key: "overview", label: "Overview" },
     { key: "extraction", label: "Extraction Jobs" },
@@ -421,6 +449,8 @@ export function AICouncilClient() {
             }}
             page={extractionPage}
             onPageChange={setExtractionPage}
+            onCancel={(id) => handleJobAction("cancel", "extraction", id)}
+            onRetry={(id) => handleJobAction("retry", "extraction", id)}
           />
         )}
 
@@ -440,6 +470,8 @@ export function AICouncilClient() {
             expandedSteps={expandedSteps}
             stepsLoading={stepsLoading}
             onExpandJob={handleExpandJob}
+            onCancel={(id) => handleJobAction("cancel", "pipeline", id)}
+            onRetry={(id) => handleJobAction("retry", "pipeline", id)}
           />
         )}
 
@@ -645,6 +677,8 @@ function ExtractionTab({
   onFilterChange,
   page,
   onPageChange,
+  onCancel,
+  onRetry,
 }: {
   jobs: ExtractionJob[];
   pagination: Pagination | null;
@@ -653,6 +687,8 @@ function ExtractionTab({
   onFilterChange: (s: string) => void;
   page: number;
   onPageChange: (p: number) => void;
+  onCancel: (id: string) => void;
+  onRetry: (id: string) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -751,6 +787,30 @@ function ExtractionTab({
                   </p>
                 </div>
               )}
+
+              {/* Action Buttons */}
+              {!["completed", "failed"].includes(job.status) && (
+                <div className="mt-3 flex justify-center">
+                  <button
+                    onClick={() => onCancel(job.id)}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-3 py-1 text-[11px] font-medium text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400"
+                  >
+                    <X size={12} weight="bold" />
+                    Cancel
+                  </button>
+                </div>
+              )}
+              {job.status === "failed" && (
+                <div className="mt-3 flex justify-center">
+                  <button
+                    onClick={() => onRetry(job.id)}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[#5227FF]/10 px-3 py-1 text-[11px] font-medium text-[#5227FF] transition-colors hover:bg-[#5227FF]/20 dark:text-[#8B6FFF]"
+                  >
+                    <ArrowCounterClockwise size={12} weight="bold" />
+                    Retry
+                  </button>
+                </div>
+              )}
             </motion.div>
           ))}
         </div>
@@ -803,6 +863,8 @@ function PipelineTab({
   expandedSteps,
   stepsLoading,
   onExpandJob,
+  onCancel,
+  onRetry,
 }: {
   jobs: PipelineJob[];
   pagination: Pagination | null;
@@ -815,6 +877,8 @@ function PipelineTab({
   expandedSteps: PipelineStepData[];
   stepsLoading: boolean;
   onExpandJob: (id: string) => void;
+  onCancel: (id: string) => void;
+  onRetry: (id: string) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -938,6 +1002,30 @@ function PipelineTab({
                   )}
                 </button>
 
+                {/* Action Buttons */}
+                {!["completed", "failed", "cancelled"].includes(job.status) && (
+                  <div className="flex justify-center border-t border-gray-900/5 px-4 py-2 dark:border-white/5">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onCancel(job.id); }}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-3 py-1 text-[11px] font-medium text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400"
+                    >
+                      <X size={12} weight="bold" />
+                      Cancel
+                    </button>
+                  </div>
+                )}
+                {job.status === "failed" && (
+                  <div className="flex justify-center border-t border-gray-900/5 px-4 py-2 dark:border-white/5">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onRetry(job.id); }}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[#5227FF]/10 px-3 py-1 text-[11px] font-medium text-[#5227FF] transition-colors hover:bg-[#5227FF]/20 dark:text-[#8B6FFF]"
+                    >
+                      <ArrowCounterClockwise size={12} weight="bold" />
+                      Retry
+                    </button>
+                  </div>
+                )}
+
                 {/* Expanded Steps */}
                 {isExpanded && (
                   <motion.div
@@ -946,8 +1034,13 @@ function PipelineTab({
                     transition={{ duration: 0.3, ease }}
                     className="border-t border-gray-900/10 bg-gray-900/[0.02] p-4 dark:border-white/10 dark:bg-white/[0.02]"
                   >
+                    {/* Mini Pipeline Flow Visualization */}
+                    {!stepsLoading && expandedSteps.length > 0 && (
+                      <MiniPipelineFlow steps={expandedSteps} jobStatus={job.status} />
+                    )}
+
                     <h4 className="mb-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-900/50 dark:text-white/50">
-                      Pipeline Steps
+                      Step Details
                     </h4>
                     {stepsLoading ? (
                       <div className="space-y-2">
@@ -1736,6 +1829,201 @@ interface LiveStatus {
 }
 
 type StageStatus = "pending" | "active" | "completed" | "failed" | "skipped";
+
+// ===========================================================================
+// Mini Pipeline Flow — visual flow for expanded pipeline job cards
+// ===========================================================================
+
+function MiniPipelineFlow({
+  steps,
+  jobStatus,
+}: {
+  steps: PipelineStepData[];
+  jobStatus: string;
+}) {
+  const modelSlugs = ["kimi", "chatgpt", "claude", "gemini", "grok"];
+  const teacherSteps = steps.filter((s) => s.stepOrder < 100);
+  const genSteps = steps.filter((s) => s.stepOrder >= 100);
+  const stepMap = new Map(teacherSteps.map((s) => [s.modelSlug, s]));
+
+  const getStatus = (slug: string): StageStatus => {
+    const step = stepMap.get(slug);
+    if (!step) return "pending";
+    if (step.status === "completed") return "completed";
+    if (step.status === "running") return "active";
+    if (step.status === "failed") return "failed";
+    if (step.status === "skipped") return "skipped";
+    return "pending";
+  };
+
+  const getGenStatus = (): StageStatus => {
+    if (genSteps.length === 0) return "pending";
+    if (genSteps.every((s) => s.status === "completed" || s.status === "skipped"))
+      return "completed";
+    if (genSteps.some((s) => s.status === "running")) return "active";
+    if (genSteps.some((s) => s.status === "failed")) return "failed";
+    return "pending";
+  };
+
+  const isDone = jobStatus === "completed" || jobStatus === "failed" || jobStatus === "cancelled";
+
+  const stageColor = (s: StageStatus) => {
+    switch (s) {
+      case "completed": return "ring-2 ring-green-400 dark:ring-green-500";
+      case "active": return "ring-2 ring-[#5227FF] dark:ring-[#8B6FFF]";
+      case "failed": return "ring-2 ring-red-400 dark:ring-red-500";
+      case "skipped": return "opacity-40";
+      default: return "ring-1 ring-gray-900/10 dark:ring-white/10";
+    }
+  };
+
+  const dotColor = (s: StageStatus) => {
+    switch (s) {
+      case "completed": return "bg-green-400";
+      case "active": return "bg-[#5227FF]";
+      case "failed": return "bg-red-400";
+      case "skipped": return "bg-gray-300 dark:bg-gray-600";
+      default: return "bg-gray-200 dark:bg-gray-700";
+    }
+  };
+
+  const lineColor = (s: StageStatus) => {
+    switch (s) {
+      case "completed": return "bg-green-400/60";
+      case "active": return "bg-[#5227FF]/40";
+      default: return "bg-gray-900/10 dark:bg-white/10";
+    }
+  };
+
+  const labelColor = (s: StageStatus) => {
+    switch (s) {
+      case "completed": return "font-medium text-green-600 dark:text-green-400";
+      case "active": return "font-medium text-[#5227FF] dark:text-[#8B6FFF]";
+      case "failed": return "font-medium text-red-600 dark:text-red-400";
+      default: return "text-gray-900/50 dark:text-white/50";
+    }
+  };
+
+  const stages: { key: string; label: string; status: StageStatus; image?: string; icon?: string; detail?: string }[] = [
+    ...modelSlugs.map((slug) => {
+      const step = stepMap.get(slug);
+      return {
+        key: slug,
+        label: MODEL_INFO[slug]?.role ?? slug,
+        status: getStatus(slug),
+        image: MODEL_INFO[slug]?.image,
+        detail: step?.durationMs ? formatDuration(step.durationMs) : step?.status === "running" ? "Running..." : undefined,
+      };
+    }),
+    {
+      key: "generate",
+      label: "Generate",
+      status: getGenStatus(),
+      icon: "generate",
+      detail: genSteps.length > 0
+        ? `${genSteps.filter((s) => s.status === "completed").length}/${genSteps.length}`
+        : undefined,
+    },
+    {
+      key: "done",
+      label: "Done",
+      status: isDone ? (jobStatus === "completed" ? "completed" : "failed") : "pending",
+      icon: "done",
+    },
+  ];
+
+  return (
+    <div className="mb-4 rounded-xl border border-gray-900/5 bg-gray-900/[0.01] p-4 dark:border-white/5 dark:bg-white/[0.01]">
+      <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-0">
+        {stages.map((stage, idx) => (
+          <div key={stage.key} className="flex items-center">
+            <div className="flex flex-col items-center gap-1">
+              {stage.image ? (
+                <div className="relative">
+                  <img
+                    src={stage.image}
+                    alt={stage.label}
+                    className={`h-8 w-8 rounded-full object-cover transition-all ${stageColor(stage.status)}`}
+                  />
+                  {stage.status === "active" && (
+                    <motion.div
+                      animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                      className="absolute inset-0 rounded-full ring-2 ring-[#5227FF] dark:ring-[#8B6FFF]"
+                    />
+                  )}
+                  <div
+                    className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-gray-900 ${dotColor(stage.status)}`}
+                  />
+                </div>
+              ) : (
+                <div className="relative">
+                  <div
+                    className={`flex h-8 w-8 items-center justify-center rounded-full transition-all ${
+                      stage.status === "completed"
+                        ? "bg-green-100 dark:bg-green-900/30"
+                        : stage.status === "active"
+                          ? "bg-[#5227FF]/10 dark:bg-[#5227FF]/20"
+                          : stage.status === "failed"
+                            ? "bg-red-100 dark:bg-red-900/30"
+                            : "bg-gray-900/5 dark:bg-white/5"
+                    } ${stageColor(stage.status)}`}
+                  >
+                    {stage.icon === "generate" && (
+                      <Lightning
+                        weight="duotone"
+                        className={`h-4 w-4 ${
+                          stage.status === "completed"
+                            ? "text-green-600 dark:text-green-400"
+                            : stage.status === "active"
+                              ? "text-[#5227FF] dark:text-[#8B6FFF]"
+                              : "text-gray-900/50 dark:text-white/50"
+                        }`}
+                      />
+                    )}
+                    {stage.icon === "done" && (
+                      <CheckCircle
+                        weight="duotone"
+                        className={`h-4 w-4 ${
+                          stage.status === "completed"
+                            ? "text-green-600 dark:text-green-400"
+                            : stage.status === "failed"
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-gray-900/50 dark:text-white/50"
+                        }`}
+                      />
+                    )}
+                  </div>
+                  {stage.status === "active" && (
+                    <motion.div
+                      animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0, 0.4] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                      className="absolute inset-0 rounded-full ring-2 ring-[#5227FF] dark:ring-[#8B6FFF]"
+                    />
+                  )}
+                </div>
+              )}
+              <span className={`text-[9px] ${labelColor(stage.status)}`}>
+                {stage.label}
+              </span>
+              {stage.detail && (
+                <span className="text-[8px] text-gray-900/40 dark:text-white/40">
+                  {stage.detail}
+                </span>
+              )}
+            </div>
+            {idx < stages.length - 1 && (
+              <>
+                <div className={`hidden h-px w-3 sm:block ${lineColor(stage.status)}`} />
+                <div className={`block h-2 w-px sm:hidden ${lineColor(stage.status)}`} />
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function LivePipelineTracker({
   extractionJobId,

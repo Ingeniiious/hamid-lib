@@ -82,6 +82,7 @@ interface AutomationRow {
   name: string;
   trigger: string;
   triggerDays: number | null;
+  sendTime: string;
   templateId: number;
   enabled: boolean;
   createdAt: Date;
@@ -985,6 +986,7 @@ function AutomationsTab() {
   const [name, setName] = useState("");
   const [trigger, setTrigger] = useState("welcome");
   const [triggerDays, setTriggerDays] = useState("");
+  const [sendTime, setSendTime] = useState("09:00");
   const [templateId, setTemplateId] = useState<number | null>(null);
   const [enabled, setEnabled] = useState(true);
 
@@ -1004,6 +1006,7 @@ function AutomationsTab() {
     setName("");
     setTrigger("welcome");
     setTriggerDays("");
+    setSendTime("09:00");
     setTemplateId(null);
     setEnabled(true);
     setEditing(null);
@@ -1020,6 +1023,7 @@ function AutomationsTab() {
     setName(a.name);
     setTrigger(a.trigger);
     setTriggerDays(a.triggerDays?.toString() || "");
+    setSendTime(a.sendTime || "09:00");
     setTemplateId(a.templateId);
     setEnabled(a.enabled);
     setDialogOpen(true);
@@ -1035,6 +1039,7 @@ function AutomationsTab() {
         name,
         trigger,
         triggerDays: triggerType?.needsDays ? parseInt(triggerDays) : undefined,
+        sendTime,
         templateId,
         enabled,
       };
@@ -1093,11 +1098,16 @@ function AutomationsTab() {
       key: "trigger",
       header: "Trigger",
       render: (item: AutomationRow) => (
-        <span className="text-sm text-gray-900/70 dark:text-white/70">
-          {TRIGGER_TYPES.find((t) => t.value === item.trigger)?.label ||
-            item.trigger}
-          {item.triggerDays !== null ? ` (${item.triggerDays}d)` : ""}
-        </span>
+        <div className="text-sm text-gray-900/70 dark:text-white/70">
+          <span>
+            {TRIGGER_TYPES.find((t) => t.value === item.trigger)?.label ||
+              item.trigger}
+            {item.triggerDays !== null ? ` (${item.triggerDays}d)` : ""}
+          </span>
+          <span className="ml-2 text-xs text-gray-900/40 dark:text-white/40">
+            {item.sendTime || "09:00"} local
+          </span>
+        </div>
       ),
     },
     {
@@ -1166,7 +1176,7 @@ function AutomationsTab() {
             {automations.length} automation{automations.length !== 1 ? "s" : ""}
           </p>
           <p className="text-[10px] text-gray-900/30 dark:text-white/30">
-            Runs daily at 9:00 AM Istanbul time
+            Sends at configured time in each user&apos;s local timezone
           </p>
         </div>
         <Button
@@ -1252,6 +1262,20 @@ function AutomationsTab() {
                 />
               </div>
             )}
+            <div>
+              <label className="mb-1 block text-xs text-gray-900/50 dark:text-white/50">
+                Send Time (user&apos;s local time)
+              </label>
+              <Input
+                type="time"
+                value={sendTime}
+                onChange={(e) => setSendTime(e.target.value)}
+                className={inputStyles}
+              />
+              <p className="mt-1 text-[10px] text-gray-900/30 dark:text-white/30">
+                Each user receives this at {sendTime || "09:00"} their local time
+              </p>
+            </div>
             <div>
               <label className="mb-1 block text-xs text-gray-900/50 dark:text-white/50">
                 Template

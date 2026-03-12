@@ -208,6 +208,7 @@ export const notificationAutomation = pgTable("notification_automation", {
   name: text("name").notNull(),
   trigger: text("trigger").notNull(),       // welcome, birthday, inactivity, milestone, anniversary
   triggerDays: integer("trigger_days"),      // days threshold (e.g. 1 for welcome_day1, 7 for inactivity_7d)
+  sendTime: text("send_time").notNull().default("09:00"), // HH:mm — fires at this time in each user's local timezone
   templateId: integer("template_id")
     .notNull()
     .references(() => notificationTemplate.id, { onDelete: "cascade" }),

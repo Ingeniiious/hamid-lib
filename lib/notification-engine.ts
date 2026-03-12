@@ -58,6 +58,40 @@ function getUserLocalDate(now: Date, timezone: string, isFallback = false): stri
   }
 }
 
+/** Returns { localDate, localMinutes } for a user's timezone at a given instant */
+function getUserLocalDateTime(
+  now: Date,
+  timezone: string
+): { localDate: string; localMinutes: number } {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(now);
+
+    const get = (type: string) =>
+      parts.find((p) => p.type === type)?.value || "0";
+
+    return {
+      localDate: `${get("year")}-${get("month")}-${get("day")}`,
+      localMinutes: parseInt(get("hour")) * 60 + parseInt(get("minute")),
+    };
+  } catch {
+    return getUserLocalDateTime(now, DEFAULT_TZ);
+  }
+}
+
+/** Parses "HH:mm" to minutes since midnight */
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + (m || 0);
+}
+
 function isLeapYear(year: number): boolean {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 }
@@ -89,6 +123,7 @@ interface AutomationRow {
   name: string;
   trigger: string;
   triggerDays: number | null;
+  sendTime: string; // "HH:mm" — fires at this time in each user's local timezone
   templateId: number;
   enabled: boolean;
   templateTitle: string;
@@ -154,7 +189,7 @@ function resolveVars(text: string, ctx: UserContext): string {
 
 const SEND_BATCH_SIZE = 100;
 
-export async function processAutomations(triggerFilter?: string): Promise<{
+export async function processAutomations(triggerFilter?: string, nowOverride?: Date): Promise<{
   processed: number;
   sent: number;
   skipped: number;
@@ -175,6 +210,7 @@ export async function processAutomations(triggerFilter?: string): Promise<{
       name: notificationAutomation.name,
       trigger: notificationAutomation.trigger,
       triggerDays: notificationAutomation.triggerDays,
+      sendTime: notificationAutomation.sendTime,
       templateId: notificationAutomation.templateId,
       enabled: notificationAutomation.enabled,
       templateTitle: notificationTemplate.title,
@@ -188,13 +224,12 @@ export async function processAutomations(triggerFilter?: string): Promise<{
 
   if (automations.length === 0) return { processed: 0, sent: 0, skipped: 0 };
 
-  // 2. Get today's date in Istanbul timezone (UTC+3) — consistent with calendar cron
-  const now = new Date();
-  const istanbulDate = new Date(now.getTime() + 3 * 60 * 60 * 1000);
-  const todayStr = istanbulDate.toISOString().slice(0, 10);
-  const todayMMDD = todayStr.slice(5);
+  // 2. Use current time (or override from cron)
+  const now = nowOverride || new Date();
+  // We still need a reference date for dedup periods — use UTC as a stable key
+  const todayStr = now.toISOString().slice(0, 10);
   const yearStr = todayStr.slice(0, 4);
-  const weekNumber = getISOWeek(istanbulDate);
+  const weekNumber = getISOWeek(now);
   const weekStr = `${yearStr}-W${String(weekNumber).padStart(2, "0")}`;
 
   // 3. Get all users who have push subscriptions (only they can receive)
@@ -239,12 +274,26 @@ export async function processAutomations(triggerFilter?: string): Promise<{
   let skipped = 0;
   const expiredSubIds: number[] = [];
 
-  // 6. Process each automation
+  // 6. Process each automation — check per-user local time against automation's sendTime
   for (const auto of automations) {
-    const eligibleUsers = getEligibleUsers(auto, usersMap, todayMMDD);
-    const period = getDeduplicationPeriod(auto, todayStr, yearStr, weekStr);
+    const sendTimeMinutes = timeToMinutes(auto.sendTime || "09:00");
+    const eligibleUsers = getEligibleUsers(auto, usersMap, now);
 
     for (const userId of eligibleUsers) {
+      // Check if the automation's sendTime matches the user's current local time
+      // Uses the same 90-second lookback window as calendar alerts
+      const ctx = usersMap.get(userId)!;
+      const { localMinutes: currentMinutes } = getUserLocalDateTime(now, ctx.timezone);
+      if (sendTimeMinutes > currentMinutes || sendTimeMinutes < currentMinutes - 1.5) {
+        continue; // Not yet time for this user
+      }
+
+      // Use user's local date for dedup (so each timezone gets its own dedup window)
+      const userLocalDate = getUserLocalDate(now, ctx.timezone);
+      const userYearStr = userLocalDate.slice(0, 4);
+      const userWeekStr = `${userYearStr}-W${String(getISOWeek(new Date(userLocalDate + "T00:00:00"))).padStart(2, "0")}`;
+      const period = getDeduplicationPeriod(auto, userLocalDate, userYearStr, userWeekStr);
+
       // In-memory dedup check first
       if (dedupSet.has(`${auto.id}:${userId}:${period}`)) {
         skipped++;
@@ -264,7 +313,6 @@ export async function processAutomations(triggerFilter?: string): Promise<{
       }
 
       // Resolve variables and send (pick user's language)
-      const ctx = usersMap.get(userId)!;
       const localized = getLocalizedTemplate(auto, ctx.language);
       const title = resolveVars(localized.title, ctx);
       const body = resolveVars(localized.body, ctx);
@@ -312,10 +360,9 @@ export async function processAutomations(triggerFilter?: string): Promise<{
 function getEligibleUsers(
   auto: AutomationRow,
   usersMap: Map<string, UserContext>,
-  _todayMMDD: string
+  now: Date
 ): string[] {
   const eligible: string[] = [];
-  const now = new Date();
 
   for (const [userId, ctx] of usersMap) {
     // Use the user's local date for timezone-accurate checks

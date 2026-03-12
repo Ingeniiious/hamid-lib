@@ -18,6 +18,81 @@ import { processAutomations } from "@/lib/notification-engine";
 
 const DEFAULT_TZ = "Europe/Istanbul";
 
+// ── i18n strings for push notifications ─────────────────────
+// Calendar alerts + task reminders in user's preferred language.
+
+const i18n = {
+  en: {
+    startingNow: "Starting now",
+    inTime: (t: string) => `In ${t}`,
+    online: "Online",
+    class: "Class",
+    exam: "Exam",
+    deadline: "Deadline",
+    reminder: "Reminder",
+    task: "Task",
+    dueToday: "Due Today",
+    dueTomorrow: "Due Tomorrow",
+    dueInDays: (d: number) => `Due in ${d} days`,
+    overdueBy: (d: number) => `Overdue by ${d} day${d > 1 ? "s" : ""}`,
+    minutesFmt: (m: number) => {
+      if (m < 60) return `${m} min`;
+      const h = Math.floor(m / 60);
+      const rem = m % 60;
+      if (rem === 0) return `${h} hour${h > 1 ? "s" : ""}`;
+      return `${h}h ${rem}m`;
+    },
+  },
+  fa: {
+    startingNow: "الان شروع می‌شه",
+    inTime: (t: string) => `تا ${t} دیگه`,
+    online: "آنلاین",
+    class: "کلاس",
+    exam: "امتحان",
+    deadline: "مهلت",
+    reminder: "یادآوری",
+    task: "تسک",
+    dueToday: "مهلتش امروزه",
+    dueTomorrow: "مهلتش فرداست",
+    dueInDays: (d: number) => `${d} روز دیگه مهلت داری`,
+    overdueBy: (d: number) => `${d} روز گذشته از مهلتش`,
+    minutesFmt: (m: number) => {
+      if (m < 60) return `${m} دقیقه`;
+      const h = Math.floor(m / 60);
+      const rem = m % 60;
+      if (rem === 0) return `${h} ساعت`;
+      return `${h} ساعت و ${rem} دقیقه`;
+    },
+  },
+  tr: {
+    startingNow: "Şimdi başlıyor",
+    inTime: (t: string) => `${t} sonra`,
+    online: "Çevrimiçi",
+    class: "Ders",
+    exam: "Sınav",
+    deadline: "Son tarih",
+    reminder: "Hatırlatma",
+    task: "Görev",
+    dueToday: "Bugün bitmeli",
+    dueTomorrow: "Yarın bitmeli",
+    dueInDays: (d: number) => `${d} gün içinde bitmeli`,
+    overdueBy: (d: number) => `${d} gün gecikmiş`,
+    minutesFmt: (m: number) => {
+      if (m < 60) return `${m} dk`;
+      const h = Math.floor(m / 60);
+      const rem = m % 60;
+      if (rem === 0) return `${h} saat`;
+      return `${h}sa ${rem}dk`;
+    },
+  },
+} as const;
+
+type Lang = keyof typeof i18n;
+
+function getStrings(lang: string) {
+  return i18n[(lang as Lang)] || i18n.en;
+}
+
 // ── Timezone helper ──────────────────────────────────────────
 // Uses Intl API — works on all JS runtimes, no libraries needed.
 
@@ -87,18 +162,20 @@ export async function GET(request: NextRequest) {
       )
     );
 
-  // Build timezone map for all event owners
+  // Build timezone + language map for all event owners
   const eventUserIds = [...new Set(events.map((e) => e.userId))];
   const userTzMap = new Map<string, string>();
+  const userLangMap = new Map<string, string>();
 
   if (eventUserIds.length > 0) {
     const profiles = await db
-      .select({ userId: userProfile.userId, timezone: userProfile.timezone })
+      .select({ userId: userProfile.userId, timezone: userProfile.timezone, language: userProfile.language })
       .from(userProfile)
       .where(inArray(userProfile.userId, eventUserIds));
 
     for (const p of profiles) {
       userTzMap.set(p.userId, p.timezone || DEFAULT_TZ);
+      userLangMap.set(p.userId, p.language || "en");
     }
   }
 
@@ -212,9 +289,10 @@ export async function GET(request: NextRequest) {
     const subscriptions = subsMap.get(event.userId)!;
 
     // Build location context for the notification body
+    const s = getStrings(userLangMap.get(event.userId) || "en");
     const locationParts: string[] = [];
     if (event.locationType === "online" && event.url) {
-      locationParts.push("Online");
+      locationParts.push(s.online);
     } else {
       if (event.campus) locationParts.push(event.campus);
       if (event.room) locationParts.push(event.room);
@@ -223,15 +301,15 @@ export async function GET(request: NextRequest) {
 
     const body =
       alertMinutes === 0
-        ? `Starting now — ${event.startTime}${locationStr}`
-        : `In ${formatMinutes(alertMinutes + travelMinutes)} — ${event.startTime}${locationStr}`;
+        ? `${s.startingNow} — ${event.startTime}${locationStr}`
+        : `${s.inTime(s.minutesFmt(alertMinutes + travelMinutes))} — ${event.startTime}${locationStr}`;
 
     // Category label for notification title (e.g., "Class: Math 101")
     const categoryLabels: Record<string, string> = {
-      class: "Class",
-      exam: "Exam",
-      deadline: "Deadline",
-      reminder: "Reminder",
+      class: s.class,
+      exam: s.exam,
+      deadline: s.deadline,
+      reminder: s.reminder,
     };
     const categoryLabel = categoryLabels[event.category] || "";
     const title = categoryLabel ? `${categoryLabel}: ${event.title}` : event.title;
@@ -299,11 +377,12 @@ export async function GET(request: NextRequest) {
       const missingTzUserIds = taskUserIds.filter((id) => !userTzMap.has(id));
       if (missingTzUserIds.length > 0) {
         const taskProfiles = await db
-          .select({ userId: userProfile.userId, timezone: userProfile.timezone })
+          .select({ userId: userProfile.userId, timezone: userProfile.timezone, language: userProfile.language })
           .from(userProfile)
           .where(inArray(userProfile.userId, missingTzUserIds));
         for (const p of taskProfiles) {
           userTzMap.set(p.userId, p.timezone || DEFAULT_TZ);
+          userLangMap.set(p.userId, p.language || "en");
         }
       }
 
@@ -378,25 +457,26 @@ export async function GET(request: NextRequest) {
 
         if (claimed.length === 0) continue;
 
-        // Build notification body based on due date proximity
-        let taskBody = "Reminder";
+        // Build notification body based on due date proximity (i18n)
+        const ts = getStrings(userLangMap.get(tk.userId) || "en");
+        let taskBody: string = ts.reminder;
         if (tk.dueDate) {
           const todayMs = new Date(localDate + "T00:00:00").getTime();
           const dueMs = new Date(tk.dueDate + "T00:00:00").getTime();
           const diffDays = Math.round((dueMs - todayMs) / 86400000);
           if (diffDays < 0) {
-            taskBody = `Overdue by ${Math.abs(diffDays)} day${Math.abs(diffDays) > 1 ? "s" : ""}`;
+            taskBody = ts.overdueBy(Math.abs(diffDays));
           } else if (diffDays === 0) {
-            taskBody = "Due Today";
+            taskBody = ts.dueToday;
           } else if (diffDays === 1) {
-            taskBody = "Due Tomorrow";
+            taskBody = ts.dueTomorrow;
           } else {
-            taskBody = `Due in ${diffDays} days`;
+            taskBody = ts.dueInDays(diffDays);
           }
         }
 
         const taskPayload = {
-          title: `Task: ${tk.title}`,
+          title: `${ts.task}: ${tk.title}`,
           body: taskBody,
           url: "/dashboard/space/tasks",
           tag: `task-${tk.id}-${tk.reminder}`,
@@ -441,6 +521,7 @@ export async function GET(request: NextRequest) {
         templateTitle: notificationTemplate.title,
         templateBody: notificationTemplate.body,
         templateUrl: notificationTemplate.url,
+        templateTranslations: notificationTemplate.translations,
       })
       .from(notificationAutomation)
       .innerJoin(
@@ -512,14 +593,24 @@ export async function GET(request: NextRequest) {
 
         const userName = userNameMap.get(exam.userId) || "there";
 
+        // Pick user's preferred language for template
+        const userLang = userLangMap.get(exam.userId) || "en";
+        const translations = auto.templateTranslations as Record<string, { title: string; body: string }> | null;
+        let tplTitle = auto.templateTitle;
+        let tplBody = auto.templateBody;
+        if (userLang !== "en" && translations?.[userLang]?.title && translations?.[userLang]?.body) {
+          tplTitle = translations[userLang].title;
+          tplBody = translations[userLang].body;
+        }
+
         const resolve = (text: string) =>
           text
             .replace(/\{\{exam_title\}\}/g, exam.title)
             .replace(/\{\{exam_time\}\}/g, exam.endTime)
             .replace(/\{\{name\}\}/g, userName);
 
-        const title = resolve(auto.templateTitle);
-        const body = resolve(auto.templateBody);
+        const title = resolve(tplTitle);
+        const body = resolve(tplBody);
         const url = auto.templateUrl
           ? resolve(auto.templateUrl)
           : "/dashboard/me/calendar";
@@ -564,24 +655,22 @@ export async function GET(request: NextRequest) {
     // Don't let campaign errors block calendar notifications
   }
 
-  // ── 4. Daily automations (9:00 AM Istanbul) ────────────────
-  // Uses Istanbul time for the daily run gate — automations engine
-  // handles per-user timezone internally for birthday/anniversary matching.
+  // ── 4. Automations (per-user local timezone) ───────────────
+  // Each automation has a configurable sendTime (e.g. "09:00", "21:00").
+  // The engine checks each user's local time against the automation's sendTime.
+  // No global time gate — runs every minute, engine handles the timing.
   const istanbulTime = getLocalDateTime(now, DEFAULT_TZ);
-  const istanbulMinuteOfHour = istanbulTime.localMinutes - istanbulTime.localHours * 60;
   let automationResults = { processed: 0, sent: 0, skipped: 0 };
-  if (istanbulTime.localHours === 9 && istanbulMinuteOfHour < 5) {
-    try {
-      automationResults = await processAutomations();
-    } catch (err) {
-      console.error("Automation engine error:", err);
-    }
+  try {
+    automationResults = await processAutomations(undefined, now);
+  } catch (err) {
+    console.error("Automation engine error:", err);
   }
 
   return NextResponse.json({
     ok: true,
     date: utcDate,
-    time: `${String(istanbulTime.localHours).padStart(2, "0")}:${String(istanbulTime.localMinutes % 60).padStart(2, "0")}`,
+    time: `${String(istanbulTime.localHours).padStart(2, "0")}:${String(istanbulTime.localMinutes - istanbulTime.localHours * 60).padStart(2, "0")}`,
     eventsChecked: events.length,
     sent,
     skipped,
@@ -597,10 +686,3 @@ function timeToMinutes(time: string): number {
   return h * 60 + m;
 }
 
-function formatMinutes(minutes: number): string {
-  if (minutes < 60) return `${minutes} min`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (m === 0) return `${h} hour${h > 1 ? "s" : ""}`;
-  return `${h}h ${m}m`;
-}

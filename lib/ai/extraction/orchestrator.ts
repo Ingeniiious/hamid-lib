@@ -623,6 +623,63 @@ async function handleFailure(
 }
 
 // ---------------------------------------------------------------------------
+// cancelExtractionJob — marks an extraction job as failed/cancelled
+// ---------------------------------------------------------------------------
+
+export async function cancelExtractionJob(jobId: string): Promise<boolean> {
+  const [job] = await db
+    .select()
+    .from(extractionJob)
+    .where(eq(extractionJob.id, jobId))
+    .limit(1);
+
+  if (!job || TERMINAL_STATUSES.includes(job.status)) {
+    return false;
+  }
+
+  await db
+    .update(extractionJob)
+    .set({
+      status: "failed",
+      errorMessage: "Cancelled by admin",
+      completedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(extractionJob.id, jobId));
+
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// retryExtractionJob — resets a failed extraction job to pending
+// ---------------------------------------------------------------------------
+
+export async function retryExtractionJob(jobId: string): Promise<boolean> {
+  const [job] = await db
+    .select()
+    .from(extractionJob)
+    .where(eq(extractionJob.id, jobId))
+    .limit(1);
+
+  if (!job || job.status !== "failed") {
+    return false;
+  }
+
+  await db
+    .update(extractionJob)
+    .set({
+      status: "pending",
+      errorMessage: null,
+      completedAt: null,
+      retryCount: 0,
+      updatedAt: new Date(),
+    })
+    .where(eq(extractionJob.id, jobId));
+
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // createExtractionJob — creates a new extraction job for a contribution
 // ---------------------------------------------------------------------------
 
