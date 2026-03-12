@@ -269,6 +269,8 @@ export const tr: TranslationKeys = {
     notifyOff: "Bildirim Kapalı",
     thisOnly: "Yalnızca Bu Etkinlik",
     thisAndFuture: "Bu ve Gelecek Etkinlikler",
+    allEvents: "Tüm Etkinlikler",
+    editRecurring: "Tekrarlanan Etkinliği Düzenle",
     pageTitle: "Takvim",
     pageSubtitle: "Programlarınız, sınavlarınız ve son tarihleriniz.",
     class: "Ders",

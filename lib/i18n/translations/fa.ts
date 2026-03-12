@@ -269,6 +269,8 @@ export const fa: TranslationKeys = {
     notifyOff: "اعلان غیرفعال",
     thisOnly: "فقط این رویداد",
     thisAndFuture: "این و رویدادهای آینده",
+    allEvents: "همه رویدادها",
+    editRecurring: "ویرایش رویداد تکراری",
     pageTitle: "تقویم",
     pageSubtitle: "برنامه‌ها، امتحانات و مهلت‌های شما.",
     class: "کلاس",

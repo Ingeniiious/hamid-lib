@@ -29,6 +29,8 @@ import {
   deleteSeriesFromDate,
   toggleEventNotify,
   updateCalendarEvent,
+  updateSeriesFromDate,
+  updateAllInSeries,
 } from "@/app/(main)/dashboard/me/calendar/actions";
 import { NotificationPrompt } from "@/components/NotificationPrompt";
 import { useTranslation } from "@/lib/i18n";
@@ -208,6 +210,11 @@ export function CalendarView() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   // Delete confirmation for recurring events
   const [deleteConfirm, setDeleteConfirm] = useState<CalendarEvent | null>(null);
+  // Edit scope confirmation for recurring events
+  const [editScopeConfirm, setEditScopeConfirm] = useState<{
+    event: CalendarEvent;
+    updated: CalendarEvent;
+  } | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -417,15 +424,15 @@ export function CalendarView() {
     });
   };
 
-  const handleSaveEvent = () => {
-    if (!editingEvent || !formTitle.trim()) return;
+  const buildUpdatedEvent = (): CalendarEvent | null => {
+    if (!editingEvent || !formTitle.trim()) return null;
     const hasLoc = HAS_LOCATION.includes(formCategory);
     const travelMin = formTravelTime || undefined;
     const alerts: CalendarAlert[] = formAlerts
       .filter((m) => m !== -1)
       .map((minutes) => ({ minutes, travelMinutes: travelMin }));
 
-    const updated: CalendarEvent = {
+    return {
       ...editingEvent,
       title: formTitle.trim(),
       date: formDate,
@@ -440,15 +447,45 @@ export function CalendarView() {
       alerts: alerts.length > 0 ? alerts : undefined,
       notify: formNotify,
     };
+  };
 
-    const backup = events;
-    setEvents((prev) =>
-      prev.map((e) => (e.id === editingEvent.id ? updated : e))
-    );
+  const handleSaveEvent = () => {
+    const updated = buildUpdatedEvent();
+    if (!updated || !editingEvent) return;
+
+    // If recurring, show scope dialog
+    if (editingEvent.seriesId) {
+      setShowForm(false);
+      setEditScopeConfirm({ event: editingEvent, updated });
+      return;
+    }
+
+    // Non-recurring: save directly
+    applyEditThisOnly(editingEvent, updated);
     setShowForm(false);
     setEditingEvent(null);
+  };
 
-    updateCalendarEvent(editingEvent.id, {
+  const getSeriesUpdateData = (updated: CalendarEvent) => ({
+    title: updated.title,
+    startTime: updated.startTime,
+    endTime: updated.endTime,
+    category: updated.category,
+    note: updated.note,
+    locationType: updated.locationType,
+    campus: updated.campus,
+    room: updated.room,
+    url: updated.url,
+    alerts: updated.alerts,
+    notify: updated.notify,
+  });
+
+  const applyEditThisOnly = (original: CalendarEvent, updated: CalendarEvent) => {
+    const backup = events;
+    setEvents((prev) =>
+      prev.map((e) => (e.id === original.id ? updated : e))
+    );
+    updateCalendarEvent(original.id, {
       title: updated.title,
       date: updated.date,
       startTime: updated.startTime,
@@ -462,6 +499,49 @@ export function CalendarView() {
       alerts: updated.alerts,
       notify: updated.notify,
     }).catch(() => setEvents(backup));
+  };
+
+  const handleEditThisOnly = () => {
+    if (!editScopeConfirm) return;
+    applyEditThisOnly(editScopeConfirm.event, editScopeConfirm.updated);
+    setEditScopeConfirm(null);
+    setEditingEvent(null);
+  };
+
+  const handleEditThisAndFuture = () => {
+    if (!editScopeConfirm) return;
+    const { event, updated } = editScopeConfirm;
+    const data = getSeriesUpdateData(updated);
+    const backup = events;
+    setEvents((prev) =>
+      prev.map((e) => {
+        if (e.seriesId === event.seriesId && e.date >= event.date) {
+          return { ...e, ...data, date: e.date, id: e.id, seriesId: e.seriesId, recurrence: e.recurrence };
+        }
+        return e;
+      })
+    );
+    setEditScopeConfirm(null);
+    setEditingEvent(null);
+    updateSeriesFromDate(event.seriesId!, event.date, data).catch(() => setEvents(backup));
+  };
+
+  const handleEditAllEvents = () => {
+    if (!editScopeConfirm) return;
+    const { event, updated } = editScopeConfirm;
+    const data = getSeriesUpdateData(updated);
+    const backup = events;
+    setEvents((prev) =>
+      prev.map((e) => {
+        if (e.seriesId === event.seriesId) {
+          return { ...e, ...data, date: e.date, id: e.id, seriesId: e.seriesId, recurrence: e.recurrence };
+        }
+        return e;
+      })
+    );
+    setEditScopeConfirm(null);
+    setEditingEvent(null);
+    updateAllInSeries(event.seriesId!, data).catch(() => setEvents(backup));
   };
 
   const handleToggleNotify = (id: string) => {
@@ -1184,6 +1264,67 @@ export function CalendarView() {
                 <div className="mx-5 h-px bg-gray-900/10 dark:bg-white/10" />
                 <button
                   onClick={() => setDeleteConfirm(null)}
+                  className="py-3 text-center text-sm font-medium text-gray-500 transition-colors hover:bg-gray-900/5 dark:text-white/50 dark:hover:bg-white/5"
+                >
+                  {t("common.cancel")}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Edit Recurring Event Scope ────────────────── */}
+      <AnimatePresence>
+        {editScopeConfirm && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease }}
+              className="fixed inset-0 z-50 bg-black/40"
+              onClick={() => { setEditScopeConfirm(null); setEditingEvent(null); }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.97 }}
+              transition={{ duration: 0.2, ease }}
+              className="fixed inset-x-4 top-1/2 z-50 mx-auto max-w-sm -translate-y-1/2 overflow-hidden rounded-2xl border border-gray-900/10 bg-white shadow-xl dark:border-white/15 dark:bg-[var(--background)]"
+            >
+              <div className="p-5">
+                <h3 className="text-center font-display text-base font-light text-gray-900 dark:text-white">
+                  {t("calendar.editRecurring")}
+                </h3>
+                <p className="mt-1.5 text-center text-xs text-gray-500 dark:text-white/50">
+                  &ldquo;{editScopeConfirm.event.title}&rdquo; on {editScopeConfirm.event.date}
+                </p>
+              </div>
+              <div className="flex flex-col gap-0 border-t border-gray-900/10 dark:border-white/10">
+                <button
+                  onClick={handleEditThisOnly}
+                  className="py-3 text-center text-sm font-medium text-gray-900 transition-colors hover:bg-gray-900/5 dark:text-white dark:hover:bg-white/5"
+                >
+                  {t("calendar.thisOnly")}
+                </button>
+                <div className="mx-5 h-px bg-gray-900/10 dark:bg-white/10" />
+                <button
+                  onClick={handleEditThisAndFuture}
+                  className="py-3 text-center text-sm font-medium text-[#5227FF] transition-colors hover:bg-[#5227FF]/5 dark:text-[#8B6FFF] dark:hover:bg-[#5227FF]/10"
+                >
+                  {t("calendar.thisAndFuture")}
+                </button>
+                <div className="mx-5 h-px bg-gray-900/10 dark:bg-white/10" />
+                <button
+                  onClick={handleEditAllEvents}
+                  className="py-3 text-center text-sm font-medium text-[#5227FF] transition-colors hover:bg-[#5227FF]/5 dark:text-[#8B6FFF] dark:hover:bg-[#5227FF]/10"
+                >
+                  {t("calendar.allEvents")}
+                </button>
+                <div className="mx-5 h-px bg-gray-900/10 dark:bg-white/10" />
+                <button
+                  onClick={() => { setEditScopeConfirm(null); setEditingEvent(null); }}
                   className="py-3 text-center text-sm font-medium text-gray-500 transition-colors hover:bg-gray-900/5 dark:text-white/50 dark:hover:bg-white/5"
                 >
                   {t("common.cancel")}

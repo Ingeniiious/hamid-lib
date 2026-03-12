@@ -279,6 +279,8 @@ export const en = {
     notifyOff: "Push Notification Off",
     thisOnly: "This Event Only",
     thisAndFuture: "This & Future Events",
+    allEvents: "All Events",
+    editRecurring: "Edit Recurring Event",
     pageTitle: "Calendar",
     pageSubtitle: "Your schedules, exams, and deadlines.",
     // Categories
