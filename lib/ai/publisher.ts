@@ -4,8 +4,11 @@
 // After the 5-teacher verification pipeline completes, the publisher:
 // 1. Extracts the best verified content (Grok's enrichedContent or fallback)
 // 2. Creates generation steps for each requested output type
-// 3. For mock_exam: each of the 5 models creates a unique exam variant
-// 4. For everything else: Kimi generates from verified content (cheapest)
+// 3. For MULTI-VARIANT types (exams, quizzes, flashcards, interactive):
+//    each of the 5 models creates a unique variant — different AIs think
+//    differently, so students get 5 diverse question sets / card decks
+// 4. For SINGLE-OUTPUT types (study guide, podcast, video, slides, etc.):
+//    Kimi generates from verified content (cheapest, one polished result)
 // 5. Each generated result is saved to `generated_content`
 // ---------------------------------------------------------------------------
 
@@ -130,12 +133,22 @@ export async function createGenerationSteps(jobId: string): Promise<number> {
     inputSummary: string | null;
   }[] = [];
 
+  // Content types where each AI model generates its own unique variant.
+  // Different AIs think differently → students get 5 diverse sets of questions,
+  // flashcard decks, exam papers, etc. This is a key value proposition.
+  const MULTI_VARIANT_TYPES = new Set([
+    "mock_exam",          // 5 unique exam papers
+    "quiz",               // 5 unique quiz sets
+    "flashcards",         // 5 unique flashcard decks
+    "interactive_section", // 5 unique interactive exercises
+  ]);
+
   // Generation steps start after the teacher steps (stepOrder 100+)
   let stepOrder = 100;
 
   for (const outputType of outputTypes) {
-    if (outputType === "mock_exam") {
-      // Each model creates its own unique exam variant
+    if (MULTI_VARIANT_TYPES.has(outputType)) {
+      // Each model creates its own unique variant — 5 different perspectives
       for (const model of models) {
         generationSteps.push({
           jobId: job.id,
@@ -151,7 +164,8 @@ export async function createGenerationSteps(jobId: string): Promise<number> {
         });
       }
     } else {
-      // Use Kimi (cheapest) for all other content types
+      // Single-output types (study guide, podcast, video, slides, etc.)
+      // Use Kimi (cheapest) — one polished result is enough
       generationSteps.push({
         jobId: job.id,
         modelSlug: "kimi",
@@ -253,8 +267,11 @@ export async function processGenerationStep(
     response.inputTokens * config.costPerInputToken +
     response.outputTokens * config.costPerOutputToken;
 
-  // Determine title
-  const title = generateTitle(contentType, job);
+  // Determine title — for multi-variant types, include the model name
+  const MULTI_VARIANT_TYPES = new Set(["mock_exam", "quiz", "flashcards", "interactive_section"]);
+  const title = MULTI_VARIANT_TYPES.has(contentType)
+    ? `${generateTitle(contentType, job)} — Variant ${config.slug}`
+    : generateTitle(contentType, job);
 
   // Save to generated_content
   await db.insert(generatedContent).values({
