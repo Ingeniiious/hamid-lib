@@ -37,8 +37,11 @@ import type {
 
 const TERMINAL_STATUSES: PipelineStatus[] = ["completed", "failed", "cancelled"];
 
-/** Timeout for AI calls (45s to leave margin for DB writes within 60s Vercel limit). */
-const AI_CALL_TIMEOUT_MS = 45_000;
+/** Timeout for AI calls (90s — Vercel Pro allows 120s maxDuration, leave 30s for DB writes). */
+const AI_CALL_TIMEOUT_MS = 90_000;
+
+/** If a step has been "running" longer than this, assume it's stuck (Vercel function crashed). */
+const STALE_RUNNING_THRESHOLD_MS = 90_000;
 
 /** Maps a model role to the job status shown while that step runs. */
 const ROLE_TO_JOB_STATUS: Record<ModelRole, PipelineStatus> = {
@@ -119,7 +122,51 @@ export async function processNextStep(): Promise<{
 
   if (!job) return null;
 
-  // 2. Find the next pending step for this job (order by stepOrder)
+  // 2a. Detect and recover stale "running" steps — if Vercel killed the function,
+  //     the step stays "running" forever. Reset any step running > 90s back to pending.
+  const staleThresholdISO = new Date(Date.now() - STALE_RUNNING_THRESHOLD_MS).toISOString();
+  const staleSteps = await db
+    .select({ id: pipelineStep.id, stepOrder: pipelineStep.stepOrder, modelSlug: pipelineStep.modelSlug, retryCount: pipelineStep.retryCount })
+    .from(pipelineStep)
+    .where(
+      and(
+        eq(pipelineStep.jobId, job.id),
+        eq(pipelineStep.status, "running"),
+        sql`${pipelineStep.startedAt} IS NOT NULL AND ${pipelineStep.startedAt} < ${staleThresholdISO}::timestamp`
+      )
+    );
+
+  for (const stale of staleSteps) {
+    console.log(`[ai-pipeline] Recovering stale step ${stale.stepOrder} (${stale.modelSlug}) — stuck running > ${STALE_RUNNING_THRESHOLD_MS / 1000}s`);
+    await db
+      .update(pipelineStep)
+      .set({
+        status: "pending",
+        retryCount: stale.retryCount + 1,
+        errorMessage: `Recovered from stale running state (function likely crashed/timed out)`,
+        startedAt: null,
+      })
+      .where(eq(pipelineStep.id, stale.id));
+  }
+
+  // 2b. Check if any step is currently running (not stale) — if so, wait.
+  //     Pipeline is sequential: don't start step N until step N-1 finishes.
+  const [activelyRunning] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(pipelineStep)
+    .where(
+      and(
+        eq(pipelineStep.jobId, job.id),
+        eq(pipelineStep.status, "running")
+      )
+    );
+
+  if (Number(activelyRunning.count) > 0) {
+    // Another step is still running (and not stale) — wait for it
+    return null;
+  }
+
+  // 2c. Find the next pending step for this job (order by stepOrder)
   const [step] = await db
     .select()
     .from(pipelineStep)
@@ -313,6 +360,9 @@ export async function processNextStep(): Promise<{
     })(),
   }));
 
+  // DEBUG: log what we're sending to each model
+  console.log(`[ai-pipeline] Job ${job.id} step ${step.stepOrder} context: sourceContent=${sourceContent.length} chars, previousOutputs=${previousOutputStrings.length} entries: ${previousOutputStrings.map(o => `${o.role}=${o.output.length}chars`).join(", ")}`);
+
   const prompt = getPrompt(role, contentType, sourceContent, previousOutputStrings);
   const messages: AIMessage[] = [
     { role: "system", content: prompt.system },
@@ -444,7 +494,7 @@ export async function processNextStep(): Promise<{
  * After a step completes, check if the job should transition:
  * - Teacher steps done (stepOrder < 100) → create generation steps
  * - Generation steps done (stepOrder ≥ 100) → mark job completed
- * - Steps still pending → return "step_completed"
+ * - Steps still pending/running → return "step_completed"
  */
 async function checkJobCompletion(
   step: typeof pipelineStep.$inferSelect,
@@ -465,9 +515,23 @@ async function checkJobCompletion(
     return "step_completed";
   }
 
-  // All current steps done — check which phase just completed
-  // Teacher steps have stepOrder < 100, generator steps start at 100+
-  if (step.stepOrder < 100) {
+  // All current steps are terminal (completed/skipped/failed) — check which phase just completed.
+  // Teacher steps have stepOrder < 100, generator steps start at 100+.
+  const isTeacherStep = step.stepOrder < 100;
+
+  // Also check if there are ANY generator steps already (avoid double-creation)
+  const [existingGenSteps] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(pipelineStep)
+    .where(
+      and(
+        eq(pipelineStep.jobId, job.id),
+        eq(pipelineStep.role, "generator")
+      )
+    );
+  const hasGenSteps = Number(existingGenSteps.count) > 0;
+
+  if (isTeacherStep && !hasGenSteps) {
     // Teacher phase done — create generation steps
     const genCount = await createGenerationSteps(job.id);
     if (genCount > 0) {

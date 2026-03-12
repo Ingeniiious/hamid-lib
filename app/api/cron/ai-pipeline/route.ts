@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { processNextStep } from "@/lib/ai/orchestrator";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -14,28 +14,50 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await processNextStep();
+    // Process steps in a loop within one invocation — no more self-chaining
+    // which caused race conditions with parallel invocations grabbing steps
+    // out of order. Loop until no more steps or we approach the time limit.
+    const startTime = Date.now();
+    const MAX_LOOP_MS = 110_000; // 110s — leave 10s buffer within 120s maxDuration
+    const results: Array<{ jobId: string; step: number; status: string }> = [];
 
-    if (!result) {
+    while (Date.now() - startTime < MAX_LOOP_MS) {
+      const result = await processNextStep();
+
+      if (!result) {
+        // No pending steps or no pending jobs — done
+        break;
+      }
+
+      results.push(result);
+
+      // If step failed/skipped/retrying, pause briefly for DB writes to settle
+      if (result.status === "retrying" || result.status === "skipped" || result.status === "failed") {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+
+      // If step completed or generating, brief pause for DB consistency
+      if (result.status === "step_completed" || result.status === "generating" || result.status === "completed") {
+        await new Promise((r) => setTimeout(r, 500));
+      }
+
+      // Job completed or rejected — no more steps for this job
+      if (result.status === "completed" || result.status === "rejected") {
+        break;
+      }
+    }
+
+    if (results.length === 0) {
       return NextResponse.json({
         status: "idle",
         message: "No pending jobs",
       });
     }
 
-    // Self-invoke: immediately process next step instead of waiting for cron tick.
-    // The cron (every 2 min) is now just a safety net for stuck/retried jobs.
-    if (result.status !== "failed" && result.status !== "completed") {
-      const baseUrl = new URL(request.url).origin;
-      fetch(`${baseUrl}/api/cron/ai-pipeline`, {
-        method: "GET",
-        headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
-      }).catch(() => {});
-    }
-
     return NextResponse.json({
       status: "processed",
-      data: result,
+      stepsProcessed: results.length,
+      data: results,
     });
   } catch (error) {
     console.error("[ai-pipeline] Cron error:", error);

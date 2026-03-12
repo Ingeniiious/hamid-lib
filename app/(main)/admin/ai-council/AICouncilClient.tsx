@@ -110,6 +110,19 @@ interface PipelineStepData {
   completedAt: string | null;
 }
 
+interface GeneratedContentItem {
+  id: string;
+  contentType: string;
+  title: string;
+  content: Record<string, unknown> | null;
+  richText: string | null;
+  language: string;
+  modelSource: string | null;
+  version: number;
+  isPublished: boolean;
+  createdAt: string;
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -484,6 +497,312 @@ export function AICouncilClient() {
 }
 
 // ===========================================================================
+// Generated Content Viewer — shows output for completed pipeline jobs
+// ===========================================================================
+
+function GeneratedContentViewer({ jobId }: { jobId: string }) {
+  const [items, setItems] = useState<GeneratedContentItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/ai-council/generated-content?jobId=${jobId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setItems(data.items ?? []);
+      } catch {
+        // silent
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [jobId]);
+
+  if (loading) {
+    return (
+      <div className="mt-4 border-t border-gray-900/10 pt-4 dark:border-white/10">
+        <Skeleton className="mx-auto h-4 w-40" />
+        <Skeleton className="mt-2 h-20 w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="mt-4 border-t border-gray-900/10 pt-4 dark:border-white/10">
+        <p className="py-3 text-center text-xs text-gray-900/40 dark:text-white/40">
+          No generated content yet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 border-t border-gray-900/10 pt-4 dark:border-white/10">
+      <h4 className="mb-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-900/50 dark:text-white/50">
+        Generated Content ({items.length})
+      </h4>
+      <div className="space-y-2">
+        {items.map((item) => {
+          const isOpen = expandedId === item.id;
+          return (
+            <div
+              key={item.id}
+              className="rounded-xl border border-gray-900/5 bg-white/50 dark:border-white/5 dark:bg-white/5"
+            >
+              <button
+                onClick={() => setExpandedId(isOpen ? null : item.id)}
+                className="flex w-full items-center justify-between p-3 transition-colors hover:bg-gray-900/5 dark:hover:bg-white/5"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-[#5227FF]/10 px-2.5 py-0.5 text-[10px] font-medium text-[#5227FF] dark:text-[#8B6FFF]">
+                    {titleCase(item.contentType.replace(/_/g, " "))}
+                  </span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {item.title}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {item.isPublished ? (
+                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                      Published
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                      Draft
+                    </span>
+                  )}
+                  <CaretDown
+                    size={14}
+                    className={`text-gray-900/40 transition-transform dark:text-white/40 ${isOpen ? "rotate-180" : ""}`}
+                  />
+                </div>
+              </button>
+              {isOpen && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.2, ease }}
+                  className="border-t border-gray-900/5 p-3 dark:border-white/5"
+                >
+                  <div className="mb-2 flex flex-wrap items-center justify-center gap-2 text-[10px] text-gray-900/40 dark:text-white/40">
+                    {item.modelSource && <span>Model: {item.modelSource}</span>}
+                    <span>v{item.version}</span>
+                    <span>{item.language.toUpperCase()}</span>
+                  </div>
+                  <div className="max-h-[400px] overflow-auto rounded-lg bg-gray-900/[0.03] p-3 dark:bg-white/[0.03]">
+                    <pre className="whitespace-pre-wrap break-words text-xs text-gray-900/80 dark:text-white/80">
+                      {item.content
+                        ? JSON.stringify(item.content, null, 2)
+                        : item.richText ?? "No content"}
+                    </pre>
+                  </div>
+                </motion.div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ===========================================================================
+// Active Flows — live pipeline progress on Overview tab
+// ===========================================================================
+
+interface ActiveFlow {
+  type: "extraction" | "pipeline";
+  id: string;
+  label: string;
+  fileType: string | null;
+  extractionStatus: string | null;
+  extractionPhase: number | null;
+  extractionImages: string | null;
+  pipelineStatus: string | null;
+  steps: PipelineStepData[];
+  totalTokens: number;
+  totalCost: string;
+  createdAt: string;
+}
+
+function ActiveFlows() {
+  const [flows, setFlows] = useState<ActiveFlow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchFlows = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/ai-council/active-flows");
+      if (!res.ok) return;
+      const data = await res.json();
+      setFlows(data.flows ?? []);
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFlows();
+    const interval = setInterval(fetchFlows, 5000);
+    return () => clearInterval(interval);
+  }, [fetchFlows]);
+
+  if (loading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, ease, delay: 0.6 }}
+        className="rounded-2xl border border-gray-900/10 bg-white/50 p-6 backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
+      >
+        <div className="mb-4 flex items-center justify-center gap-2">
+          <Skeleton className="h-5 w-32" />
+        </div>
+        <Skeleton className="h-24 w-full rounded-xl" />
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.6, ease, delay: 0.6 }}
+      className="rounded-2xl border border-gray-900/10 bg-white/50 p-6 backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
+    >
+      <div className="mb-4 flex items-center justify-center gap-2">
+        <h3 className="font-display text-lg font-light text-gray-900 dark:text-white">
+          Active Flows
+        </h3>
+        {flows.length > 0 && (
+          <motion.span
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className="rounded-full bg-[#5227FF]/10 px-2.5 py-0.5 text-[10px] font-medium text-[#5227FF] dark:bg-[#5227FF]/20 dark:text-[#8B6FFF]"
+          >
+            {flows.length} Active
+          </motion.span>
+        )}
+      </div>
+
+      {flows.length === 0 ? (
+        <p className="py-6 text-center text-sm text-gray-900/40 dark:text-white/40">
+          No active flows right now.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {flows.map((flow, idx) => (
+            <motion.div
+              key={flow.id}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4, delay: idx * 0.05, ease }}
+              className="rounded-xl border border-gray-900/5 bg-gray-900/[0.02] p-4 dark:border-white/5 dark:bg-white/[0.02]"
+            >
+              {/* Header */}
+              <div className="mb-3 flex flex-col items-center gap-1 sm:flex-row sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="max-w-[200px] truncate text-sm font-medium text-gray-900 dark:text-white" title={flow.label}>
+                    {flow.label}
+                  </span>
+                  {flow.fileType && (
+                    <Badge variant="outline" className="text-[10px] uppercase">
+                      {flow.fileType}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {flow.extractionStatus && (
+                    <StatusBadge status={flow.extractionStatus} />
+                  )}
+                  {flow.pipelineStatus && (
+                    <StatusBadge status={flow.pipelineStatus} />
+                  )}
+                  <span className="text-[10px] text-gray-900/40 dark:text-white/40">
+                    {formatRelativeTime(flow.createdAt)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Extraction-only flow — show extraction progress */}
+              {flow.type === "extraction" && (
+                <div className="flex items-center justify-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                        flow.extractionStatus === "completed"
+                          ? "bg-green-100 ring-2 ring-green-400 dark:bg-green-900/30 dark:ring-green-500"
+                          : "bg-[#5227FF]/10 ring-2 ring-[#5227FF] dark:bg-[#5227FF]/20 dark:ring-[#8B6FFF]"
+                      }`}>
+                        <Files weight="duotone" className={`h-4 w-4 ${
+                          flow.extractionStatus === "completed"
+                            ? "text-green-600 dark:text-green-400"
+                            : "text-[#5227FF] dark:text-[#8B6FFF]"
+                        }`} />
+                      </div>
+                      <motion.div
+                        animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0, 0.4] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                        className="absolute inset-0 rounded-full ring-2 ring-[#5227FF] dark:ring-[#8B6FFF]"
+                      />
+                    </div>
+                    <div className="text-center">
+                      <span className="text-[10px] font-medium text-[#5227FF] dark:text-[#8B6FFF]">Extracting</span>
+                      <div className="flex gap-1.5">
+                        {flow.extractionPhase != null && (
+                          <span className="text-[9px] text-gray-900/40 dark:text-white/40">
+                            Phase {flow.extractionPhase}/2
+                          </span>
+                        )}
+                        {flow.extractionImages && (
+                          <span className="text-[9px] text-gray-900/40 dark:text-white/40">
+                            Images: {flow.extractionImages}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Pending stages shown as gray dots */}
+                  <div className="hidden h-px w-4 bg-gray-900/10 dark:bg-white/10 sm:block" />
+                  {["Creator", "Reviewer", "Enricher", "Validator", "Fact Checker"].map((role) => (
+                    <div key={role} className="hidden flex-col items-center gap-1 sm:flex">
+                      <div className="h-6 w-6 rounded-full bg-gray-900/5 ring-1 ring-gray-900/10 dark:bg-white/5 dark:ring-white/10" />
+                      <span className="text-[8px] text-gray-900/30 dark:text-white/30">{role}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Pipeline flow — reuse MiniPipelineFlow */}
+              {flow.type === "pipeline" && flow.steps.length > 0 && (
+                <div>
+                  <MiniPipelineFlow steps={flow.steps} jobStatus={flow.pipelineStatus ?? "pending"} />
+                  {/* Tokens + cost */}
+                  {flow.totalTokens > 0 && (
+                    <div className="mt-1 flex items-center justify-center gap-3">
+                      <span className="text-[10px] text-gray-900/40 dark:text-white/40">
+                        {formatTokens(flow.totalTokens)} tokens
+                      </span>
+                      <span className="text-[10px] text-gray-900/40 dark:text-white/40">
+                        ${Number(flow.totalCost).toFixed(4)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ===========================================================================
 // Status Filter (matching ContributionsClient pattern)
 // ===========================================================================
 
@@ -617,6 +936,9 @@ function OverviewTab({
           index={7}
         />
       </div>
+
+      {/* Active Flows */}
+      <ActiveFlows />
 
       {/* Pipeline Models */}
       <motion.div
@@ -1119,6 +1441,11 @@ function PipelineTab({
                           );
                         })}
                       </div>
+                    )}
+
+                    {/* Generated Content */}
+                    {job.status === "completed" && (
+                      <GeneratedContentViewer jobId={job.id} />
                     )}
                   </motion.div>
                 )}
