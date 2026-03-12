@@ -8,7 +8,7 @@ function getClient(): Anthropic {
   if (!client) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
-    client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 });
+    client = new Anthropic({ apiKey, maxRetries: 0 });
   }
   return client;
 }
@@ -27,7 +27,11 @@ export async function complete(
       content: m.content,
     }));
 
-  const response = await ai.messages.create({
+  // Use streaming + finalMessage() to prevent HTTP timeouts.
+  // Non-streaming requests sit idle while Claude generates — the SDK sees
+  // zero data flowing and fires "Request timed out." even though Claude is
+  // working fine. Streaming keeps the connection alive with incremental data.
+  const stream = ai.messages.stream({
     model: "claude-opus-4-6",
     max_tokens: request.maxTokens ?? 16384,
     temperature: request.temperature ?? 0.3,
@@ -35,6 +39,7 @@ export async function complete(
     messages: nonSystemMessages,
   });
 
+  const response = await stream.finalMessage();
   const textBlock = response.content.find((b) => b.type === "text");
 
   return {
