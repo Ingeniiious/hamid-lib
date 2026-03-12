@@ -8,12 +8,15 @@ const ease = [0.25, 0.46, 0.45, 0.94] as const;
 interface StatsCardProps {
   title: string;
   value: number;
+  prefix?: string;
+  suffix?: string;
+  decimals?: number;
   trend?: { direction: "up" | "down"; percentage: number };
   icon: React.ReactNode;
   index?: number;
 }
 
-export function StatsCard({ title, value, trend, icon, index = 0 }: StatsCardProps) {
+export function StatsCard({ title, value, prefix, suffix, decimals = 0, trend, icon, index = 0 }: StatsCardProps) {
   const [displayValue, setDisplayValue] = useState(0);
 
   useEffect(() => {
@@ -23,6 +26,7 @@ export function StatsCard({ title, value, trend, icon, index = 0 }: StatsCardPro
     }
 
     const duration = 800;
+    const multiplier = Math.pow(10, decimals);
     let startTime: number | null = null;
     let animationId: number;
 
@@ -33,7 +37,7 @@ export function StatsCard({ title, value, trend, icon, index = 0 }: StatsCardPro
 
       // Ease-out cubic for smooth deceleration
       const easedProgress = 1 - Math.pow(1 - progress, 3);
-      setDisplayValue(Math.round(easedProgress * value));
+      setDisplayValue(Math.round(easedProgress * value * multiplier) / multiplier);
 
       if (progress < 1) {
         animationId = requestAnimationFrame(animate);
@@ -45,7 +49,7 @@ export function StatsCard({ title, value, trend, icon, index = 0 }: StatsCardPro
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, [value]);
+  }, [value, decimals]);
 
   return (
     <motion.div
@@ -61,7 +65,7 @@ export function StatsCard({ title, value, trend, icon, index = 0 }: StatsCardPro
       <p className="text-sm text-gray-900/60 dark:text-white/60">{title}</p>
 
       <p className="mt-2 text-3xl font-display font-light text-gray-900 dark:text-white">
-        {displayValue.toLocaleString()}
+        {prefix}{decimals > 0 ? displayValue.toFixed(decimals) : displayValue.toLocaleString()}{suffix}
       </p>
 
       {trend && (

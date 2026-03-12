@@ -912,8 +912,10 @@ function OverviewTab({
           index={4}
         />
         <StatsCard
-          title="Total Cost (USD)"
-          value={loading ? 0 : Math.round(totalCost * 10000) / 10000}
+          title="Total Cost"
+          value={loading ? 0 : totalCost}
+          prefix="$"
+          decimals={4}
           icon={<CurrencyDollar size={24} weight="duotone" />}
           index={5}
         />
@@ -932,6 +934,7 @@ function OverviewTab({
                 ? Math.round((completedJobs / totalJobs) * 100)
                 : 0
           }
+          suffix="%"
           icon={<ArrowsClockwise size={24} weight="duotone" />}
           index={7}
         />
