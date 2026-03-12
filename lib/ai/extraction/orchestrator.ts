@@ -11,13 +11,6 @@ import { db } from "@/lib/db";
 import { extractionJob, contribution } from "@/database/schema";
 import { eq, and, not, inArray, asc, sql } from "drizzle-orm";
 import { downloadFromR2 } from "@/lib/r2";
-import { extractFromPdf } from "./pdf";
-import { extractFromDocx } from "./docx";
-import { extractFromPptx } from "./pptx";
-import { fileToExtractedImage } from "./image";
-import { prepareImagesForKimi } from "./image";
-import { prepareVideoForKimi, cleanupVideoFile } from "./video";
-import { classifyImages, ocrImage, extractFromVideo } from "./multimodal-kimi";
 import { createJob as createPipelineJob } from "@/lib/ai/orchestrator";
 import type {
   DeterministicResult,
@@ -25,6 +18,36 @@ import type {
   ExtractedImage,
   ClassifiedImage,
 } from "./types";
+
+// ---------------------------------------------------------------------------
+// Dynamic imports for heavy libraries that use browser APIs (DOMMatrix, etc.)
+// These CANNOT be top-level imports because pdfjs-dist (used by pdf-parse)
+// tries to polyfill DOMMatrix at module evaluation time and crashes in
+// serverless/Node environments without @napi-rs/canvas.
+// ---------------------------------------------------------------------------
+
+async function loadExtractors() {
+  const [pdf, docx, pptx, image, video, multimodal] = await Promise.all([
+    import("./pdf"),
+    import("./docx"),
+    import("./pptx"),
+    import("./image"),
+    import("./video"),
+    import("./multimodal-kimi"),
+  ]);
+  return {
+    extractFromPdf: pdf.extractFromPdf,
+    extractFromDocx: docx.extractFromDocx,
+    extractFromPptx: pptx.extractFromPptx,
+    fileToExtractedImage: image.fileToExtractedImage,
+    prepareImagesForKimi: image.prepareImagesForKimi,
+    prepareVideoForKimi: video.prepareVideoForKimi,
+    cleanupVideoFile: video.cleanupVideoFile,
+    classifyImages: multimodal.classifyImages,
+    ocrImage: multimodal.ocrImage,
+    extractFromVideo: multimodal.extractFromVideo,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -92,6 +115,9 @@ async function handlePhase1(
     `[extraction] Job ${job.id} Phase 1: downloading + extracting ${job.fileName}`
   );
 
+  // Lazy-load extractors (avoids DOMMatrix crash from pdfjs-dist at module eval)
+  const ext = await loadExtractors();
+
   // Update status to downloading
   await db
     .update(extractionJob)
@@ -123,16 +149,16 @@ async function handlePhase1(
 
   switch (fileType) {
     case "pdf":
-      result = await extractFromPdf(fileBuffer);
+      result = await ext.extractFromPdf(fileBuffer);
       break;
     case "docx":
-      result = await extractFromDocx(fileBuffer);
+      result = await ext.extractFromDocx(fileBuffer);
       break;
     case "pptx":
-      result = await extractFromPptx(fileBuffer);
+      result = await ext.extractFromPptx(fileBuffer);
       break;
     case "image": {
-      const img = await fileToExtractedImage(fileBuffer, job.fileType);
+      const img = await ext.fileToExtractedImage(fileBuffer, job.fileType);
       result = {
         textByPage: [],
         images: [img],
@@ -144,12 +170,12 @@ async function handlePhase1(
     }
     case "video": {
       // Videos go directly to Kimi multimodal — no deterministic extraction
-      const videoRef = await prepareVideoForKimi(fileBuffer, job.fileType);
-      const videoResult = await extractFromVideo(videoRef.url);
+      const videoRef = await ext.prepareVideoForKimi(fileBuffer, job.fileType);
+      const videoResult = await ext.extractFromVideo(videoRef.url);
 
       // Clean up uploaded file if applicable
       if (videoRef.fileId) {
-        await cleanupVideoFile(videoRef.fileId);
+        await ext.cleanupVideoFile(videoRef.fileId);
       }
 
       // Video extraction is complete — skip Phase 2, go straight to completion
@@ -252,6 +278,9 @@ async function handlePhase2(
   const extracted = job.extractedContent as unknown as DeterministicResult;
   if (!extracted) throw new Error("No extracted content for Phase 2");
 
+  // Lazy-load extractors
+  const ext = await loadExtractors();
+
   const allImages = extracted.images ?? [];
   const processed = job.processedImages;
 
@@ -268,10 +297,10 @@ async function handlePhase2(
   }
 
   // Prepare images for Kimi (resize, optimize)
-  const preparedImages = await prepareImagesForKimi(batch);
+  const preparedImages = await ext.prepareImagesForKimi(batch);
 
   // Classify images
-  const { classified, tokens, cost } = await classifyImages(preparedImages);
+  const { classified, tokens, cost } = await ext.classifyImages(preparedImages);
 
   // For scanned documents or photo notes, run OCR on relevant images
   let ocrTokens = 0;
@@ -283,7 +312,7 @@ async function handlePhase2(
       img.classification === "photo_notes" ||
       (extracted.isScanned && img.classification !== "decorative")
     ) {
-      const ocrResult = await ocrImage(img);
+      const ocrResult = await ext.ocrImage(img);
       ocrTexts.push({ page: img.pageOrSlide, text: ocrResult.text });
       ocrTokens += ocrResult.tokens;
       ocrCost += ocrResult.cost;

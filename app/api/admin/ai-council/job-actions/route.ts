@@ -4,7 +4,7 @@ import { cancelJob, retryJob } from "@/lib/ai/orchestrator";
 import {
   cancelExtractionJob,
   retryExtractionJob,
-} from "@/lib/ai/extraction/orchestrator";
+} from "@/lib/ai/extraction/actions";
 
 export const dynamic = "force-dynamic";
 
