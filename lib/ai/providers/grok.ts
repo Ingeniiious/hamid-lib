@@ -30,7 +30,8 @@ export async function complete(
       content: m.content,
     })),
     temperature: request.temperature ?? 0.1,
-    max_tokens: request.maxTokens ?? 16384,
+    // max_tokens is DEPRECATED — use max_completion_tokens per xAI docs
+    max_completion_tokens: request.maxTokens ?? 16384,
     ...(request.responseFormat === "json" && {
       response_format: { type: "json_object" as const },
     }),
