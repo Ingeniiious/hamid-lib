@@ -20,10 +20,7 @@ import type {
 } from "./types";
 
 // ---------------------------------------------------------------------------
-// Dynamic imports for heavy libraries that use browser APIs (DOMMatrix, etc.)
-// These CANNOT be top-level imports because pdfjs-dist (used by pdf-parse)
-// tries to polyfill DOMMatrix at module evaluation time and crashes in
-// serverless/Node environments without @napi-rs/canvas.
+// Dynamic imports — keeps the orchestrator module lightweight at eval time
 // ---------------------------------------------------------------------------
 
 async function loadExtractors() {
@@ -48,6 +45,13 @@ async function loadExtractors() {
     extractFromVideo: multimodal.extractFromVideo,
   };
 }
+
+/**
+ * Minimum sourceContent length to consider an extraction meaningful.
+ * A sourceContent of just "# Source: file.pdf" is ~25 chars — useless.
+ * Anything under 200 chars means extraction effectively failed.
+ */
+const MIN_SOURCE_CONTENT_LENGTH = 200;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -219,6 +223,24 @@ async function handlePhase1(
 
   // If no images and not scanned — skip Phase 2, go to completion
   if (result.images.length === 0 && !result.isScanned) {
+    // Validate extraction produced meaningful content
+    if (result.textByPage.length === 0 && result.tables.length === 0) {
+      console.log(
+        `[extraction] Job ${job.id} produced no text or tables — marking failed`
+      );
+      await db
+        .update(extractionJob)
+        .set({
+          status: "failed",
+          errorMessage: "Extraction produced no text content. The source file may be encrypted, corrupted, or empty.",
+          extractedContent: result as any,
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(extractionJob.id, job.id));
+      return { jobId: job.id, phase: 1, status: "failed" };
+    }
+
     const sourceContent = buildSourceContent(
       job.fileName,
       result.textByPage,
@@ -227,6 +249,23 @@ async function handlePhase1(
       result.speakerNotes,
       result.warnings
     );
+
+    if (sourceContent.length < MIN_SOURCE_CONTENT_LENGTH) {
+      console.log(
+        `[extraction] Job ${job.id} sourceContent too short (${sourceContent.length} chars) — marking failed`
+      );
+      await db
+        .update(extractionJob)
+        .set({
+          status: "failed",
+          errorMessage: `Extraction produced insufficient content (${sourceContent.length} chars). The source file may be mostly images or have very little text.`,
+          extractedContent: result as any,
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(extractionJob.id, job.id));
+      return { jobId: job.id, phase: 1, status: "failed" };
+    }
 
     await db
       .update(extractionJob)
@@ -397,6 +436,33 @@ async function finalizeExtraction(
     extracted.speakerNotes,
     extracted.warnings
   );
+
+  // Validate that extraction produced meaningful content
+  const hasText = extracted.textByPage.length > 0;
+  const hasImages = imageDescriptions.length > 0;
+  const hasTables = extracted.tables.length > 0;
+  const hasNotes = (extracted.speakerNotes?.length ?? 0) > 0;
+  const hasMeaningfulContent =
+    (hasText || hasImages || hasTables || hasNotes) &&
+    sourceContent.length >= MIN_SOURCE_CONTENT_LENGTH;
+
+  if (!hasMeaningfulContent) {
+    console.log(
+      `[extraction] Job ${job.id} produced no meaningful content (${sourceContent.length} chars) — marking failed`
+    );
+    await db
+      .update(extractionJob)
+      .set({
+        status: "failed",
+        errorMessage: `Extraction produced no meaningful content (${sourceContent.length} chars, text=${hasText}, images=${hasImages}, tables=${hasTables}). The source file may be encrypted, corrupted, or empty.`,
+        extractedContent: extracted as any,
+        completedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(extractionJob.id, job.id));
+
+    return { jobId: job.id, phase: 2, status: "failed" };
+  }
 
   await db
     .update(extractionJob)
@@ -579,13 +645,18 @@ async function autoCreatePipelineJob(
 
     if (completedJobs.length === 0) return;
 
-    // Combine sourceContent from all completed extractions
+    // Combine sourceContent from all completed extractions — only include meaningful ones
     const combinedSource = completedJobs
-      .filter((j) => j.sourceContent)
+      .filter((j) => j.sourceContent && j.sourceContent.length >= MIN_SOURCE_CONTENT_LENGTH)
       .map((j) => j.sourceContent!)
       .join("\n\n---\n\n");
 
-    if (!combinedSource) return;
+    if (!combinedSource || combinedSource.length < MIN_SOURCE_CONTENT_LENGTH) {
+      console.log(
+        `[extraction] Skipping pipeline creation — combined sourceContent too short (${combinedSource.length} chars)`
+      );
+      return;
+    }
 
     const contributionIds = completedJobs.map((j) => j.contributionId);
 
