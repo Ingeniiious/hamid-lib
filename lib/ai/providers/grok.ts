@@ -11,7 +11,7 @@ function getClient(): OpenAI {
     client = new OpenAI({
       apiKey,
       baseURL: "https://api.x.ai/v1",
-      timeout: 50_000, // 50s — leaves 10s headroom for Vercel's 60s limit
+      timeout: 120_000, // 120s — Vercel Pro allows 300s maxDuration
       maxRetries: 0, // Disable SDK auto-retry — orchestrator handles retries
     });
   }
