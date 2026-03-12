@@ -37,8 +37,8 @@ import type {
 
 const TERMINAL_STATUSES: PipelineStatus[] = ["completed", "failed", "cancelled"];
 
-/** Timeout for AI calls (90s — Vercel Pro allows 120s maxDuration, leave 30s for DB writes). */
-const AI_CALL_TIMEOUT_MS = 90_000;
+/** Timeout for individual AI calls (120s — Vercel Pro allows 300s maxDuration). */
+const AI_CALL_TIMEOUT_MS = 120_000;
 
 /** If a step has been "running" longer than this, assume it's stuck (Vercel function crashed). */
 const STALE_RUNNING_THRESHOLD_MS = 90_000;

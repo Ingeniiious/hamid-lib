@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { processNextStep } from "@/lib/ai/orchestrator";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300; // Vercel Pro plan allows up to 300s (5 min)
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     // which caused race conditions with parallel invocations grabbing steps
     // out of order. Loop until no more steps or we approach the time limit.
     const startTime = Date.now();
-    const MAX_LOOP_MS = 110_000; // 110s — leave 10s buffer within 120s maxDuration
+    const MAX_LOOP_MS = 280_000; // 280s — leave 20s buffer within 300s maxDuration
     const results: Array<{ jobId: string; step: number; status: string }> = [];
 
     while (Date.now() - startTime < MAX_LOOP_MS) {
