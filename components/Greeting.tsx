@@ -1,22 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
 
-function getGreeting(): string {
+type GreetingKey = "goodNight" | "goodMorning" | "goodAfternoon" | "goodEvening";
+
+function getGreetingKey(): GreetingKey {
   const hour = new Date().getHours();
-  if (hour < 5) return "Good Night";
-  if (hour < 12) return "Good Morning";
-  if (hour < 17) return "Good Afternoon";
-  if (hour < 21) return "Good Evening";
-  return "Good Night";
+  if (hour < 5) return "goodNight";
+  if (hour < 12) return "goodMorning";
+  if (hour < 17) return "goodAfternoon";
+  if (hour < 21) return "goodEvening";
+  return "goodNight";
 }
 
 export function Greeting({ name }: { name: string }) {
-  const [greeting, setGreeting] = useState("Hey");
+  const { t } = useTranslation();
+  const [greetingKey, setGreetingKey] = useState<GreetingKey | null>(null);
 
   useEffect(() => {
-    setGreeting(getGreeting());
+    setGreetingKey(getGreetingKey());
   }, []);
+
+  const greeting = greetingKey ? t(`greeting.${greetingKey}`) : t("greeting.hey");
 
   return `${greeting}, ${name}`;
 }

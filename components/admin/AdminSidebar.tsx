@@ -20,6 +20,7 @@ import {
   CaretLeft,
   EnvelopeSimple,
   BellRinging,
+  Brain,
 } from "@phosphor-icons/react";
 import Image from "next/image";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -46,6 +47,7 @@ const navItems: NavItem[] = [
   { icon: Star, label: "Reviews", href: "/admin/reviews", permission: "contributions.view" },
   { icon: PresentationChart, label: "Presentations", href: "/admin/presentations", permission: "presentations.view" },
   { icon: CalendarBlank, label: "Calendar", href: "/admin/calendar", permission: "calendar.view" },
+  { icon: Brain, label: "AI Council", href: "/admin/ai-council", permission: null },
   { icon: ChartLine, label: "Analytics", href: "/admin/analytics", permission: "analytics.view" },
   { icon: BellRinging, label: "Notifications", href: "/admin/notifications", permission: null },
   { icon: EnvelopeSimple, label: "Email", href: "/admin/email", permission: "email.view" },

@@ -1,11 +1,17 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { ReactLenis, useLenis } from "lenis/react";
 import { GrainientButton } from "@/components/GrainientButton";
 import { FeatureCard } from "@/components/FeatureCard";
+import { useTranslation, type Locale } from "@/lib/i18n";
+
+const Grainient = dynamic(() => import("@/components/Grainient"), {
+  ssr: false,
+});
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -144,19 +150,19 @@ function IllustrationLayer({ illustrations }: { illustrations: FloatingDef[] }) 
 const STICKY_NOTES = [
   {
     image: `${CDN}/images/landing/sticky-grid.png`,
-    text: "Your Notes Power The Community.",
+    textKey: "landing.stickyNote1",
     tilt: -3,
     font: "font-gochi",
   },
   {
     image: `${CDN}/images/landing/sticky-clip.png`,
-    text: "Students Build,\nStudents Learn.",
+    textKey: "landing.stickyNote2",
     tilt: 2,
     font: "font-delicious",
   },
   {
     image: `${CDN}/images/landing/sticky-lined.png`,
-    text: "Practice Smarter, Score Higher.",
+    textKey: "landing.stickyNote3",
     tilt: -1.5,
     font: "font-gochi",
   },
@@ -336,6 +342,71 @@ function NavLink({
   );
 }
 
+/* ── Landing language switcher — hover dropdown (desktop), tap toggle (mobile) ── */
+const LANG_OPTIONS: { code: Locale; label: string }[] = [
+  { code: "en", label: "EN" },
+  { code: "tr", label: "TR" },
+  { code: "fa", label: "FA" },
+];
+
+function LangSwitcher() {
+  const { locale, setLocale } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const current = LANG_OPTIONS.find((l) => l.code === locale) || LANG_OPTIONS[0];
+  const others = LANG_OPTIONS.filter((l) => l.code !== locale);
+
+  const handleEnter = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setOpen(true);
+  };
+  const handleLeave = () => {
+    timeoutRef.current = setTimeout(() => setOpen(false), 200);
+  };
+
+  return (
+    <div
+      className="relative inline-flex"
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+    >
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="relative inline-flex items-center px-2 py-1 pb-2 font-gochi text-[22px] text-white sm:px-3"
+      >
+        {current.label}
+        <SketchUnderline visible={open} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-1/2 bottom-full z-50 mb-1 flex -translate-x-1/2 flex-col items-center gap-1 px-3 py-2"
+          >
+            {others.map((lang) => (
+              <button
+                key={lang.code}
+                onClick={() => {
+                  setLocale(lang.code);
+                  setOpen(false);
+                }}
+                className="w-full px-3 py-1 font-gochi text-[18px] text-white/60 transition-colors hover:text-white"
+              >
+                {lang.label}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 /*
  * Stack slots — named by layer position.
  * TOP is front-and-center, MID/BOT peek out slightly behind.
@@ -453,6 +524,7 @@ function useDrawPathUpdate() {
 
 /* ── Sticky Notes with scroll-driven stacking ── */
 function StickyNotesSection() {
+  const { t } = useTranslation();
   const sectionRef = useRef<HTMLDivElement>(null);
   const cardEls = useRef<(HTMLDivElement | null)[]>([]);
   const drawPath = useDrawPathUpdate();
@@ -591,7 +663,7 @@ function StickyNotesSection() {
         transition={{ duration: 0.7, ease }}
         className="pb-[6vh] pt-[10vh] text-center font-display text-3xl font-light text-foreground sm:pb-[8vh] sm:pt-[8vh] sm:text-4xl md:text-5xl"
       >
-        3 Things We Strongly Believe In
+        {t("landing.beliefsTitle")}
       </motion.h2>
 
       {/* Cards — pin below the title, only these animate */}
@@ -619,12 +691,12 @@ function StickyNotesSection() {
               className="w-full"
               draggable={false}
             />
-            <div className="absolute inset-0 flex items-center justify-center p-8 sm:p-7 md:p-9">
+            <div className={`absolute inset-0 flex items-center justify-center p-8 sm:p-7 md:p-9 ${i === 0 ? "pt-16 sm:pt-14 md:pt-18" : ""} ${i === 2 ? "pb-16 sm:pb-14 md:pb-18" : ""}`}>
               <p
                 className={`whitespace-pre-line text-center text-lg leading-relaxed sm:text-xl md:text-2xl ${note.font}`}
                 style={{ color: "rgb(60, 50, 40)" }}
               >
-                {note.text}
+                {t(note.textKey)}
               </p>
             </div>
           </div>
@@ -637,26 +709,27 @@ function StickyNotesSection() {
 /* ── How It Works — three-step contribution flow ── */
 const STEPS = [
   {
-    number: "01",
-    title: "Contribute",
-    description: "Share your course notes, study guides, and exam materials from your university.",
+    numberKey: "landing.step1Number",
+    titleKey: "landing.step1Title",
+    descKey: "landing.step1Desc",
     font: "font-gochi",
   },
   {
-    number: "02",
-    title: "Moderate",
-    description: "Submissions are reviewed, cross-checked, and verified by the community.",
+    numberKey: "landing.step2Number",
+    titleKey: "landing.step2Title",
+    descKey: "landing.step2Desc",
     font: "font-delicious",
   },
   {
-    number: "03",
-    title: "Learn",
-    description: "Original study resources are created — examples, practices, and mock exams for everyone.",
+    numberKey: "landing.step3Number",
+    titleKey: "landing.step3Title",
+    descKey: "landing.step3Desc",
     font: "font-gochi",
   },
 ];
 
 function HowItWorksSection() {
+  const { t } = useTranslation();
   return (
     <section className="relative overflow-hidden bg-[var(--background)] py-24 sm:py-32 md:py-40">
       <IllustrationLayer illustrations={HOWITWORKS_ILLUSTRATIONS} />
@@ -669,13 +742,13 @@ function HowItWorksSection() {
           transition={{ duration: 0.7, ease }}
           className="mb-16 text-center font-display text-3xl font-light text-foreground sm:mb-20 sm:text-4xl md:text-5xl"
         >
-          How It Works
+          {t("landing.howItWorksTitle")}
         </motion.h2>
 
         <div className="flex flex-col items-center gap-12 sm:gap-16 md:gap-20">
           {STEPS.map((step, i) => (
             <motion.div
-              key={step.number}
+              key={step.numberKey}
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true, margin: "-5%" }}
@@ -683,13 +756,13 @@ function HowItWorksSection() {
               className="flex w-full max-w-lg flex-col items-center gap-4 text-center"
             >
               <span className="font-display text-6xl font-light text-[#5227FF] opacity-40 sm:text-7xl">
-                {step.number}
+                {t(step.numberKey)}
               </span>
               <h3 className={`text-2xl text-foreground sm:text-3xl ${step.font}`}>
-                {step.title}
+                {t(step.titleKey)}
               </h3>
               <p className="max-w-sm text-base leading-relaxed text-foreground/60 sm:text-lg">
-                {step.description}
+                {t(step.descKey)}
               </p>
             </motion.div>
           ))}
@@ -702,38 +775,144 @@ function HowItWorksSection() {
 /* ── Features — key platform features ── */
 const FEATURES = [
   {
-    title: "Mock Exams",
-    description: "Practice with real-style exams, multiple versions, instant scoring.",
+    titleKey: "landing.mockExams",
+    descKey: "landing.mockExamsDesc",
     font: "font-gochi",
   },
   {
-    title: "Study Guides",
-    description: "Structured content built from verified student contributions.",
+    titleKey: "landing.studyGuides",
+    descKey: "landing.studyGuidesDesc",
     font: "font-delicious",
   },
   {
-    title: "Presentations",
-    description: "Class presentations toggled live by instructors, then yours forever.",
+    titleKey: "landing.presentations",
+    descKey: "landing.presentationsDesc",
     font: "font-gochi",
   },
   {
-    title: "Professor Ratings",
-    description: "Anonymous, moderated reviews — know before you enroll.",
+    titleKey: "landing.professorRatings",
+    descKey: "landing.professorRatingsDesc",
     font: "font-delicious",
   },
   {
-    title: "Progress Tracking",
-    description: "See your scores improve over time, course by course.",
+    titleKey: "landing.progressTracking",
+    descKey: "landing.progressTrackingDesc",
     font: "font-gochi",
   },
   {
-    title: "Community Driven",
-    description: "Built by students, powered by the community — for everyone.",
+    titleKey: "landing.communityDriven",
+    descKey: "landing.communityDrivenDesc",
     font: "font-delicious",
   },
 ];
 
+/* ── Pricing — ultra-wide banner with Grainient, between How It Works & Features ── */
+function PricingSection() {
+  const { t } = useTranslation();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setReady(true), 150);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <section className="relative overflow-hidden">
+      {/* Top fade — blends from the section above */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 sm:h-32"
+        style={{
+          background:
+            "linear-gradient(to bottom, var(--background) 0%, transparent 100%)",
+        }}
+      />
+
+      {/* Grainient background — full bleed */}
+      <div
+        className="absolute inset-0 transition-opacity duration-700 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]"
+        style={{ opacity: ready ? 1 : 0 }}
+      >
+        <Grainient
+          className=""
+          timeSpeed={0.4}
+          grainAmount={0.06}
+          contrast={1.2}
+          saturation={0.7}
+          zoom={0.5}
+          warpSpeed={2.0}
+          warpAmplitude={30}
+          color1="#FF9FFC"
+          color2="#5227FF"
+          color3="#B19EEF"
+        />
+      </div>
+
+      {/* Semi-transparent overlay for readability */}
+      <div className="absolute inset-0 bg-white/80 dark:bg-gray-950/80" />
+
+      {/* Content */}
+      <div className="relative z-20 mx-auto flex max-w-4xl flex-col items-center gap-6 px-6 py-24 text-center sm:py-32">
+        <motion.h2
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, margin: "-10%" }}
+          transition={{ duration: 0.7, ease }}
+          className="font-display text-3xl font-light text-foreground sm:text-4xl md:text-5xl"
+        >
+          {t("landing.pricingTitle")}
+        </motion.h2>
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, margin: "-5%" }}
+          transition={{ duration: 0.7, ease, delay: 0.1 }}
+          className="max-w-lg text-base leading-relaxed text-foreground/60 sm:text-lg"
+        >
+          {t("landing.pricingSubtitle")}
+        </motion.p>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, margin: "-5%" }}
+          transition={{ duration: 0.7, ease, delay: 0.2 }}
+          className="flex items-baseline gap-1"
+        >
+          <span className="font-display text-6xl font-light text-foreground sm:text-7xl md:text-8xl">
+            {t("landing.pricingPrice")}
+          </span>
+          <span className="text-lg text-foreground/40 sm:text-xl">
+            {t("landing.pricingPeriod")}
+          </span>
+        </motion.div>
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7, ease, delay: 0.3 }}
+          className="mt-2 flex items-center gap-2 text-sm text-foreground/40 sm:text-base"
+        >
+          <span>*</span>
+          {t("landing.pricingNote")}
+        </motion.p>
+      </div>
+
+      {/* Bottom fade — blends into the section below */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 sm:h-32"
+        style={{
+          background:
+            "linear-gradient(to top, var(--background) 0%, transparent 100%)",
+        }}
+      />
+    </section>
+  );
+}
+
 function FeaturesSection() {
+  const { t } = useTranslation();
   return (
     <section className="relative overflow-hidden bg-[var(--background)] py-24 sm:py-32 md:py-40">
       <IllustrationLayer illustrations={FEATURES_ILLUSTRATIONS} />
@@ -746,15 +925,15 @@ function FeaturesSection() {
           transition={{ duration: 0.7, ease }}
           className="mb-16 text-center font-display text-3xl font-light text-foreground sm:mb-20 sm:text-4xl md:text-5xl"
         >
-          Everything You Need
+          {t("landing.featuresTitle")}
         </motion.h2>
 
         <div className="grid auto-rows-[1fr] grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3">
           {FEATURES.map((feature, i) => (
             <FeatureCard
-              key={feature.title}
-              title={feature.title}
-              description={feature.description}
+              key={feature.titleKey}
+              title={t(feature.titleKey)}
+              description={t(feature.descKey)}
               font={feature.font}
               index={i}
             />
@@ -767,6 +946,7 @@ function FeaturesSection() {
 
 /* ── Community / About section ── */
 function CommunitySection() {
+  const { t } = useTranslation();
   return (
     <section className="relative overflow-hidden bg-[var(--background)] py-24 sm:py-32 md:py-40">
       <IllustrationLayer illustrations={COMMUNITY_ILLUSTRATIONS} />
@@ -779,7 +959,7 @@ function CommunitySection() {
           transition={{ duration: 0.7, ease }}
           className="font-display text-3xl font-light text-foreground sm:text-4xl md:text-5xl"
         >
-          Built By The Community
+          {t("landing.communityTitle")}
         </motion.h2>
 
         <motion.p
@@ -789,8 +969,7 @@ function CommunitySection() {
           transition={{ duration: 0.7, ease, delay: 0.1 }}
           className="max-w-xl text-base leading-relaxed text-foreground/60 sm:text-lg md:text-xl"
         >
-          Libraryyy is an open-source platform where students contribute, verify, and build
-          study resources together. Every note you share helps someone else succeed.
+          {t("landing.communityDesc1")}
         </motion.p>
 
         <motion.p
@@ -800,8 +979,7 @@ function CommunitySection() {
           transition={{ duration: 0.7, ease, delay: 0.2 }}
           className="max-w-lg text-base leading-relaxed text-foreground/40 sm:text-lg"
         >
-          Professors can become Core Contributors — verified educators who shape the
-          study material directly. Students and professors, building the future of learning.
+          {t("landing.communityDesc2")}
         </motion.p>
 
         <motion.div
@@ -811,7 +989,7 @@ function CommunitySection() {
           transition={{ duration: 0.7, ease, delay: 0.3 }}
         >
           <GrainientButton href="/auth">
-            Get Started
+            {t("landing.getStarted")}
           </GrainientButton>
         </motion.div>
       </div>
@@ -821,6 +999,7 @@ function CommunitySection() {
 
 /* ── Footer ── */
 function Footer() {
+  const { t } = useTranslation();
   return (
     <footer className="relative pt-20 pb-12 sm:pt-28 sm:pb-16">
       {/* Fade from solid background → transparent so Grainient bleeds through */}
@@ -840,22 +1019,22 @@ function Footer() {
       <div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center gap-8 px-6 text-center">
         <div className="flex flex-col items-center gap-2">
           <Link href="/" className="font-display text-2xl font-light text-white sm:text-3xl">
-            Libraryyy
+            {t("landing.title")}
           </Link>
           <p className="font-gochi text-sm text-white/70 sm:text-base">
-            By A Student, For A Student
+            {t("landing.subtitle")}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
           <Link href="/professors" className="text-sm text-white/80 transition-colors hover:text-white">
-            Rate Your Professor
+            {t("landing.rateYourProfessor")}
           </Link>
           <Link href="/privacy" className="text-sm text-white/80 transition-colors hover:text-white">
-            Privacy Policy
+            {t("landing.privacyPolicy")}
           </Link>
           <Link href="/terms" className="text-sm text-white/80 transition-colors hover:text-white">
-            Terms Of Use
+            {t("landing.termsOfUse")}
           </Link>
         </div>
 
@@ -867,7 +1046,7 @@ function Footer() {
             hello@libraryyy.com
           </a>
           <p className="text-xs text-white/50">
-            &copy; {new Date().getFullYear()} Libraryyy. All Rights Reserved.
+            &copy; {new Date().getFullYear()} {t("landing.title")}. {t("landing.allRightsReserved")}
           </p>
         </div>
       </div>
@@ -876,6 +1055,7 @@ function Footer() {
 }
 
 export default function LandingPage() {
+  const { t } = useTranslation();
   return (
     <ReactLenis
       className="h-full w-full overflow-y-auto"
@@ -889,21 +1069,6 @@ export default function LandingPage() {
       <section className="relative w-full">
         {/* Content — locked to first viewport */}
         <div className="relative flex h-dvh w-full flex-col items-center text-center">
-          {/* ── Nav ── */}
-          <motion.nav
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, ease, delay: 0.3 }}
-            className="flex w-full items-center justify-center gap-2 px-6 pt-7 sm:gap-4 sm:px-10 sm:pt-9"
-          >
-            <NavLink href="/auth" font="delicious">
-              Lets Start
-            </NavLink>
-            <NavLink href="/portal" font="gochi">
-              Portal
-            </NavLink>
-          </motion.nav>
-
           {/* ── Title + Motto — centered ── */}
           <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 sm:gap-8 md:gap-10">
             <motion.h1
@@ -912,7 +1077,7 @@ export default function LandingPage() {
               transition={{ duration: 0.8, ease }}
               className="font-display text-7xl font-light tracking-tight text-white sm:text-9xl md:text-[10rem] lg:text-[11rem]"
             >
-              Libraryyy
+              {t("landing.title")}
             </motion.h1>
 
             <motion.p
@@ -921,9 +1086,25 @@ export default function LandingPage() {
               transition={{ duration: 0.8, ease, delay: 0.2 }}
               className="font-gochi text-xl text-white sm:text-2xl md:text-3xl"
             >
-              By A Student, For A Student
+              {t("landing.subtitle")}
             </motion.p>
           </div>
+
+          {/* ── Nav ── */}
+          <motion.nav
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, ease, delay: 0.3 }}
+            className="flex w-full items-center justify-center gap-2 px-6 pb-10 sm:gap-4 sm:px-10 sm:pb-14"
+          >
+            <NavLink href="/auth" font="delicious">
+              {t("landing.letsStart")}
+            </NavLink>
+            <NavLink href="/portal" font="gochi">
+              {t("landing.portal")}
+            </NavLink>
+            <LangSwitcher />
+          </motion.nav>
         </div>
 
         {/* Extra scroll space — the "leap" before the fade begins */}
@@ -955,6 +1136,9 @@ export default function LandingPage() {
 
       {/* ── How It Works ── */}
       <HowItWorksSection />
+
+      {/* ── Pricing ── */}
+      <PricingSection />
 
       {/* ── Features ── */}
       <FeaturesSection />

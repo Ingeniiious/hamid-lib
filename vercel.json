@@ -4,6 +4,14 @@
     {
       "path": "/api/cron/notifications",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/ai-pipeline",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/extraction",
+      "schedule": "*/2 * * * *"
     }
   ]
 }

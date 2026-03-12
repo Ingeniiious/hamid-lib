@@ -1,5 +1,5 @@
 import { BackButton } from "@/components/BackButton";
-import { PageHeader } from "@/components/PageHeader";
+import { TranslatedPageHeader } from "@/components/TranslatedPageHeader";
 import { PresentationsList } from "@/components/portal/PresentationsList";
 import type { Metadata } from "next";
 
@@ -13,9 +13,9 @@ export default function PresentationsPage() {
     <div className="flex h-full flex-col">
       {/* Fixed header — stays pinned */}
       <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
-        <PageHeader
-          title="Presentations"
-          subtitle="Upload files and share them instantly via Portal."
+        <TranslatedPageHeader
+          titleKey="studies.presentations"
+          subtitleKey="portal.uploadAndShare"
         />
       </div>
 

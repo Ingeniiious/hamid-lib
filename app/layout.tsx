@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { I18nProvider } from "@/lib/i18n";
 import { ServiceWorkerProvider } from "@/components/ServiceWorkerProvider";
 import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 import { CookieConsent } from "@/components/CookieConsent";
@@ -70,9 +71,11 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geist.variable} font-sans antialiased`}>
         <ThemeProvider>
-          {children}
-          <AnalyticsTracker />
-          <CookieConsent />
+          <I18nProvider>
+            {children}
+            <AnalyticsTracker />
+            <CookieConsent />
+          </I18nProvider>
         </ThemeProvider>
         <ServiceWorkerProvider />
         <Analytics />

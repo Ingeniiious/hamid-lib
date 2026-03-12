@@ -12,6 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTranslation } from "@/lib/i18n";
+import { LanguagePicker } from "@/components/LanguagePicker";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -25,6 +27,7 @@ export function DashboardTopBar({
   isContributor?: boolean;
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const initial = userName.charAt(0).toUpperCase();
 
   const handleSignOut = async () => {
@@ -62,56 +65,56 @@ export function DashboardTopBar({
               onClick={() => router.push("/dashboard")}
               className="cursor-pointer rounded-lg text-gray-900/80 focus:bg-gray-900/5 focus:text-gray-900 dark:text-white/80 dark:focus:bg-white/10 dark:focus:text-white"
             >
-              Home
+              {t("common.home")}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => router.push("/dashboard/courses")}
               className="cursor-pointer rounded-lg text-gray-900/80 focus:bg-gray-900/5 focus:text-gray-900 dark:text-white/80 dark:focus:bg-white/10 dark:focus:text-white"
             >
-              Courses
+              {t("dashboard.courses")}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => router.push("/dashboard/me/calendar")}
               className="cursor-pointer rounded-lg text-gray-900/80 focus:bg-gray-900/5 focus:text-gray-900 dark:text-white/80 dark:focus:bg-white/10 dark:focus:text-white"
             >
-              Calendar
+              {t("studies.calendar")}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => router.push("/dashboard/me/presentations")}
               className="cursor-pointer rounded-lg text-gray-900/80 focus:bg-gray-900/5 focus:text-gray-900 dark:text-white/80 dark:focus:bg-white/10 dark:focus:text-white"
             >
-              Presentations
+              {t("studies.presentations")}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => router.push("/dashboard/space")}
               className="cursor-pointer rounded-lg text-gray-900/80 focus:bg-gray-900/5 focus:text-gray-900 dark:text-white/80 dark:focus:bg-white/10 dark:focus:text-white"
             >
-              My Space
+              {t("dashboard.mySpace")}
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-gray-900/10 dark:bg-white/10" />
             <DropdownMenuItem
               onClick={() => router.push("/dashboard/users")}
               className="cursor-pointer rounded-lg text-gray-900/80 focus:bg-gray-900/5 focus:text-gray-900 dark:text-white/80 dark:focus:bg-white/10 dark:focus:text-white"
             >
-              Settings
+              {t("settings.accountSettings")}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => router.push("/dashboard/subs")}
               className="cursor-pointer rounded-lg text-gray-900/80 focus:bg-gray-900/5 focus:text-gray-900 dark:text-white/80 dark:focus:bg-white/10 dark:focus:text-white"
             >
-              Subscription
+              {t("common.subscription")}
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-gray-900/10 dark:bg-white/10" />
             <DropdownMenuItem
               onClick={handleSignOut}
               className="cursor-pointer rounded-lg text-gray-900/80 focus:bg-gray-900/5 focus:text-gray-900 dark:text-white/80 dark:focus:bg-white/10 dark:focus:text-white"
             >
-              Sign Out
+              {t("settings.signOut")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <span className="font-display text-sm font-light text-gray-900 dark:text-white">
-          Hello, {userName.split(" ")[0]}
+          {t("common.hello")} {userName.split(" ")[0]}
         </span>
         {isContributor && (
           <motion.img
@@ -124,8 +127,9 @@ export function DashboardTopBar({
         )}
       </div>
 
-      {/* Right — theme toggle */}
-      <div className="pointer-events-auto flex items-center">
+      {/* Right — language + theme */}
+      <div className="pointer-events-auto flex items-center gap-2">
+        <LanguagePicker />
         <ThemeToggle />
       </div>
     </motion.div>

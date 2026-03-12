@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, serial, boolean, unique, jsonb, index, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, serial, boolean, unique, jsonb, index, uuid, numeric } from "drizzle-orm/pg-core";
 
 // ==================
 // App tables
@@ -595,4 +595,191 @@ export const mindMap = pgTable("mind_map", {
   index("mind_map_user_id_idx").on(table.userId),
   index("mind_map_folder_id_idx").on(table.folderId),
   index("mind_map_updated_at_idx").on(table.updatedAt),
+]);
+
+// ==================
+// AI Teachers' Council
+// Multi-model pipeline that processes student contributions into verified study content
+// ==================
+
+export const aiModelConfig = pgTable("ai_model_config", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),                    // "Kimi 2.5", "ChatGPT", "Claude Sonnet 4.6", "Gemini"
+  slug: text("slug").notNull().unique(),            // "kimi", "chatgpt", "claude", "gemini"
+  provider: text("provider").notNull(),             // "moonshot", "openai", "anthropic", "google"
+  modelId: text("model_id").notNull(),              // "kimi-2.5", "gpt-4o", "claude-sonnet-4-6", "gemini-2.5-pro"
+  role: text("role").notNull(),                     // "creator", "reviewer", "enricher", "validator"
+  pipelineOrder: integer("pipeline_order").notNull(), // 1, 2, 3, 4
+  costPerInputToken: numeric("cost_per_input_token", { precision: 12, scale: 10 }),
+  costPerOutputToken: numeric("cost_per_output_token", { precision: 12, scale: 10 }),
+  maxInputTokens: integer("max_input_tokens"),
+  maxOutputTokens: integer("max_output_tokens"),
+  enabled: boolean("enabled").notNull().default(true),
+  config: jsonb("config"),                          // extra provider-specific config (temperature, etc.)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("ai_model_config_slug_idx").on(table.slug),
+]);
+
+export const pipelineJob = pgTable("pipeline_job", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  courseId: text("course_id").notNull().references(() => course.id, { onDelete: "cascade" }),
+  contributionIds: jsonb("contribution_ids").notNull(), // array of contribution IDs used as source
+  status: text("status").notNull().default("pending"),  // pending, extracting, reviewing, enriching, validating, publishing, completed, failed, cancelled
+  currentStep: integer("current_step").notNull().default(0), // which pipeline_order step we're on
+  outputTypes: jsonb("output_types").notNull(),          // requested output types: ["study_guide", "flashcards", ...]
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").notNull().default(0),
+  maxRetries: integer("max_retries").notNull().default(3),
+  // Cost tracking
+  totalInputTokens: integer("total_input_tokens").notNull().default(0),
+  totalOutputTokens: integer("total_output_tokens").notNull().default(0),
+  totalCostUsd: numeric("total_cost_usd", { precision: 10, scale: 6 }).notNull().default("0"),
+  // Version tracking
+  version: integer("version").notNull().default(1),
+  startedBy: text("started_by").notNull(),              // admin user who triggered
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("pipeline_job_course_id_idx").on(table.courseId),
+  index("pipeline_job_status_idx").on(table.status),
+  index("pipeline_job_created_at_idx").on(table.createdAt),
+]);
+
+export const pipelineStep = pgTable("pipeline_step", {
+  id: serial("id").primaryKey(),
+  jobId: uuid("job_id").notNull().references(() => pipelineJob.id, { onDelete: "cascade" }),
+  modelSlug: text("model_slug").notNull(),              // "kimi", "chatgpt", "claude", "gemini"
+  role: text("role").notNull(),                         // "creator", "reviewer", "enricher", "validator"
+  stepOrder: integer("step_order").notNull(),            // matches pipeline_order from model config
+  status: text("status").notNull().default("pending"),   // pending, running, completed, failed, skipped
+  // Input
+  inputHash: text("input_hash"),                        // SHA-256 of input for dedup/caching
+  inputSummary: text("input_summary"),                  // brief description of what was sent
+  // Output
+  output: jsonb("output"),                              // full structured output from the model
+  // Review decision
+  verdict: text("verdict"),                             // "approved", "needs_changes", "rejected" (null for creator)
+  issues: jsonb("issues"),                              // [{field, description, severity}] flagged issues
+  // Cost
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
+  costUsd: numeric("cost_usd", { precision: 10, scale: 6 }).notNull().default("0"),
+  // Timing
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  durationMs: integer("duration_ms"),
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("pipeline_step_job_id_idx").on(table.jobId),
+  index("pipeline_step_status_idx").on(table.status),
+  index("pipeline_step_model_slug_idx").on(table.modelSlug),
+]);
+
+export const generatedContent = pgTable("generated_content", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  courseId: text("course_id").notNull().references(() => course.id, { onDelete: "cascade" }),
+  jobId: uuid("job_id").references(() => pipelineJob.id, { onDelete: "set null" }),
+  contentType: text("content_type").notNull(),          // "study_guide", "flashcards", "quiz", "mock_exam", "podcast_script", "video_script", "mind_map", "infographic_data", "slide_deck", "data_table", "report", "interactive_section"
+  title: text("title").notNull(),
+  description: text("description"),
+  // Structured content (for quiz, flashcards, slides, data tables, mind maps, etc.)
+  content: jsonb("content"),
+  // Media content (for podcast audio, video, infographic images)
+  mediaUrl: text("media_url"),                          // R2 CDN URL
+  mediaKey: text("media_key"),                          // R2 object key
+  mediaType: text("media_type"),                        // MIME type
+  mediaSize: integer("media_size"),                     // bytes
+  // Rich text content (for study guides, reports)
+  richText: text("rich_text"),                          // Tiptap-compatible JSON
+  // Metadata
+  language: text("language").notNull().default("en"),
+  modelSource: text("model_source"),                    // which model produced this variant (for mock exams)
+  version: integer("version").notNull().default(1),
+  isPublished: boolean("is_published").notNull().default(false),
+  publishedAt: timestamp("published_at"),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("generated_content_course_id_idx").on(table.courseId),
+  index("generated_content_type_idx").on(table.contentType),
+  index("generated_content_published_idx").on(table.isPublished),
+  index("generated_content_course_type_idx").on(table.courseId, table.contentType),
+]);
+
+export const contentChallenge = pgTable("content_challenge", {
+  id: serial("id").primaryKey(),
+  contentId: uuid("content_id").notNull().references(() => generatedContent.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  challengeText: text("challenge_text").notNull(),      // student's challenge explanation
+  fieldPath: text("field_path"),                        // specific field in JSONB e.g. "flashcards[3].answer"
+  status: text("status").notNull().default("pending"),  // pending, evaluating, accepted, rejected
+  // AI council response
+  evaluationJobId: uuid("evaluation_job_id").references(() => pipelineJob.id, { onDelete: "set null" }),
+  responseText: text("response_text"),                  // council's explanation
+  verdict: text("verdict"),                             // "correction_accepted", "content_correct", "partially_correct"
+  reviewedBy: text("reviewed_by"),                      // admin who approved the final decision
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("content_challenge_content_id_idx").on(table.contentId),
+  index("content_challenge_status_idx").on(table.status),
+  index("content_challenge_user_id_idx").on(table.userId),
+  index("content_challenge_created_at_idx").on(table.createdAt),
+]);
+
+// ==================
+// Content Extraction Pipeline
+// Tracks file extraction (Phase 1 deterministic + Phase 2 Kimi multimodal) per contribution
+// ==================
+
+export const extractionJob = pgTable("extraction_job", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  contributionId: integer("contribution_id")
+    .notNull()
+    .references(() => contribution.id, { onDelete: "cascade" }),
+  courseId: text("course_id")
+    .notNull()
+    .references(() => course.id, { onDelete: "cascade" }),
+  // File info (copied from contribution for easy access)
+  fileName: text("file_name").notNull(),
+  fileKey: text("file_key").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileType: text("file_type").notNull(),         // "pdf", "docx", "pptx", "image", "video"
+  fileSize: integer("file_size"),
+  // Status
+  status: text("status").notNull().default("pending"), // pending, downloading, extracting, classifying, completed, failed
+  currentPhase: integer("current_phase").notNull().default(0), // 0=not started, 1=deterministic, 2=multimodal
+  // Extraction output
+  extractedContent: jsonb("extracted_content"),    // DeterministicResult from Phase 1
+  sourceContent: text("source_content"),           // Final flattened markdown (output of Phase 2)
+  // Image processing tracking
+  totalImages: integer("total_images").notNull().default(0),
+  processedImages: integer("processed_images").notNull().default(0),
+  // Cost tracking
+  extractionTokens: integer("extraction_tokens").notNull().default(0),
+  extractionCostUsd: numeric("extraction_cost_usd", { precision: 10, scale: 6 }).notNull().default("0"),
+  // Error handling
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").notNull().default(0),
+  maxRetries: integer("max_retries").notNull().default(3),
+  // Linking to AI Council pipeline
+  pipelineJobId: uuid("pipeline_job_id").references(() => pipelineJob.id, { onDelete: "set null" }),
+  // Timestamps
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("extraction_job_contribution_id_idx").on(table.contributionId),
+  index("extraction_job_course_id_idx").on(table.courseId),
+  index("extraction_job_status_idx").on(table.status),
+  index("extraction_job_created_at_idx").on(table.createdAt),
 ]);

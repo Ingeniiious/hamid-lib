@@ -14,12 +14,12 @@
 }
 
 @font-face {
-  font-family: "SGKara";
-  src: url("/fonts/SGKara-Regular.ttf") format("truetype");
-  font-weight: 400;
+  font-family: "Estedad";
+  src: url("/fonts/estedad-variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0600-06FF, U+FB50-FDFF, U+FE70-FEFF;
+  unicode-range: U+0600-06FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F, U+25CC, U+0640;
 }
 
 @font-face {
@@ -53,12 +53,25 @@
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black var(--fade), black calc(100% - var(--fade)), transparent 100%);
 }
 
+/*
+ * Persian (Estedad) weight boost — Cooper BT headings use font-weight 300
+ * (font-light), which makes Estedad nearly invisible. When the page is in
+ * Persian (:root[lang="fa"]), bump light-weight text to 500 so headings
+ * are visually distinct from body text.
+ */
+:root[lang="fa"] .font-light {
+  font-weight: 500;
+}
+:root[lang="fa"] .font-medium {
+  font-weight: 600;
+}
+
 @theme {
-  --font-sans: var(--font-geist), "SGKara", ui-sans-serif, system-ui, sans-serif,
+  --font-sans: var(--font-geist), "Estedad", ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --font-display: "Cooper BT", "SGKara", Georgia, "Times New Roman", serif;
-  --font-gochi: "Gochi Hand", "SGKara", cursive;
-  --font-delicious: "Delicious Handrawn", "SGKara", cursive;
+  --font-display: "Cooper BT", "Estedad", Georgia, "Times New Roman", serif;
+  --font-gochi: "Gochi Hand", "Estedad", cursive;
+  --font-delicious: "Delicious Handrawn", "Estedad", cursive;
 }
 
 @theme inline {

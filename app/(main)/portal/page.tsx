@@ -6,6 +6,7 @@ import Link from "next/link";
 import { PortalCodeInput } from "@/components/portal/PortalCodeInput";
 import { FileViewer } from "@/components/portal/FileViewer";
 import { verifyPortalCode, checkApprovalStatus } from "./actions";
+import { useTranslation } from "@/lib/i18n";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -24,6 +25,7 @@ type PortalState =
     };
 
 export default function PortalPage() {
+  const { t } = useTranslation();
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState<PortalState>({ step: "input" });
@@ -113,7 +115,7 @@ export default function PortalPage() {
           href="/"
           className="inline-flex items-center rounded-full bg-white/10 px-8 py-3 text-sm font-medium text-white backdrop-blur-sm transition-all duration-300 hover:bg-white/20"
         >
-          Back To Home
+          {t("common.backToHome")}
         </Link>
       </motion.div>
 
@@ -189,14 +191,14 @@ export default function PortalPage() {
                         className="mb-2 text-center font-display text-2xl font-light text-white"
                         transition={{ layout: { duration: 0.3, ease } }}
                       >
-                        Portal
+                        {t("portal.title")}
                       </motion.h2>
                       <motion.p
                         layout
                         className="mb-6 text-center text-sm text-white/50"
                         transition={{ layout: { duration: 0.3, ease } }}
                       >
-                        Enter your 8-character code to grab your file
+                        {t("portal.subtitle")}
                       </motion.p>
 
                       <PortalCodeInput
@@ -230,7 +232,7 @@ export default function PortalPage() {
                       className="flex flex-col items-center py-6"
                     >
                       <div className="h-7 w-7 animate-spin rounded-full border-2 border-white/20 border-t-white/70" />
-                      <p className="mt-4 text-sm text-white/50">Verifying...</p>
+                      <p className="mt-4 text-sm text-white/50">{t("portal.verifying")}</p>
                     </motion.div>
                   )}
 
@@ -245,10 +247,10 @@ export default function PortalPage() {
                     >
                       <div className="h-7 w-7 animate-spin rounded-full border-2 border-amber-400/30 border-t-amber-400/80" />
                       <p className="mt-4 text-sm font-medium text-amber-400/90">
-                        Waiting For Approval
+                        {t("portal.waitingForApproval")}
                       </p>
                       <p className="mt-1.5 text-center text-xs leading-relaxed text-white/40">
-                        The presenter needs to approve your access request.
+                        {t("portal.presenterNeedsApproval")}
                       </p>
                       <p className="mt-3 max-w-full truncate text-xs text-white/30">
                         {state.fileName}
@@ -269,16 +271,16 @@ export default function PortalPage() {
                         <div className="h-3 w-3 rounded-full bg-red-400" />
                       </div>
                       <p className="mt-4 text-sm font-medium text-red-400">
-                        Access Denied
+                        {t("portal.accessDenied")}
                       </p>
                       <p className="mt-1.5 text-center text-xs text-white/40">
-                        The presenter rejected your request.
+                        {t("portal.presenterRejected")}
                       </p>
                       <button
                         onClick={handleReset}
                         className="mt-5 rounded-full bg-white/10 px-5 py-2 text-xs font-medium text-white/70 transition-all duration-300 hover:bg-white/15 hover:text-white/90"
                       >
-                        Try Another Code
+                        {t("portal.tryAnotherCode")}
                       </button>
                     </motion.div>
                   )}
@@ -296,16 +298,16 @@ export default function PortalPage() {
                         <div className="h-3 w-3 rounded-full bg-white/30" />
                       </div>
                       <p className="mt-4 text-sm font-medium text-white/60">
-                        Code Expired
+                        {t("portal.codeExpired")}
                       </p>
                       <p className="mt-1.5 text-center text-xs text-white/40">
-                        Ask the presenter for a new code.
+                        {t("portal.askForNewCode")}
                       </p>
                       <button
                         onClick={handleReset}
                         className="mt-5 rounded-full bg-white/10 px-5 py-2 text-xs font-medium text-white/70 transition-all duration-300 hover:bg-white/15 hover:text-white/90"
                       >
-                        Try Again
+                        {t("common.tryAgain")}
                       </button>
                     </motion.div>
                   )}

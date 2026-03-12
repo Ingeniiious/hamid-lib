@@ -3,9 +3,11 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { portalPresentation } from "@/database/schema";
 import { uploadToR2 } from "@/lib/r2";
-import { watermarkFile } from "@/lib/watermark";
 import { eq, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
+
+// Allow uploads up to 50MB (Next.js default is 1MB)
+export const bodySizeLimit = "50mb";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB per file
 const MAX_FILES_PER_USER = 5;
@@ -90,27 +92,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Watermark the file before uploading (PDFs + images)
-    let watermarkedBuffer: Uint8Array;
-    let finalMime: string;
-    try {
-      const rawBuffer = new Uint8Array(await file.arrayBuffer());
-      const result = await watermarkFile(rawBuffer, file.type);
-      watermarkedBuffer = result.buffer;
-      finalMime = result.mimeType;
-    } catch (wmErr) {
-      console.error("Watermark failed:", file.type, file.name, wmErr);
-      // Fall back to uploading without watermark
-      watermarkedBuffer = new Uint8Array(await file.arrayBuffer());
-      finalMime = file.type;
-    }
+    // Read the raw file buffer — watermarking is done dynamically in the viewer
+    const fileBuffer = new Uint8Array(await file.arrayBuffer());
 
     // Hash the object key — no userId or filename in the path
     const hash = randomBytes(32).toString("hex");
-    const ext = getExtension(finalMime);
+    const ext = getExtension(file.type);
     const objectKey = `portal/${hash}${ext}`;
 
-    const result = await uploadToR2(watermarkedBuffer, objectKey, finalMime);
+    const result = await uploadToR2(fileBuffer, objectKey, file.type);
 
     if (!result.success) {
       console.error("R2 upload failed:", result.error);
@@ -124,8 +114,8 @@ export async function POST(request: NextRequest) {
         fileName: file.name,
         fileKey: objectKey,
         fileUrl: result.url,
-        fileSize: watermarkedBuffer.length,
-        fileType: finalMime,
+        fileSize: fileBuffer.length,
+        fileType: file.type,
       })
       .returning();
 

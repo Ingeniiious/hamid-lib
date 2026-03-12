@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 
 const BUCKET = "hamid-lib-assets";
 const CDN_BASE = "https://lib.thevibecodedcompany.com";
@@ -43,5 +43,29 @@ export async function deleteFromR2(objectKey: string): Promise<void> {
     );
   } catch {
     // Best-effort deletion
+  }
+}
+
+export async function downloadFromR2(
+  objectKey: string
+): Promise<{ success: true; data: Buffer; contentType: string } | { success: false; error: string }> {
+  try {
+    const response = await s3.send(
+      new GetObjectCommand({
+        Bucket: BUCKET,
+        Key: objectKey,
+      })
+    );
+
+    if (!response.Body) {
+      return { success: false, error: "Empty response body from R2" };
+    }
+
+    const bytes = await response.Body.transformToByteArray();
+    const contentType = response.ContentType ?? "application/octet-stream";
+
+    return { success: true, data: Buffer.from(bytes), contentType };
+  } catch (e) {
+    return { success: false, error: `R2 download error: ${(e as Error).message}` };
   }
 }

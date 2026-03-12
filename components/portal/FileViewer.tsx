@@ -9,12 +9,13 @@ const ease = [0.25, 0.46, 0.45, 0.94] as const;
 /**
  * Dynamic watermark overlay — tiles "libraryyy.com" diagonally across the viewer.
  * pointer-events: none so it doesn't block interaction with the content.
+ * Uses both white and black text at low opacity so it's subtly visible on any background.
  */
-function WatermarkOverlay({ variant = "dark" }: { variant?: "dark" | "light" }) {
+function WatermarkOverlay({ variant = "light" }: { variant?: "dark" | "light" }) {
   const color =
     variant === "dark"
-      ? "rgba(255,255,255,0.04)"
-      : "rgba(0,0,0,0.035)";
+      ? "rgba(255,255,255,0.05)"
+      : "rgba(0,0,0,0.04)";
 
   return (
     <div
@@ -160,7 +161,8 @@ export function FileViewer({
       ) : (
         <iframe src={googleViewerUrl} title={fileName} className="h-full w-full" />
       )}
-      <WatermarkOverlay variant="dark" />
+      {/* Dynamic watermark: dark text for docs/PDFs (white bg), white text for images/fullscreen (dark bg) */}
+      <WatermarkOverlay variant={isPdf || isOffice ? "light" : "dark"} />
     </>
   );
 

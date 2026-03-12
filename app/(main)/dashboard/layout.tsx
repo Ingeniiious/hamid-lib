@@ -6,6 +6,7 @@ import { userProfile } from "@/database/schema";
 import { getAvatarUrl } from "@/lib/avatar";
 import { DashboardTopBar } from "@/components/DashboardTopBar";
 import { DashboardShell } from "@/components/DashboardShell";
+import { LanguageSync } from "@/components/LanguageSync";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -41,6 +42,7 @@ export default async function DashboardLayout({
       avatarUrl: userProfile.avatarUrl,
       gender: userProfile.gender,
       contributorVerifiedAt: userProfile.contributorVerifiedAt,
+      language: userProfile.language,
     })
     .from(userProfile)
     .where(eq(userProfile.userId, session.user.id))
@@ -48,11 +50,15 @@ export default async function DashboardLayout({
   const profile = profiles[0];
   const avatarUrl = getAvatarUrl(profile?.avatarUrl, profile?.gender);
   const isContributor = !!profile?.contributorVerifiedAt;
+  const userLanguage = profile?.language || "en";
 
   return (
     <div className="relative h-full w-full">
       {/* Gradient overlay — Grainient visible at top, smoothly fading to background */}
       <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-transparent from-0% via-[var(--background)]/60 via-[20%] to-[var(--background)] to-[45%]" />
+
+      {/* Sync DB language to i18n context (cross-device persistence) */}
+      <LanguageSync language={userLanguage} />
 
       {/* Content */}
       <div className="relative z-10 flex h-full flex-col">

@@ -7,6 +7,7 @@ import ConfettiBurst from "@/components/ConfettiBurst";
 import Link from "next/link";
 import { Eye, EyeSlash, CaretUpDown, Check } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
+import { useTranslation } from "@/lib/i18n";
 import {
   sendOTP,
   verifyOTP,
@@ -90,6 +91,7 @@ function PasswordInput({
 
 export default function AuthPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   // Always start with "sign-in" on server & client to avoid hydration mismatch,
   // then switch to "sign-up" after mount if user has never visited
   const [mode, setMode] = useState<Mode>("sign-in");
@@ -133,7 +135,7 @@ export default function AuthPage() {
         }
         setMode("admin-verify");
       } catch {
-        setError("Failed to send admin verification code.");
+        setError(t("auth.failedToSendCode"));
         adminOtpSending.current = false;
       }
     } else {
@@ -156,9 +158,9 @@ export default function AuthPage() {
       if (authError) {
         const msg = (authError.message || "").toLowerCase();
         if (msg.includes("invalid") || msg.includes("credential") || msg.includes("password") || msg.includes("not found") || msg.includes("user")) {
-          setError("Invalid email or password.");
+          setError(t("auth.invalidCredentials"));
         } else {
-          setError(authError.message || "Invalid email or password.");
+          setError(authError.message || t("auth.invalidCredentials"));
         }
         return;
       }
@@ -167,9 +169,9 @@ export default function AuthPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message.toLowerCase() : "";
       if (msg.includes("invalid") || msg.includes("credential") || msg.includes("password") || msg.includes("not found") || msg.includes("user")) {
-        setError("Invalid email or password.");
+        setError(t("auth.invalidCredentials"));
       } else {
-        setError("Something went wrong. Please try again.");
+        setError(t("common.error"));
       }
     } finally {
       setLoading(false);
@@ -189,7 +191,7 @@ export default function AuthPage() {
       }
       setMode("verify");
     } catch {
-      setError("Failed to send verification code.");
+      setError(t("auth.failedToSendCode"));
     } finally {
       setLoading(false);
     }
@@ -217,7 +219,7 @@ export default function AuthPage() {
       });
 
       if (authError) {
-        setError(authError.message || "Failed to create account.");
+        setError(authError.message || t("common.error"));
         return;
       }
 
@@ -231,7 +233,7 @@ export default function AuthPage() {
 
       redirectByRole(data?.user as Record<string, unknown> | undefined);
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -244,7 +246,7 @@ export default function AuthPage() {
       const result = await sendOTP(email);
       if (result.error) setError(result.error);
     } catch {
-      setError("Failed to resend code.");
+      setError(t("auth.failedToResend"));
     } finally {
       setLoading(false);
     }
@@ -266,7 +268,7 @@ export default function AuthPage() {
       }
       router.replace("/admin");
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -279,7 +281,7 @@ export default function AuthPage() {
       const result = await sendAdminOTP();
       if (result.error) setError(result.error);
     } catch {
-      setError("Failed to resend code.");
+      setError(t("auth.failedToResend"));
     } finally {
       setLoading(false);
     }
@@ -308,7 +310,7 @@ export default function AuthPage() {
       }
       setMode("forgot-verify");
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -336,7 +338,7 @@ export default function AuthPage() {
       const result = await sendPasswordResetOTP(email);
       if (result.error) setError(result.error);
     } catch {
-      setError("Failed to resend code.");
+      setError(t("auth.failedToResend"));
     } finally {
       setLoading(false);
     }
@@ -347,12 +349,12 @@ export default function AuthPage() {
     setError(null);
 
     if (newPassword !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError(t("auth.passwordsDontMatch"));
       return;
     }
 
     if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError(t("auth.passwordTooShort"));
       return;
     }
 
@@ -367,7 +369,7 @@ export default function AuthPage() {
       setResetSuccess(true);
       setTimeout(() => switchMode("sign-in"), 2000);
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -408,7 +410,7 @@ export default function AuthPage() {
           href="/"
           className="inline-flex items-center rounded-full bg-white/10 px-8 py-3 text-sm font-medium text-white backdrop-blur-sm transition-all duration-300 hover:bg-white/20"
         >
-          Back To Home
+          {t("common.backToHome")}
         </Link>
       </motion.div>
 
@@ -432,10 +434,10 @@ export default function AuthPage() {
                 transition={{ duration: 0.2 }}
               >
                 <h2 className="mb-2 text-center font-display text-2xl font-light text-white">
-                  Admin Verification
+                  {t("auth.adminVerification")}
                 </h2>
                 <p className="mb-6 text-center text-sm text-white/50">
-                  Enter the 6-digit code sent to your email
+                  {t("auth.enterAdminCode")}
                 </p>
 
                 <div className="flex flex-col items-center gap-4">
@@ -471,7 +473,7 @@ export default function AuthPage() {
                     disabled={loading || adminOtp.length !== 6}
                     className="w-full rounded-full bg-white font-medium text-gray-900 hover:bg-white/90 disabled:opacity-50"
                   >
-                    {loading ? "Verifying..." : "Verify"}
+                    {loading ? t("auth.verifying") : t("auth.verify")}
                   </Button>
 
                   <button
@@ -479,7 +481,7 @@ export default function AuthPage() {
                     disabled={loading}
                     className="text-sm text-white/70 underline underline-offset-2 transition-colors hover:text-white disabled:opacity-50"
                   >
-                    Resend Code
+                    {t("auth.resendCode")}
                   </button>
                 </div>
               </motion.div>
@@ -497,7 +499,7 @@ export default function AuthPage() {
                   className="mb-2 text-center font-display text-2xl font-light text-white"
                   transition={{ layout: { duration: 0.3, ease } }}
                 >
-                  New Password
+                  {t("auth.newPassword")}
                 </motion.h2>
                 <motion.p
                   layout
@@ -505,8 +507,8 @@ export default function AuthPage() {
                   transition={{ layout: { duration: 0.3, ease } }}
                 >
                   {resetSuccess
-                    ? "Your password has been reset. Redirecting..."
-                    : "Enter your new password below."}
+                    ? t("auth.passwordResetSuccess")
+                    : t("auth.enterNewPassword")}
                 </motion.p>
 
                 {!resetSuccess ? (
@@ -522,7 +524,7 @@ export default function AuthPage() {
                       <PasswordInput
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="New Password"
+                        placeholder={t("auth.newPassword")}
                         minLength={8}
                         autoComplete="new-password"
                         className={passwordInputClass}
@@ -537,7 +539,7 @@ export default function AuthPage() {
                       <PasswordInput
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Confirm Password"
+                        placeholder={t("auth.confirmPassword")}
                         minLength={8}
                         autoComplete="new-password"
                         className={passwordInputClass}
@@ -568,7 +570,7 @@ export default function AuthPage() {
                         disabled={loading}
                         className="w-full rounded-full bg-white font-medium text-gray-900 hover:bg-white/90 disabled:opacity-50"
                       >
-                        {loading ? "Resetting..." : "Reset Password"}
+                        {loading ? t("auth.resetting") : t("auth.resetPassword")}
                       </Button>
                     </motion.div>
                   </form>
@@ -584,7 +586,7 @@ export default function AuthPage() {
                       onClick={() => switchMode("sign-in")}
                       className="text-white underline underline-offset-2 transition-colors hover:text-white"
                     >
-                      Back To Sign In
+                      {t("common.backToSignIn")}
                     </button>
                   </motion.p>
                 )}
@@ -599,10 +601,10 @@ export default function AuthPage() {
                 transition={{ duration: 0.2 }}
               >
                 <h2 className="mb-2 text-center font-display text-2xl font-light text-white">
-                  Enter Reset Code
+                  {t("auth.enterResetCode")}
                 </h2>
                 <p className="mb-6 text-center text-sm text-white/50">
-                  Enter the 6-digit code sent to{" "}
+                  {t("auth.enterCodeSentTo")}{" "}
                   <span className="text-white/70">{email}</span>
                 </p>
 
@@ -639,7 +641,7 @@ export default function AuthPage() {
                     disabled={loading || resetOtp.length !== 6}
                     className="w-full rounded-full bg-white font-medium text-gray-900 hover:bg-white/90 disabled:opacity-50"
                   >
-                    Continue
+                    {t("common.continue")}
                   </Button>
 
                   <div className="flex gap-4 text-sm">
@@ -648,13 +650,13 @@ export default function AuthPage() {
                       disabled={loading}
                       className="text-white/70 underline underline-offset-2 transition-colors hover:text-white disabled:opacity-50"
                     >
-                      Resend Code
+                      {t("auth.resendCode")}
                     </button>
                     <button
                       onClick={() => switchMode("forgot-password")}
                       className="text-white/70 underline underline-offset-2 transition-colors hover:text-white"
                     >
-                      Back
+                      {t("common.back")}
                     </button>
                   </div>
                 </div>
@@ -673,14 +675,14 @@ export default function AuthPage() {
                   className="mb-2 text-center font-display text-2xl font-light text-white"
                   transition={{ layout: { duration: 0.3, ease } }}
                 >
-                  Reset Password
+                  {t("auth.resetPassword")}
                 </motion.h2>
                 <motion.p
                   layout
                   className="mb-6 text-center text-sm text-white/50"
                   transition={{ layout: { duration: 0.3, ease } }}
                 >
-                  Enter your email to receive a reset code.
+                  {t("auth.enterEmailForReset")}
                 </motion.p>
 
                 <form
@@ -695,7 +697,7 @@ export default function AuthPage() {
                     <Input
                       type="email"
                       name="email"
-                      placeholder="Email"
+                      placeholder={t("auth.email")}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -728,7 +730,7 @@ export default function AuthPage() {
                       disabled={loading}
                       className="w-full rounded-full bg-white font-medium text-gray-900 hover:bg-white/90 disabled:opacity-50"
                     >
-                      {loading ? "Sending..." : "Send Reset Code"}
+                      {loading ? t("common.sending") : t("auth.sendResetCode")}
                     </Button>
                   </motion.div>
                 </form>
@@ -742,7 +744,7 @@ export default function AuthPage() {
                     onClick={() => switchMode("sign-in")}
                     className="text-white underline underline-offset-2 transition-colors hover:text-white"
                   >
-                    Back To Sign In
+                    {t("common.backToSignIn")}
                   </button>
                 </motion.p>
               </motion.div>
@@ -761,7 +763,7 @@ export default function AuthPage() {
                   className="mb-6 text-center font-display text-2xl font-light text-white"
                   transition={{ layout: { duration: 0.3, ease } }}
                 >
-                  {isSignUp ? "Create Account" : "Welcome Back"}
+                  {isSignUp ? t("auth.createAccount") : t("auth.welcomeBack")}
                 </motion.h2>
 
                 {/* Form */}
@@ -784,7 +786,7 @@ export default function AuthPage() {
                         <Input
                           type="text"
                           name="name"
-                          placeholder="Full Name"
+                          placeholder={t("auth.fullName")}
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                           required
@@ -803,7 +805,7 @@ export default function AuthPage() {
                     <Input
                       type="email"
                       name="email"
-                      placeholder="Email"
+                      placeholder={t("auth.email")}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -820,6 +822,7 @@ export default function AuthPage() {
                     <PasswordInput
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      placeholder={t("auth.password")}
                       autoComplete={
                         isSignUp ? "new-password" : "current-password"
                       }
@@ -849,12 +852,12 @@ export default function AuthPage() {
                             >
                               <span className={gender ? "text-white" : "text-white/50"}>
                                 {gender === "male"
-                                  ? "Male"
+                                  ? t("auth.male")
                                   : gender === "female"
-                                    ? "Female"
+                                    ? t("auth.female")
                                     : gender === "prefer-not-to-say"
-                                      ? "Prefer Not To Say"
-                                      : "Gender"}
+                                      ? t("auth.preferNotToSay")
+                                      : t("auth.gender")}
                               </span>
                               <CaretUpDown size={16} weight="duotone" className="absolute right-5 text-white/40" />
                             </button>
@@ -864,9 +867,9 @@ export default function AuthPage() {
                             sideOffset={4}
                           >
                             {[
-                              { value: "male", label: "Male" },
-                              { value: "female", label: "Female" },
-                              { value: "prefer-not-to-say", label: "Prefer Not To Say" },
+                              { value: "male", label: t("auth.male") },
+                              { value: "female", label: t("auth.female") },
+                              { value: "prefer-not-to-say", label: t("auth.preferNotToSay") },
                             ].map((opt) => (
                               <button
                                 key={opt.value}
@@ -901,7 +904,7 @@ export default function AuthPage() {
                         onClick={() => switchMode("forgot-password")}
                         className="text-xs text-white/60 transition-colors hover:text-white/90"
                       >
-                        Forgot Password?
+                        {t("auth.forgotPassword")}
                       </button>
                     </motion.div>
                   )}
@@ -933,11 +936,11 @@ export default function AuthPage() {
                     >
                       {loading
                         ? isSignUp
-                          ? "Sending Code..."
-                          : "Signing In..."
+                          ? t("auth.sendingCode")
+                          : t("common.loading")
                         : isSignUp
-                          ? "Continue"
-                          : "Sign In"}
+                          ? t("common.continue")
+                          : t("auth.signIn")}
                     </Button>
                   </motion.div>
 
@@ -948,21 +951,21 @@ export default function AuthPage() {
                       transition={{ layout: { duration: 0.3, ease } }}
                       className="mt-3 text-center text-xs text-white/70"
                     >
-                      By signing up, you agree to our{" "}
+                      {t("auth.termsAgreement")}{" "}
                       <a
                         href="/terms"
                         target="_blank"
                         className="text-white underline underline-offset-2 hover:text-white"
                       >
-                        Terms Of Service
+                        {t("auth.termsOfService")}
                       </a>{" "}
-                      and{" "}
+                      {t("common.and")}{" "}
                       <a
                         href="/privacy"
                         target="_blank"
                         className="text-white underline underline-offset-2 hover:text-white"
                       >
-                        Privacy Policy
+                        {t("auth.privacyPolicy")}
                       </a>
                       .
                     </motion.p>
@@ -977,22 +980,22 @@ export default function AuthPage() {
                 >
                   {isSignUp ? (
                     <>
-                      Already have an account?{" "}
+                      {t("auth.alreadyHaveAccount")}{" "}
                       <button
                         onClick={() => switchMode("sign-in")}
                         className="text-white underline underline-offset-2 transition-colors hover:text-white"
                       >
-                        Sign In
+                        {t("auth.signIn")}
                       </button>
                     </>
                   ) : (
                     <>
-                      Don&apos;t have an account?{" "}
+                      {t("auth.dontHaveAccount")}{" "}
                       <button
                         onClick={() => switchMode("sign-up")}
                         className="text-white underline underline-offset-2 transition-colors hover:text-white"
                       >
-                        Sign Up
+                        {t("auth.signUp")}
                       </button>
                     </>
                   )}
@@ -1008,10 +1011,10 @@ export default function AuthPage() {
                 transition={{ duration: 0.2 }}
               >
                 <h2 className="mb-2 text-center font-display text-2xl font-light text-white">
-                  Verify Email
+                  {t("auth.verifyEmail")}
                 </h2>
                 <p className="mb-6 text-center text-sm text-white/50">
-                  Enter the 6-digit code sent to{" "}
+                  {t("auth.enterCodeSentTo")}{" "}
                   <span className="text-white/70">{email}</span>
                 </p>
 
@@ -1048,7 +1051,7 @@ export default function AuthPage() {
                     disabled={loading || otp.length !== 6}
                     className="w-full rounded-full bg-white font-medium text-gray-900 hover:bg-white/90 disabled:opacity-50"
                   >
-                    {loading ? "Verifying..." : "Verify & Create Account"}
+                    {loading ? t("auth.verifying") : t("auth.verifyAndCreate")}
                   </Button>
 
                   <div className="flex gap-4 text-sm">
@@ -1057,13 +1060,13 @@ export default function AuthPage() {
                       disabled={loading}
                       className="text-white/70 underline underline-offset-2 transition-colors hover:text-white disabled:opacity-50"
                     >
-                      Resend Code
+                      {t("auth.resendCode")}
                     </button>
                     <button
                       onClick={() => switchMode("sign-up")}
                       className="text-white/70 underline underline-offset-2 transition-colors hover:text-white"
                     >
-                      Back
+                      {t("common.back")}
                     </button>
                   </div>
                 </div>

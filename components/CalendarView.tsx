@@ -31,6 +31,7 @@ import {
   updateCalendarEvent,
 } from "@/app/(main)/dashboard/me/calendar/actions";
 import { NotificationPrompt } from "@/components/NotificationPrompt";
+import { useTranslation } from "@/lib/i18n";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -72,37 +73,37 @@ interface CalendarEvent {
 
 const HAS_LOCATION: EventCategory[] = ["class", "exam"];
 
-const ALERT_OPTIONS: { value: AlertMinutes; label: string }[] = [
-  { value: -1, label: "None" },
-  { value: 0, label: "At time of event" },
-  { value: 5, label: "5 minutes before" },
-  { value: 10, label: "10 minutes before" },
-  { value: 15, label: "15 minutes before" },
-  { value: 30, label: "30 minutes before" },
-  { value: 60, label: "1 hour before" },
-  { value: 120, label: "2 hours before" },
-  { value: 1440, label: "1 day before" },
-  { value: 2880, label: "2 days before" },
+const ALERT_VALUES: { value: AlertMinutes; key: string }[] = [
+  { value: -1, key: "calendar.alertNone" },
+  { value: 0, key: "calendar.alertAtTime" },
+  { value: 5, key: "calendar.alertFiveMin" },
+  { value: 10, key: "calendar.alertTenMin" },
+  { value: 15, key: "calendar.alertFifteenMin" },
+  { value: 30, key: "calendar.alertThirtyMin" },
+  { value: 60, key: "calendar.alertOneHour" },
+  { value: 120, key: "calendar.alertTwoHours" },
+  { value: 1440, key: "calendar.alertOneDay" },
+  { value: 2880, key: "calendar.alertTwoDays" },
 ];
 
-const TRAVEL_OPTIONS: { value: number; label: string }[] = [
-  { value: 0, label: "No travel time" },
-  { value: 5, label: "5 min travel" },
-  { value: 10, label: "10 min travel" },
-  { value: 15, label: "15 min travel" },
-  { value: 20, label: "20 min travel" },
-  { value: 30, label: "30 min travel" },
-  { value: 45, label: "45 min travel" },
-  { value: 60, label: "1 hour travel" },
-  { value: 90, label: "1.5 hours travel" },
-  { value: 120, label: "2 hours travel" },
+const TRAVEL_VALUES: { value: number; key: string }[] = [
+  { value: 0, key: "calendar.travelNone" },
+  { value: 5, key: "calendar.travelFiveMin" },
+  { value: 10, key: "calendar.travelTenMin" },
+  { value: 15, key: "calendar.travelFifteenMin" },
+  { value: 20, key: "calendar.travelTwentyMin" },
+  { value: 30, key: "calendar.travelThirtyMin" },
+  { value: 45, key: "calendar.travelFortyFiveMin" },
+  { value: 60, key: "calendar.travelOneHour" },
+  { value: 90, key: "calendar.travelNinetyMin" },
+  { value: 120, key: "calendar.travelTwoHours" },
 ];
 
-const RECURRENCE_OPTIONS: { value: Recurrence; label: string }[] = [
-  { value: "none", label: "Does Not Repeat" },
-  { value: "weekly", label: "Every Week" },
-  { value: "biweekly", label: "Every 2 Weeks" },
-  { value: "monthly", label: "Every Month" },
+const RECURRENCE_VALUES: { value: Recurrence; key: string }[] = [
+  { value: "none", key: "calendar.doesNotRepeat" },
+  { value: "weekly", key: "calendar.everyWeek" },
+  { value: "biweekly", key: "calendar.everyTwoWeeks" },
+  { value: "monthly", key: "calendar.everyMonth" },
 ];
 
 /* ── Constants ───────────────────────────────────────────── */
@@ -116,31 +117,27 @@ const HOURS = Array.from(
 const HOUR_HEIGHT = 60;
 const CATEGORY_CONFIG: Record<
   EventCategory,
-  { label: string; bg: string; accent: string; text: string; dot: string }
+  { bg: string; accent: string; text: string; dot: string }
 > = {
   class: {
-    label: "Class",
     bg: "bg-blue-500/10 dark:bg-blue-500/15",
     accent: "bg-blue-500",
     text: "text-blue-700 dark:text-blue-300",
     dot: "bg-blue-500",
   },
   exam: {
-    label: "Exam",
     bg: "bg-red-500/10 dark:bg-red-500/15",
     accent: "bg-red-500",
     text: "text-red-700 dark:text-red-300",
     dot: "bg-red-500",
   },
   deadline: {
-    label: "Deadline",
     bg: "bg-amber-500/10 dark:bg-amber-500/15",
     accent: "bg-amber-500",
     text: "text-amber-700 dark:text-amber-300",
     dot: "bg-amber-500",
   },
   reminder: {
-    label: "Reminder",
     bg: "bg-purple-500/10 dark:bg-purple-500/15",
     accent: "bg-purple-500",
     text: "text-purple-700 dark:text-purple-300",
@@ -159,11 +156,11 @@ function minutesToPx(minutes: number): number {
   return ((minutes - START_HOUR * 60) / 60) * HOUR_HEIGHT;
 }
 
-function formatHour(hour: number): string {
-  if (hour === 0 || hour === 24) return "12 AM";
-  if (hour === 12) return "Noon";
+function formatHour(hour: number, t: (key: string) => string): string {
+  if (hour === 0 || hour === 24) return t("calendar.midnight");
+  if (hour === 12) return t("calendar.noon");
   const h = hour % 12 || 12;
-  const suffix = hour < 12 ? "AM" : "PM";
+  const suffix = hour < 12 ? t("calendar.am") : t("calendar.pm");
   return `${h} ${suffix}`;
 }
 
@@ -174,6 +171,11 @@ function dateKey(date: Date): string {
 /* ── Component ───────────────────────────────────────────── */
 
 export function CalendarView() {
+  const { t } = useTranslation();
+  const alertOptions = useMemo(() => ALERT_VALUES.map((a) => ({ value: a.value, label: t(a.key) })), [t]);
+  const travelOptions = useMemo(() => TRAVEL_VALUES.map((a) => ({ value: a.value, label: t(a.key) })), [t]);
+  const recurrenceOptions = useMemo(() => RECURRENCE_VALUES.map((a) => ({ value: a.value, label: t(a.key) })), [t]);
+
   const [isDesktop, setIsDesktop] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
@@ -566,7 +568,7 @@ export function CalendarView() {
                     : "bg-[#5227FF] text-white hover:opacity-90"
                 }`}
               >
-                Today
+                {t("calendar.today")}
               </button>
               <button
                 onClick={() => openForm(selectedDay)}
@@ -659,13 +661,13 @@ export function CalendarView() {
                   : "bg-[#5227FF] text-white hover:opacity-90"
               }`}
             >
-              Today
+              {t("calendar.today")}
             </button>
             <button
               onClick={() => openForm(selectedDay)}
               className="rounded-full bg-gray-900 px-3.5 py-1.5 text-xs font-medium text-white transition-colors duration-200 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-white/90"
             >
-              Add Event
+              {t("calendar.addEvent")}
             </button>
           </div>
         </div>
@@ -714,7 +716,7 @@ export function CalendarView() {
                   className="absolute right-2 -translate-y-1/2 text-[10px] font-medium text-gray-400 dark:text-white/30"
                   style={{ top: (hour - START_HOUR) * HOUR_HEIGHT }}
                 >
-                  {formatHour(hour)}
+                  {formatHour(hour, t)}
                 </div>
               ))}
 
@@ -773,7 +775,7 @@ export function CalendarView() {
                         className={`group absolute z-10 flex overflow-hidden rounded-lg ${config.bg} cursor-pointer`}
                         style={{ top: top + 1, height: height - 2, left: 3, right: 3 }}
                         onClick={() => openEditForm(event)}
-                        title={`${event.title}\n${event.startTime} — ${event.endTime}${event.locationType === "in-person" ? `\n${[event.campus, event.room].filter(Boolean).join(" · ") || "In Person"}` : event.locationType === "online" ? `\n${event.url || "Online"}` : ""}${event.note ? "\n" + event.note : ""}`}
+                        title={`${event.title}\n${event.startTime} — ${event.endTime}${event.locationType === "in-person" ? `\n${[event.campus, event.room].filter(Boolean).join(" · ") || t("calendar.inPerson")}` : event.locationType === "online" ? `\n${event.url || t("calendar.online")}` : ""}${event.note ? "\n" + event.note : ""}`}
                       >
                         {/* Left accent bar */}
                         <div className={`w-[3px] shrink-0 rounded-l-lg ${config.accent}`} />
@@ -794,7 +796,7 @@ export function CalendarView() {
                               {event.locationType === "in-person" && event.campus
                                 ? event.campus
                                 : event.locationType === "online"
-                                  ? "Online"
+                                  ? t("calendar.online")
                                   : ""}
                               {event.note ? (event.campus || event.url ? ` · ${event.note}` : event.note) : ""}
                             </p>
@@ -875,7 +877,7 @@ export function CalendarView() {
               className="fixed inset-x-4 top-1/2 z-50 mx-auto max-h-[85vh] max-w-md -translate-y-1/2 overflow-y-auto rounded-2xl border border-gray-900/10 bg-white p-5 shadow-xl dark:border-white/15 dark:bg-[var(--background)]"
             >
               <h3 className="text-center font-display text-lg font-light text-gray-900 dark:text-white">
-                {editingEvent ? "Edit Event" : "New Event"}
+                {editingEvent ? t("calendar.editEvent") : t("calendar.newEvent")}
               </h3>
               {editingEvent ? (
                 <input
@@ -894,7 +896,7 @@ export function CalendarView() {
                 <input
                   ref={titleRef}
                   type="text"
-                  placeholder="Event title..."
+                  placeholder={t("calendar.titlePlaceholder")}
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && (editingEvent ? handleSaveEvent() : handleAddEvent())}
@@ -918,7 +920,7 @@ export function CalendarView() {
                       }`}
                     >
                       <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
-                      {config.label}
+                      {t(`calendar.${key}`)}
                     </button>
                   ))}
                 </div>
@@ -930,7 +932,7 @@ export function CalendarView() {
                     onChange={(e) => setFormStartTime(e.target.value)}
                     className="h-10 flex-1 rounded-full border border-gray-900/15 bg-gray-900/5 px-5 text-center text-sm text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:focus-visible:ring-white/30"
                   />
-                  <span className="text-xs text-gray-900/40 dark:text-white/50">to</span>
+                  <span className="text-xs text-gray-900/40 dark:text-white/50">{t("calendar.timeTo")}</span>
                   <input
                     type="time"
                     value={formEndTime}
@@ -954,7 +956,7 @@ export function CalendarView() {
                               : "text-gray-900/50 hover:text-gray-900/70 dark:text-white/40 dark:hover:text-white/60"
                           }`}
                         >
-                          {lt === "in-person" ? "In Person" : "Online"}
+                          {lt === "in-person" ? t("calendar.inPerson") : t("calendar.online")}
                         </button>
                       ))}
                     </div>
@@ -963,14 +965,14 @@ export function CalendarView() {
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          placeholder="Campus (optional)"
+                          placeholder={t("calendar.campusPlaceholder")}
                           value={formCampus}
                           onChange={(e) => setFormCampus(e.target.value)}
                           className="h-10 min-w-0 flex-1 rounded-full border border-gray-900/15 bg-gray-900/5 px-5 text-center text-sm text-gray-900 placeholder:text-gray-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:placeholder:text-white/50 dark:focus-visible:ring-white/30"
                         />
                         <input
                           type="text"
-                          placeholder="Room (optional)"
+                          placeholder={t("calendar.roomPlaceholder")}
                           value={formRoom}
                           onChange={(e) => setFormRoom(e.target.value)}
                           className="h-10 w-28 rounded-full border border-gray-900/15 bg-gray-900/5 px-4 text-center text-sm text-gray-900 placeholder:text-gray-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:placeholder:text-white/50 dark:focus-visible:ring-white/30"
@@ -979,7 +981,7 @@ export function CalendarView() {
                     ) : (
                       <input
                         type="url"
-                        placeholder="Meeting link (optional)"
+                        placeholder={t("calendar.meetingLinkPlaceholder")}
                         value={formUrl}
                         onChange={(e) => setFormUrl(e.target.value)}
                         className="h-10 w-full rounded-full border border-gray-900/15 bg-gray-900/5 px-5 text-center text-sm text-gray-900 placeholder:text-gray-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:placeholder:text-white/50 dark:focus-visible:ring-white/30"
@@ -997,12 +999,11 @@ export function CalendarView() {
                     >
                       <span className={formAlerts.length > 0 ? "truncate text-gray-900 dark:text-white" : "text-gray-900/40 dark:text-white/50"}>
                         {formAlerts.length === 0
-                          ? "No Alerts"
-                          : formAlerts.length === 1
-                            ? ALERT_OPTIONS.find((o) => o.value === formAlerts[0])?.label || "1 Alert"
-                            : formAlerts
-                                .map((v) => ALERT_OPTIONS.find((o) => o.value === v)?.label?.replace(" before", ""))
-                                .join(", ")}
+                          ? t("calendar.noAlerts")
+                          : formAlerts
+                              .map((v) => alertOptions.find((o) => o.value === v)?.label)
+                              .filter(Boolean)
+                              .join(", ")}
                       </span>
                       <CaretUpDown
                         size={16}
@@ -1016,7 +1017,7 @@ export function CalendarView() {
                     sideOffset={4}
                   >
                     <div className="max-h-[200px] overflow-y-auto">
-                      {ALERT_OPTIONS.filter((o) => o.value !== -1).map((opt) => {
+                      {alertOptions.filter((o) => o.value !== -1).map((opt) => {
                         const isSelected = formAlerts.includes(opt.value);
                         return (
                           <button
@@ -1053,7 +1054,7 @@ export function CalendarView() {
                           onClick={() => setFormAlerts([])}
                           className="flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm text-gray-900/40 transition-colors hover:bg-gray-900/5 hover:text-gray-900/60 dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white/60"
                         >
-                          Clear All
+                          {t("calendar.clearAll")}
                         </button>
                       )}
                     </div>
@@ -1076,28 +1077,28 @@ export function CalendarView() {
                     ) : (
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
                     )}
-                    {formNotify ? "Push Notification On" : "Push Notification Off"}
+                    {formNotify ? t("calendar.notifyOn") : t("calendar.notifyOff")}
                   </button>
                 )}
 
                 {/* Travel time — only when alerts exist + in-person location */}
                 {formAlerts.length > 0 && HAS_LOCATION.includes(formCategory) && formLocationType === "in-person" && (
-                  <OptionPicker options={TRAVEL_OPTIONS} value={formTravelTime} onChange={setFormTravelTime} size="sm" />
+                  <OptionPicker options={travelOptions} value={formTravelTime} onChange={setFormTravelTime} size="sm" />
                 )}
 
                 {/* Recurrence — only for new events */}
                 {!editingEvent && (
                   <OptionPicker
-                    options={RECURRENCE_OPTIONS}
+                    options={recurrenceOptions}
                     value={formRecurrence}
                     onChange={(v) => setFormRecurrence(v as Recurrence)}
-                    placeholder="Repeat..."
+                    placeholder={t("calendar.repeatPlaceholder")}
                   />
                 )}
 
                 <input
                   type="text"
-                  placeholder="Note (optional)"
+                  placeholder={t("calendar.notePlaceholder")}
                   value={formNote}
                   onChange={(e) => setFormNote(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && (editingEvent ? handleSaveEvent() : handleAddEvent())}
@@ -1109,14 +1110,14 @@ export function CalendarView() {
                     onClick={() => { setShowForm(false); setEditingEvent(null); }}
                     className="flex-1 rounded-full bg-gray-900/5 py-2.5 text-sm font-medium text-gray-900/60 transition-colors duration-200 hover:bg-gray-900/10 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10"
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </button>
                   <button
                     onClick={editingEvent ? handleSaveEvent : handleAddEvent}
                     disabled={!formTitle.trim()}
                     className="flex-1 rounded-full bg-[#5227FF] py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:opacity-90 disabled:opacity-40"
                   >
-                    {editingEvent ? "Save" : formRecurrence !== "none" ? "Add Series" : "Add Event"}
+                    {editingEvent ? t("common.save") : formRecurrence !== "none" ? t("calendar.addSeries") : t("calendar.addEvent")}
                   </button>
                 </div>
 
@@ -1130,7 +1131,7 @@ export function CalendarView() {
                     }}
                     className="mt-1 w-full rounded-full border border-red-500/20 py-2.5 text-sm font-medium text-red-600 transition-colors duration-200 hover:bg-red-50 dark:border-red-500/20 dark:text-red-400 dark:hover:bg-red-500/5"
                   >
-                    Delete Event
+                    {t("calendar.deleteEvent")}
                   </button>
                 )}
               </div>
@@ -1160,7 +1161,7 @@ export function CalendarView() {
             >
               <div className="p-5">
                 <h3 className="text-center font-display text-base font-light text-gray-900 dark:text-white">
-                  Delete Recurring Event
+                  {t("calendar.deleteRecurring")}
                 </h3>
                 <p className="mt-1.5 text-center text-xs text-gray-500 dark:text-white/50">
                   &ldquo;{deleteConfirm.title}&rdquo; on {deleteConfirm.date}
@@ -1171,21 +1172,21 @@ export function CalendarView() {
                   onClick={handleDeleteThisOnly}
                   className="py-3 text-center text-sm font-medium text-gray-900 transition-colors hover:bg-gray-900/5 dark:text-white dark:hover:bg-white/5"
                 >
-                  This Event Only
+                  {t("calendar.thisOnly")}
                 </button>
                 <div className="mx-5 h-px bg-gray-900/10 dark:bg-white/10" />
                 <button
                   onClick={handleDeleteThisAndFuture}
                   className="py-3 text-center text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/5"
                 >
-                  This & Future Events
+                  {t("calendar.thisAndFuture")}
                 </button>
                 <div className="mx-5 h-px bg-gray-900/10 dark:bg-white/10" />
                 <button
                   onClick={() => setDeleteConfirm(null)}
                   className="py-3 text-center text-sm font-medium text-gray-500 transition-colors hover:bg-gray-900/5 dark:text-white/50 dark:hover:bg-white/5"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
               </div>
             </motion.div>

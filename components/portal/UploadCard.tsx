@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "@/lib/i18n";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -25,6 +26,7 @@ interface UploadCardProps {
 }
 
 export function UploadCard({ onUploaded }: UploadCardProps) {
+  const { t } = useTranslation();
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -36,7 +38,7 @@ export function UploadCard({ onUploaded }: UploadCardProps) {
       setError(null);
 
       if (!ALLOWED_TYPES.has(file.type)) {
-        setError("File type not allowed. Use PDF, images, presentations, or documents.");
+        setError(t("upload.fileNotAllowed"));
         return;
       }
 
@@ -75,7 +77,7 @@ export function UploadCard({ onUploaded }: UploadCardProps) {
         setProgress(0);
       }
     },
-    [onUploaded]
+    [onUploaded, t]
   );
 
   const handleDrop = useCallback(
@@ -136,7 +138,7 @@ export function UploadCard({ onUploaded }: UploadCardProps) {
               className="space-y-3"
             >
               <p className="text-sm text-gray-900/60 dark:text-white/60">
-                Uploading...
+                {t("upload.uploading")}
               </p>
               <div className="mx-auto h-1.5 w-48 overflow-hidden rounded-full bg-gray-900/10 dark:bg-white/10">
                 <motion.div
@@ -157,10 +159,10 @@ export function UploadCard({ onUploaded }: UploadCardProps) {
               className="space-y-1.5"
             >
               <p className="text-sm font-medium text-gray-900/70 dark:text-white/70">
-                Drop A File Here Or Click To Upload
+                {t("upload.dropOrClick")}
               </p>
               <p className="text-xs text-gray-900/35 dark:text-white/35">
-                PDF, Images, Presentations, Documents — Max 50MB
+                {t("upload.fileTypes")}
               </p>
             </motion.div>
           )}

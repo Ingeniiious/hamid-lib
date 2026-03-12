@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeSlash } from "@phosphor-icons/react";
+import { useTranslation, changeLocaleAnimated, type Locale } from "@/lib/i18n";
 import { authClient } from "@/lib/auth-client";
 import {
   updateName,
@@ -133,6 +134,7 @@ function parseUA(ua: string | null | undefined) {
 
 export default function AccountPage() {
   const router = useRouter();
+  const { t, locale, setLocale } = useTranslation();
 
   // Session/user state
   const [userName, setUserName] = useState("");
@@ -212,14 +214,8 @@ export default function AccountPage() {
   const [contributorEmail, setContributorEmail] = useState<string | null>(null);
   const [contributorUniversity, setContributorUniversity] = useState<string | null>(null);
 
-  // Language
-  const [language, setLanguage] = useState("en");
-
   // Load user session + language preference
   useEffect(() => {
-    const saved = localStorage.getItem("hamid-lib-lang");
-    if (saved && ["en", "fa", "tr"].includes(saved)) setLanguage(saved);
-
     authClient.getSession().then(async ({ data }) => {
       if (!data?.user) {
         router.replace("/auth");
@@ -251,8 +247,7 @@ export default function AccountPage() {
         setFacultyId(profile.facultyId ?? null);
         setProgramId(profile.programId ?? null);
         if (profile.language && ["en", "fa", "tr"].includes(profile.language)) {
-          setLanguage(profile.language);
-          localStorage.setItem("hamid-lib-lang", profile.language);
+          setLocale(profile.language as Locale);
         }
         if (profile.avatarUrl) {
           setAvatarUrl(profile.avatarUrl);
@@ -323,8 +318,7 @@ export default function AccountPage() {
   }, [facultyId]);
 
   const handleLanguageChange = (lang: string) => {
-    setLanguage(lang);
-    localStorage.setItem("hamid-lib-lang", lang);
+    changeLocaleAnimated(lang as Locale);
     updateUserProfile({ language: lang });
   };
 
@@ -525,7 +519,7 @@ export default function AccountPage() {
     return (
       <div className="flex h-full flex-col">
         <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
-          <PageHeader title="Account Settings" />
+          <PageHeader title={t("settings.accountSettings")} />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-24">
           <div className="mx-auto max-w-3xl pt-8">
@@ -537,7 +531,7 @@ export default function AccountPage() {
             </div>
           </div>
         </div>
-        <BackButton href="/dashboard" label="Dashboard" floating />
+        <BackButton href="/dashboard" label={t("common.backToDashboard")} floating />
       </div>
     );
   }
@@ -546,7 +540,7 @@ export default function AccountPage() {
     <div className="flex h-full flex-col">
       {/* Fixed header — title only */}
       <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
-        <PageHeader title="Account Settings" />
+        <PageHeader title={t("settings.accountSettings")} />
       </div>
 
       {/* Scrollable content */}
@@ -568,7 +562,7 @@ export default function AccountPage() {
           {/* ── Profile — full width, 2-col internal layout ── */}
           <motion.div variants={fadeUp} className={`${cardClass} md:col-span-2`}>
             <h2 className="mb-4 text-center font-display text-lg font-light text-gray-900 dark:text-white">
-              Profile
+              {t("settings.profile")}
             </h2>
 
             {/* Avatar */}
@@ -599,7 +593,7 @@ export default function AccountPage() {
                   onClick={() => fileInputRef.current?.click()}
                   className="rounded-xl bg-[#5227FF] px-4 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
-                  {avatarLoading ? "Uploading..." : "Upload Photo"}
+                  {avatarLoading ? t("settings.uploading") : t("settings.uploadPhoto")}
                 </motion.button>
                 {hasCustomAvatar && (
                   <motion.button
@@ -610,7 +604,7 @@ export default function AccountPage() {
                     onClick={handleAvatarRemove}
                     className="rounded-xl border border-gray-900/10 px-4 py-2 text-xs font-medium text-gray-900/70 transition-colors hover:bg-gray-900/5 disabled:opacity-50 dark:border-white/15 dark:text-white/70 dark:hover:bg-white/5"
                   >
-                    Remove
+                    {t("settings.remove")}
                   </motion.button>
                 )}
               </div>
@@ -638,13 +632,13 @@ export default function AccountPage() {
                 <div className="flex flex-col gap-4">
                   <div>
                     <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
-                      Display Name
+                      {t("settings.displayName")}
                     </label>
                     <Input
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="Your Name"
+                      placeholder={t("settings.yourName")}
                       required
                       autoComplete="name"
                       className={inputClass}
@@ -652,7 +646,7 @@ export default function AccountPage() {
                   </div>
                   <div>
                     <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
-                      Email
+                      {t("settings.email")}
                     </label>
                     <Input
                       type="email"
@@ -664,7 +658,7 @@ export default function AccountPage() {
                   {contributorEmail && (
                     <div>
                       <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
-                        University Email
+                        {t("settings.universityEmail")}
                       </label>
                       <Input
                         type="email"
@@ -685,7 +679,7 @@ export default function AccountPage() {
                 <div className="flex flex-col gap-4">
                   <div>
                     <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
-                      University
+                      {t("settings.university")}
                     </label>
                     {!profileLoaded ? (
                       <Skeleton className="mx-auto h-10 w-full rounded-full bg-gray-900/10 dark:bg-white/10" />
@@ -704,7 +698,7 @@ export default function AccountPage() {
                   {availableFaculties.length > 0 && (
                     <div>
                       <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
-                        Faculty
+                        {t("settings.faculty")}
                       </label>
                       <FacultyPicker
                         faculties={availableFaculties}
@@ -718,7 +712,7 @@ export default function AccountPage() {
                   {availablePrograms.length > 0 && (
                     <div>
                       <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
-                        Program
+                        {t("settings.program")}
                       </label>
                       <ProgramPicker
                         programs={availablePrograms}
@@ -731,7 +725,7 @@ export default function AccountPage() {
 
                   <div>
                     <label className="mb-1.5 block text-center text-sm text-gray-900/50 dark:text-white/50">
-                      Gender
+                      {t("settings.gender")}
                     </label>
                     {!profileLoaded ? (
                       <div className="flex justify-center gap-2">
@@ -742,9 +736,9 @@ export default function AccountPage() {
                     ) : (
                     <div className="flex justify-center gap-2">
                       {[
-                        { value: "male", label: "Male" },
-                        { value: "female", label: "Female" },
-                        { value: "prefer-not-to-say", label: "Prefer Not To Say" },
+                        { value: "male", label: t("auth.male") },
+                        { value: "female", label: t("auth.female") },
+                        { value: "prefer-not-to-say", label: t("auth.preferNotToSay") },
                       ].map((opt) => (
                         <button
                           key={opt.value}
@@ -786,7 +780,7 @@ export default function AccountPage() {
                 disabled={nameLoading || profileLoading || !name.trim()}
                 className="mx-auto w-full max-w-xs rounded-full bg-[#5227FF] font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
-                {nameLoading || profileLoading ? "Saving..." : "Save"}
+                {nameLoading || profileLoading ? t("settings.saving") : t("common.save")}
               </Button>
             </form>
           </motion.div>
@@ -794,7 +788,7 @@ export default function AccountPage() {
           {/* ── Change Password ── */}
           <motion.div variants={fadeUp} className={cardClass}>
             <h2 className="mb-4 text-center font-display text-lg font-light text-gray-900 dark:text-white">
-              Change Password
+              {t("settings.updatePassword")}
             </h2>
             <form
               onSubmit={handleChangePassword}
@@ -803,20 +797,20 @@ export default function AccountPage() {
               <PasswordInput
                 value={currentPw}
                 onChange={(e) => setCurrentPw(e.target.value)}
-                placeholder="Current Password"
+                placeholder={t("settings.currentPassword")}
                 autoComplete="current-password"
               />
               <PasswordInput
                 value={newPw}
                 onChange={(e) => setNewPw(e.target.value)}
-                placeholder="New Password"
+                placeholder={t("settings.newPassword")}
                 minLength={8}
                 autoComplete="new-password"
               />
               <PasswordInput
                 value={confirmPw}
                 onChange={(e) => setConfirmPw(e.target.value)}
-                placeholder="Confirm New Password"
+                placeholder={t("settings.confirmNewPassword")}
                 minLength={8}
                 autoComplete="new-password"
               />
@@ -837,7 +831,7 @@ export default function AccountPage() {
                 disabled={pwLoading}
                 className="w-full rounded-full bg-[#5227FF] font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
-                {pwLoading ? "Updating..." : "Update Password"}
+                {pwLoading ? t("settings.updating") : t("settings.updatePassword")}
               </Button>
             </form>
           </motion.div>
@@ -848,7 +842,7 @@ export default function AccountPage() {
             className={`${cardClass} flex flex-col`}
           >
             <h2 className="mb-4 text-center font-display text-lg font-light text-gray-900 dark:text-white">
-              Language
+              {t("settings.language")}
             </h2>
             <div className="flex flex-1 flex-col justify-center gap-2.5">
               {[
@@ -860,7 +854,7 @@ export default function AccountPage() {
                   key={lang.code}
                   onClick={() => handleLanguageChange(lang.code)}
                   className={`w-full rounded-full px-5 py-2.5 text-sm font-medium transition-all ${
-                    language === lang.code
+                    locale === lang.code
                       ? "bg-[#5227FF] text-white"
                       : "bg-gray-900/5 text-gray-900/60 hover:bg-gray-900/10 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10"
                   }`}
@@ -877,7 +871,7 @@ export default function AccountPage() {
             className={`${cardClass} md:col-span-2`}
           >
             <h2 className="mb-4 text-center font-display text-lg font-light text-gray-900 dark:text-white">
-              Active Sessions
+              {t("settings.activeSessions")}
             </h2>
             {sessions.length > 1 && (
               <div className="mb-4 flex justify-center">
@@ -888,7 +882,7 @@ export default function AccountPage() {
                   disabled={revokingAll}
                   className="rounded-full text-xs text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900 dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"
                 >
-                  {revokingAll ? "Revoking..." : "Sign Out All Others"}
+                  {revokingAll ? t("settings.revoking") : t("settings.signOutAll")}
                 </Button>
               </div>
             )}
@@ -904,7 +898,7 @@ export default function AccountPage() {
               </div>
             ) : sessions.length === 0 ? (
               <p className="text-sm text-gray-900/40 dark:text-white/40">
-                No active sessions found.
+                {t("settings.noSessions")}
               </p>
             ) : (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -918,12 +912,12 @@ export default function AccountPage() {
                         {parseUA(s.userAgent)}
                         {s.current && (
                           <span className="ml-2 text-xs text-emerald-600 dark:text-emerald-300">
-                            Current
+                            {t("settings.current")}
                           </span>
                         )}
                       </p>
                       <p className="truncate text-xs text-gray-900/40 dark:text-white/40">
-                        {s.ipAddress || "Unknown IP"} &middot;{" "}
+                        {s.ipAddress || t("settings.unknownIP")} &middot;{" "}
                         {formatDate(s.updatedAt || s.createdAt)}
                       </p>
                     </div>
@@ -935,7 +929,7 @@ export default function AccountPage() {
                         disabled={revokingId === s.id}
                         className="ml-3 shrink-0 rounded-full text-xs text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900 dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"
                       >
-                        {revokingId === s.id ? "..." : "Sign Out"}
+                        {revokingId === s.id ? "..." : t("settings.signOut")}
                       </Button>
                     )}
                   </div>
@@ -963,11 +957,10 @@ export default function AccountPage() {
             className="rounded-2xl border border-red-500/30 bg-red-500/5 p-6 backdrop-blur-xl md:col-span-2"
           >
             <h2 className="mb-2 text-center font-display text-lg font-light text-gray-900 dark:text-white">
-              Delete Account
+              {t("settings.deleteAccount")}
             </h2>
             <p className="mb-4 text-center text-sm text-gray-900/40 dark:text-white/40">
-              This will permanently disable your account. You won&apos;t be able
-              to sign in again.
+              {t("settings.deleteAccountWarning")}
             </p>
 
             <AnimatePresence mode="wait">
@@ -984,7 +977,7 @@ export default function AccountPage() {
                     onClick={() => setDeleteStep("password")}
                     className="rounded-full border border-red-500/30 text-red-600 hover:bg-red-500/10 hover:text-red-500 dark:text-red-300 dark:hover:text-red-200"
                   >
-                    Delete Account
+                    {t("settings.deleteAccount")}
                   </Button>
                 </motion.div>
               )}
@@ -1000,12 +993,12 @@ export default function AccountPage() {
                 >
                   <Separator className="bg-red-500/20" />
                   <p className="text-center text-sm text-gray-900/50 dark:text-white/50">
-                    Enter your password to continue.
+                    {t("settings.enterPasswordToContinue")}
                   </p>
                   <PasswordInput
                     value={deletePw}
                     onChange={(e) => setDeletePw(e.target.value)}
-                    placeholder="Your Password"
+                    placeholder={t("settings.yourPassword")}
                     autoComplete="current-password"
                   />
                   <AnimatePresence>
@@ -1031,14 +1024,14 @@ export default function AccountPage() {
                       }}
                       className="flex-1 rounded-full text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900 dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"
                     >
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                     <Button
                       type="submit"
                       disabled={deleteLoading || !deletePw}
                       className="flex-1 rounded-full bg-red-500 font-medium text-white hover:bg-red-600 disabled:opacity-50"
                     >
-                      {deleteLoading ? "Sending Code..." : "Continue"}
+                      {deleteLoading ? t("common.sending") : t("common.continue")}
                     </Button>
                   </div>
                 </motion.form>
@@ -1054,7 +1047,7 @@ export default function AccountPage() {
                 >
                   <Separator className="w-full bg-red-500/20" />
                   <p className="text-center text-sm text-gray-900/50 dark:text-white/50">
-                    Enter the 6-digit code sent to your email.
+                    {t("settings.enterDeleteCode")}
                   </p>
                   <InputOTP
                     maxLength={6}
@@ -1096,14 +1089,14 @@ export default function AccountPage() {
                       }}
                       className="flex-1 rounded-full text-gray-900/50 hover:bg-gray-900/5 hover:text-gray-900 dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"
                     >
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                     <Button
                       onClick={() => handleDeleteOtp()}
                       disabled={deleteLoading || deleteOtp.length !== 6}
                       className="flex-1 rounded-full bg-red-500 font-medium text-white hover:bg-red-600 disabled:opacity-50"
                     >
-                      {deleteLoading ? "Deleting..." : "Delete Account"}
+                      {deleteLoading ? t("settings.deleting") : t("settings.deleteAccount")}
                     </Button>
                   </div>
                 </motion.div>
@@ -1115,7 +1108,7 @@ export default function AccountPage() {
       </div>
 
       {/* Floating back button */}
-      <BackButton href="/dashboard" label="Dashboard" floating />
+      <BackButton href="/dashboard" label={t("common.backToDashboard")} floating />
 
       {/* Crop modal — always rendered so AnimatePresence can fade out */}
       <AvatarCropModal

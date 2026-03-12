@@ -1,5 +1,5 @@
 import { BackButton } from "@/components/BackButton";
-import { PageHeader } from "@/components/PageHeader";
+import { TranslatedPageHeader } from "@/components/TranslatedPageHeader";
 import { SpaceCardGrid } from "./SpaceCardGrid";
 import type { Metadata } from "next";
 
@@ -13,7 +13,7 @@ export default function MySpacePage() {
     <div className="flex h-full flex-col">
       {/* Fixed header — stays pinned */}
       <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
-        <PageHeader title="My Space" />
+        <TranslatedPageHeader titleKey="dashboard.mySpace" />
       </div>
 
       {/* Scrollable content */}

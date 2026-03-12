@@ -295,6 +295,274 @@ Public-facing professor & course rating system. Students rate professors at spec
 - Admin approves/rejects reviews from `/admin/reviews`
 - Rate limiting on review submission (1 review per professor per user, 5 reviews per day max)
 
+## AI Teachers' Council (Core System — In Progress)
+The AI Council is the platform's content engine. It replaces manual content creation with an automated multi-model pipeline that produces verified study content from student-contributed sources. This is the **key differentiator from Google NotebookLM** — content is created ONCE and served to all students (not per-user), at a fraction of the cost.
+
+### Full Pipeline Architecture (2 stages)
+
+```
+Student uploads any file (PDF/DOCX/PPTX/image/video)
+  ↓
+STAGE 1: Content Extraction Pipeline (pre-AI Council)
+  Phase 1 — Deterministic extraction (no AI, free)
+    PDF → pdf-parse (text) + pdf-lib (images)
+    DOCX → mammoth (text + images + tables)
+    PPTX → adm-zip + XML parsing (slides + speaker notes + media)
+    Image → sharp (resize/optimize)
+  Phase 2 — Multimodal AI extraction (Kimi K2.5 vision, cheap)
+    Classify images: content diagram / equation / photo / decorative junk
+    OCR handwritten notes, whiteboard photos, scanned PDFs
+    Extract equations → LaTeX
+    Process video keyframes
+    Cost: ~$0.01-0.05 per contribution
+  → Flatten to structured markdown sourceContent
+  ↓
+STAGE 2: AI Council Pipeline (5-model verification)
+  1. Kimi K2.5 (Creator) → 2. ChatGPT (Reviewer) → 3. Claude (Enricher)
+  → 4. Gemini (Validator) → 5. Grok (Fact Checker)
+  → Publish verified content
+```
+
+### Stage 1: Content Extraction Pipeline
+
+**Why this exists:** Student contributions are messy — PDFs with masked titles, photos of handwritten notes, PowerPoints with hidden speaker notes, scanned documents with no text layer. The extraction pipeline normalizes ALL input formats into clean structured markdown before the AI Council touches it.
+
+**Supported input formats:**
+- **PDF** — text layer extraction + embedded image extraction. Scanned/image-only PDFs detected automatically and sent to Kimi K2.5 multimodal for OCR.
+- **DOCX** — text, tables, headings, embedded images via `mammoth`
+- **PPTX** — slide-by-slide text + titles + speaker notes + embedded media via `adm-zip` + XML parsing
+- **Images** (JPEG, PNG, WebP) — photos of handwritten notes, whiteboard captures, scanned documents → Kimi K2.5 multimodal OCR
+- **Videos** (MP4, MOV) — keyframe extraction via Kimi K2.5 multimodal (no ffmpeg needed)
+
+**Kimi K2.5 Multimodal capabilities (used in extraction):**
+- Model: `kimi-k2.5`, base URL: `https://api.moonshot.ai/v1`
+- Supports images: PNG, JPEG, WebP, GIF (base64 encoded, unlimited count, max 100MB total request)
+- Supports videos: MP4, MOV, AVI, WebM (base64 encoded)
+- 256K context window
+- Pricing: $0.60/M input (cache miss), $0.10/M (cache hit), $3.00/M output — extremely cheap for bulk extraction
+- **FIXED parameters:** temperature=0.6 (non-thinking), thinking={"type":"disabled"} for extraction. Custom values cause errors.
+- **No Tesseract needed** — Kimi handles OCR natively, cheaper and more reliable on serverless
+- **No ffmpeg needed** — Kimi processes video directly via base64
+
+**Image classification strategy:**
+- Each extracted image sent to Kimi with classification prompt
+- Categories: content diagram, mathematical equation, photo of notes, decorative/logo/junk
+- Decorative images discarded, content images get AI-generated text descriptions
+- Equations extracted as LaTeX
+- Batch multiple images per request for efficiency
+
+**Output format (sourceContent):** Structured markdown with sections:
+```markdown
+# Source: [fileName]
+## Text Content
+[Full extracted text by page/slide]
+## Tables
+[Preserved table structures]
+## Image Descriptions
+[Kimi-generated descriptions of content-relevant images]
+## Speaker Notes (PPTX only)
+[Hidden speaker notes from slides]
+## Warnings
+[Extraction issues: low quality images, approximate table structures, etc.]
+```
+
+**Extraction database table:**
+```
+extraction_job — tracks extraction progress per contribution
+  Fields: contribution_id, course_id, status, extracted_content (JSONB),
+          source_content (flattened text), pending_images, processed_images,
+          extraction_cost_usd, extraction_tokens, error_message, retry_count
+```
+
+**Extraction cron:** `/api/cron/extraction` runs every 2 minutes (same cadence as pipeline cron). Each invocation handles one phase:
+- Invocation 1: Download file from R2 + deterministic extraction (Phase 1)
+- Invocation 2+: Process image batches via Kimi multimodal (Phase 2)
+- Final: Flatten to sourceContent → auto-create pipeline job via `createJob()`
+
+**NPM packages for extraction:**
+- `pdf-parse` — PDF text extraction (lightweight, uses pdf.js internally)
+- `mammoth` — DOCX to HTML/text (zero native dependencies)
+- `adm-zip` — PPTX unzipping (PPTX = ZIP of XML files)
+- `sharp` — image processing/resizing (already installed)
+- `pdf-lib` — PDF image extraction (already installed)
+
+### Stage 2: AI Council Pipeline (5 models)
+
+**Model Chain (in order):**
+1. **Kimi K2.5** (Moonshot AI) — **Creator**. Cheap, good at edu content. Generates initial structured content from extracted source. Bulk token work at $0.60/M input. **Runs real-time** (instant content generation).
+2. **GPT-5.4** (OpenAI) — **Reviewer**. Reviews for accuracy, completeness, clarity, pedagogical quality. Returns verdict + issues. $2.50/M input, $15/M output (1.05M context, 128K output).
+3. **Claude Opus 4.6** (Anthropic) — **Enricher**. Adds examples, deepens explanations, refines language, fills gaps. $5/M input, $25/M output.
+4. **Gemini 3.1 Pro** (Google) — **Validator**. Validates factual accuracy, internal consistency, source fidelity. Returns verdict + issues.
+5. **Grok** (xAI) — **Fact Checker**. Cross-references claims against real-world knowledge. Final verification.
+
+**Execution Strategy — Hybrid Real-time + Batch + Webhooks:**
+- **Step 1 (Kimi Creator):** Runs real-time via standard API. User gets initial content instantly.
+- **Steps 2-5 (GPT-5.4, Claude, Gemini, Grok):** Run via **Batch API** (50% discount, up to 24h processing). User sees "Other teachers are reviewing your content..." — the review delay is a feature, not a bug. Builds trust and saves 50% on 4/5 models.
+- **Batch pricing:** GPT-5.4 batch = $1.25/$7.50, Claude Opus batch = $2.50/$12.50, Gemini batch = $1/$6, etc.
+
+**Webhook-driven pipeline chain:**
+When a batch job finishes, the provider fires a webhook → our handler processes the result and immediately submits the NEXT model's batch job. No polling, no cron delays — each teacher passes the baton to the next.
+
+```
+Kimi (real-time) completes
+  → submit GPT-5.4 batch job (webhook: /api/webhooks/ai-pipeline/openai)
+  → OpenAI webhook fires when done
+    → process result, submit Claude Opus batch (webhook: /api/webhooks/ai-pipeline/anthropic)
+    → Anthropic webhook fires when done
+      → process result, submit Gemini batch (webhook: /api/webhooks/ai-pipeline/google)
+      → Google webhook fires when done
+        → process result, submit Grok batch (webhook: /api/webhooks/ai-pipeline/xai)
+        → xAI webhook fires when done
+          → process result → all teachers done → publish content
+```
+
+**Webhook endpoints:**
+- `POST /api/webhooks/ai-pipeline/openai` — receives OpenAI batch completion
+- `POST /api/webhooks/ai-pipeline/anthropic` — receives Anthropic batch completion
+- `POST /api/webhooks/ai-pipeline/google` — receives Google batch completion
+- `POST /api/webhooks/ai-pipeline/xai` — receives xAI batch completion
+
+**Webhook security:** Each provider has its own signature/secret verification:
+- OpenAI: webhook signing secret (configured in dashboard)
+- Anthropic: webhook signature verification
+- Google: API key / service account verification
+- xAI: webhook secret header
+
+**Fallback:** Cron (`/api/cron/ai-pipeline`) still runs every 2 min as a safety net — picks up any batch jobs that completed but whose webhook failed (network issues, timeouts, etc.). Belt and suspenders.
+
+**Key principle:** Each model reviews INDEPENDENTLY — no shared context between models = genuine peer review. When all agree → content is verified. If disagreement → flag for re-processing.
+
+**Two correctness layers:**
+- Teacher-specific: what the professor taught in their specific way
+- Universal truth: math formulas, scientific facts any model can verify
+
+### Output Types (matching/exceeding Google NotebookLM)
+- Study guides (rich text)
+- Flashcards (`{front, back, tags}[]`)
+- Quizzes (`{question, options, correct, explanation}[]`)
+- Mock exams (5 variants — each council member produces one)
+- Podcast scripts (multi-language, timestamped for TTS)
+- Video overview scripts
+- Mind maps (React Flow nodes/edges format)
+- Infographics
+- Slide decks
+- Data tables
+- Reports
+- Interactive course sections
+
+### Database Tables
+```
+extraction_job      — tracks file extraction (Phase 1 + 2) per contribution
+ai_model_config     — model settings, costs, roles, pipeline order
+pipeline_job        — tracks each source through the council (status, cost, version)
+pipeline_step       — each model's execution (input/output/verdict/tokens/cost)
+generated_content   — final published content (structured JSON + media URLs + rich text)
+content_challenge   — student challenges to published content (AI council re-evaluates)
+```
+
+### Execution Model (Vercel-compatible)
+- **Step 1 (Kimi Creator):** Real-time execution via standard API, triggered by cron or extraction completion.
+- **Steps 2-5 (Batch + Webhooks):** Each step submits a batch job to the provider. When the batch completes, the provider sends a webhook to our endpoint. The webhook handler processes the result, updates the pipeline step, and immediately submits the next batch job to the next provider. This creates a chain reaction: each teacher passes the baton to the next.
+- **Cron as fallback:** `/api/cron/ai-pipeline` still runs every 2 min — catches any batch completions where the webhook failed (network issues, etc.). Also handles Step 1 (Kimi real-time).
+- `/api/cron/extraction` — extraction pipeline (file → structured text), runs every 2 min.
+- After all steps pass → publish `generated_content` rows
+- **Resilience:** max 3 retries per step. If a reviewer fails, pipeline can proceed with remaining reviewers (degraded). If creator fails, pipeline waits for retry.
+- **Webhook handlers** verify provider signatures before processing. Each returns 200 immediately, then processes async.
+
+### File Structure
+```
+lib/ai/
+  types.ts              — shared types (ModelSlug, ContentType, multimodal messages, etc.)
+  client.ts             — unified AI client (router dispatches to providers)
+  orchestrator.ts       — council pipeline engine (create job, process step, publish)
+  prompts.ts            — all system prompts per role × 12 content types
+  cost.ts               — token/cost calculation helpers
+  providers/
+    kimi.ts             — Moonshot/Kimi K2.5 (OpenAI-compatible, non-thinking mode)
+    openai.ts           — OpenAI/ChatGPT client
+    anthropic.ts        — Anthropic/Claude client
+    gemini.ts           — Google Generative AI client
+    grok.ts             — xAI/Grok client (OpenAI-compatible)
+  extraction/
+    types.ts            — extraction-specific types (ExtractedContent, ExtractedImage, etc.)
+    pdf.ts              — PDF text + image extraction
+    docx.ts             — DOCX text + image + table extraction
+    pptx.ts             — PPTX slides + speaker notes + media extraction
+    image.ts            — image prep/resize for Kimi multimodal
+    video.ts            — video processing via Kimi multimodal
+    multimodal-kimi.ts  — Kimi K2.5 vision calls (OCR, classification, description)
+    orchestrator.ts     — extraction pipeline state machine
+
+app/api/cron/ai-pipeline/route.ts        — council pipeline cron handler (fallback for missed webhooks + Kimi real-time)
+app/api/cron/extraction/route.ts         — extraction pipeline cron handler
+app/api/webhooks/ai-pipeline/
+  openai/route.ts                        — OpenAI batch completion webhook (GPT-5.4 → triggers Claude)
+  anthropic/route.ts                     — Anthropic batch completion webhook (Claude → triggers Gemini)
+  google/route.ts                        — Google batch completion webhook (Gemini → triggers Grok)
+  xai/route.ts                           — xAI batch completion webhook (Grok → triggers publish)
+app/(main)/admin/ai-council/             — admin UI (pipeline visualization, jobs, stats)
+```
+
+### Environment Variables (AI Council)
+- `KIMI_API_KEY` — Moonshot AI (Kimi) API key
+- `OPENAI_API_KEY` — OpenAI API key
+- `ANTHROPIC_API_KEY` — Anthropic API key
+- `GOOGLE_AI_API_KEY` — Google Generative AI API key (also used for Nano Banana 2 image generation)
+- `XAI_API_KEY` — xAI (Grok) API key
+- `ELEVENLABS_API_KEY` — ElevenLabs API key (podcast audio generation)
+- `CRON_SECRET` — Vercel cron authentication secret
+
+### Content Generation Services (Phase 6)
+
+**Image Generation:**
+- **Nano Banana 2** (`gemini-3.1-flash-image-preview`) — Google AI, same `GOOGLE_AI_API_KEY`. 131K input / 32K output tokens. Per image: $0.045 (0.5K), $0.067 (1K), $0.101 (2K).
+- **Grok Imagine** (`grok-imagine-image`) — xAI, same `XAI_API_KEY`. $0.02/image (standard), $0.07/image (pro). 300 RPM. Cheapest option.
+
+**Video Generation:**
+- **Grok Imagine Video** (`grok-imagine-video`) — xAI, same `XAI_API_KEY`. $0.05/second. 60 RPM.
+
+**Text-to-Speech (Podcast Audio):**
+- **ElevenLabs** — best voice quality, especially for multilingual (en/fa/tr). Creator plan ($22/mo).
+  - `eleven_v3` — best quality, 70+ languages, 5K char limit (~5 min audio). For final published podcasts.
+  - `eleven_flash_v2_5` — fast/cheap, 32 languages, 40K char limit (~40 min audio). For draft previews.
+  - Pricing: ~$220/M chars (v3), ~$110/M chars (Flash). 100K v3 + 200K Flash chars included/mo.
+- **Grok TTS** — xAI, same `XAI_API_KEY`. $4.20/M chars. 50x cheaper than ElevenLabs but lower voice quality. Good for draft/preview audio, not final published podcasts.
+- **Strategy:** ElevenLabs for final published podcasts (best voices, multilingual). Grok TTS for draft previews / internal testing.
+
+**xAI/Grok Full Model Lineup (for reference):**
+- `grok-4.20-beta-0309-non-reasoning` — flagship, $2/$6 per M, 2M context (our Fact Checker)
+- `grok-4.20-beta-0309-reasoning` — same price, with reasoning tokens
+- `grok-4-1-fast-non-reasoning` — $0.20/$0.50 per M, 2M context (budget alternative)
+- `grok-code-fast-1` — $0.20/$1.50 per M, 256K context (code-specific)
+- `grok-imagine-image` — $0.02/image, `grok-imagine-image-pro` — $0.07/image
+- `grok-imagine-video` — $0.05/sec
+- Grok TTS — $4.20/M chars (beta)
+- Grok Batch API — 50% off all models
+- Knowledge cutoff: November 2024
+
+### Student Challenge System
+Students can challenge published content by commenting on specific sections. The AI council re-evaluates the challenged content — if the student is right, the content is corrected. If not, the council explains why the content is correct. Admin has final say.
+
+### Implementation Phases
+1. **Foundation** ✅ — DB schema (5 tables) + `lib/ai/types.ts` + unified AI client
+2. **Providers** ✅ — Kimi, OpenAI, Anthropic, Gemini, Grok provider implementations
+3. **Pipeline Engine** ✅ — Orchestrator + prompts + cron handler
+4. **Content Extraction** 🔄 — Extraction pipeline (PDF/DOCX/PPTX/image/video → structured text)
+5. **Admin UI** — AI Council admin pages (jobs list, stats, job detail, publish flow)
+6. **Content Generation** — Output type generators + course page rendering
+7. **Student Challenges** — Challenge submission UI + re-evaluation pipeline
+
+### Cost Model
+- **Kimi** does 90% of token work at ~1/10th the price — runs real-time (instant for users)
+- **Steps 2-5 via Batch API** — 50% off: GPT-5.4 batch $1.25/$7.50, Claude Opus batch $2.50/$12.50, Gemini batch $1/$6, Grok batch $1/$3
+- Extraction: ~$0.01-0.05 per contribution (Kimi multimodal for images/OCR)
+- Reviewers only process diffs/confirmations (small token load)
+- Content generated ONCE, served to 10,000+ students at $0 marginal cost
+- Cost tracked per step, per job, per course, with configurable ceiling per job
+- **Estimated cost per content piece (batch):** ~$0.05-0.30 total across all 5 models
+
+---
+
 ## Notes
 - **Next.js 16:** `middleware.ts` has been deprecated and renamed to `proxy.ts` — don't confuse them. Use `proxy.ts` for request interception/routing.
 - **Target: 10,000+ users in first 6 months** — university-scale project aiming for university sponsorship and wide adoption. ALWAYS build for scale, never treat this as a small/hobby project.
