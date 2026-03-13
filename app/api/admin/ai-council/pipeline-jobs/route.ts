@@ -74,6 +74,7 @@ export async function GET(request: Request) {
       durationMs: number | null;
       errorMessage: string | null;
       retryCount: number;
+      inputSummary: string | null;
       startedAt: Date | null;
       completedAt: Date | null;
     }[] | undefined;
@@ -93,6 +94,7 @@ export async function GET(request: Request) {
           durationMs: pipelineStep.durationMs,
           errorMessage: pipelineStep.errorMessage,
           retryCount: pipelineStep.retryCount,
+          inputSummary: pipelineStep.inputSummary,
           startedAt: pipelineStep.startedAt,
           completedAt: pipelineStep.completedAt,
         })

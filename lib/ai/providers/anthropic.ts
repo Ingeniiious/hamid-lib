@@ -27,6 +27,10 @@ export async function complete(
       content: m.content,
     }));
 
+  const t0 = Date.now();
+  const inputCharCount = nonSystemMessages.reduce((s, m) => s + m.content.length, 0) + (systemMessage?.content.length ?? 0);
+  console.log(`[anthropic] Starting stream — model=${request.maxTokens ?? 16384} max_tokens, ~${inputCharCount} input chars`);
+
   // Use streaming + finalMessage() to prevent HTTP timeouts.
   // Non-streaming requests sit idle while Claude generates — the SDK sees
   // zero data flowing and fires "Request timed out." even though Claude is
@@ -39,8 +43,26 @@ export async function complete(
     messages: nonSystemMessages,
   });
 
+  let firstTokenMs: number | null = null;
+  let tokenCount = 0;
+
+  stream.on("text", () => {
+    tokenCount++;
+    if (!firstTokenMs) {
+      firstTokenMs = Date.now() - t0;
+      console.log(`[anthropic] First token at ${firstTokenMs}ms`);
+    }
+  });
+
   const response = await stream.finalMessage();
+  const totalMs = Date.now() - t0;
   const textBlock = response.content.find((b) => b.type === "text");
+
+  console.log(
+    `[anthropic] Done in ${totalMs}ms — first_token=${firstTokenMs ?? "never"}ms, ` +
+    `chunks=${tokenCount}, in=${response.usage.input_tokens}, out=${response.usage.output_tokens}, ` +
+    `stop=${response.stop_reason}`
+  );
 
   return {
     content: textBlock?.text ?? "",

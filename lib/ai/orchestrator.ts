@@ -39,11 +39,11 @@ import type {
 
 const TERMINAL_STATUSES: PipelineStatus[] = ["completed", "failed", "cancelled"];
 
-/** Timeout for individual AI calls (120s — Vercel Pro allows 300s maxDuration). */
-const AI_CALL_TIMEOUT_MS = 120_000;
+/** Timeout for individual AI calls (270s — Vercel Pro allows 300s maxDuration, 30s buffer for DB). */
+const AI_CALL_TIMEOUT_MS = 270_000;
 
 /** If a step has been "running" longer than this, assume it's stuck (Vercel function crashed). */
-const STALE_RUNNING_THRESHOLD_MS = 90_000;
+const STALE_RUNNING_THRESHOLD_MS = 280_000;
 
 /** Maps a model role to the job status shown while that step runs. */
 const ROLE_TO_JOB_STATUS: Record<ModelRole, PipelineStatus> = {

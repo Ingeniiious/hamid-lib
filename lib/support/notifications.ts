@@ -39,7 +39,7 @@ export async function notifyUserOfReply(ticketId: string, isAdminReply: boolean)
     // Send email only for admin replies
     if (isAdminReply) {
       const userRows = await db.execute<{ name: string; email: string }>(
-        sql`SELECT name, email FROM neon_auth.user WHERE id = ${ticket.userId} LIMIT 1`
+        sql`SELECT name, email FROM neon_auth."user" WHERE id = ${ticket.userId}::uuid LIMIT 1`
       );
       const user = userRows[0];
       if (user?.email) {

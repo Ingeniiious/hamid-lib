@@ -106,6 +106,7 @@ interface PipelineStepData {
   durationMs: number | null;
   errorMessage: string | null;
   retryCount: number;
+  inputSummary: string | null;
   startedAt: string | null;
   completedAt: string | null;
 }
@@ -1015,6 +1016,8 @@ function ExtractionTab({
   onCancel: (id: string) => void;
   onRetry: (id: string) => void;
 }) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   return (
     <div className="space-y-4">
       <StatusFilter
@@ -1062,6 +1065,17 @@ function ExtractionTab({
               <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
                 <div className="flex flex-col items-center gap-1 sm:flex-row sm:gap-3">
                   <span
+                    onClick={() => {
+                      navigator.clipboard.writeText(String(job.id));
+                      setCopiedId(String(job.id));
+                      setTimeout(() => setCopiedId(null), 1500);
+                    }}
+                    title="Click to copy ID"
+                    className="cursor-copy font-mono text-[10px] text-gray-900/40 transition-colors hover:text-[#5227FF] dark:text-white/40 dark:hover:text-[#8B6FFF]"
+                  >
+                    {copiedId === String(job.id) ? "Copied!" : `#${String(job.id).slice(0, 8)}`}
+                  </span>
+                  <span
                     className="max-w-[250px] truncate text-sm font-medium text-gray-900 dark:text-white"
                     title={job.fileName}
                   >
@@ -1106,8 +1120,25 @@ function ExtractionTab({
 
               {/* Error */}
               {job.status === "failed" && job.errorMessage && (
-                <div className="mt-3 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-center">
-                  <p className="break-words text-xs text-red-600 dark:text-red-400">
+                <div className="mt-3 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-red-600/70 dark:text-red-400/70">
+                      Error Details
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `Extraction Job: ${job.id}\nFile: ${job.fileName}\nStatus: ${job.status}\nPhase: ${job.currentPhase}/2\nError: ${job.errorMessage}`
+                        );
+                        setCopiedId(`err-${job.id}`);
+                        setTimeout(() => setCopiedId(null), 1500);
+                      }}
+                      className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400"
+                    >
+                      {copiedId === `err-${job.id}` ? "Copied!" : "Copy Error"}
+                    </button>
+                  </div>
+                  <p className="select-text break-words text-xs leading-relaxed text-red-600 dark:text-red-400">
                     {job.errorMessage}
                   </p>
                 </div>
@@ -1173,6 +1204,88 @@ function ExtractionTab({
 }
 
 // ===========================================================================
+// StepCard — reusable card for council and generation steps
+// ===========================================================================
+
+function StepCard({
+  step,
+  job,
+  copiedId,
+  setCopiedId,
+  compact,
+}: {
+  step: PipelineStepData;
+  job: PipelineJob;
+  copiedId: string | null;
+  setCopiedId: (id: string | null) => void;
+  compact?: boolean;
+}) {
+  const info = MODEL_INFO[step.modelSlug];
+  return (
+    <div className={`rounded-xl border border-gray-900/5 bg-white/50 ${compact ? "p-2" : "p-3"} dark:border-white/5 dark:bg-white/5`}>
+      <div className="flex flex-col items-center gap-1 sm:flex-row sm:justify-between">
+        <div className="flex items-center gap-2">
+          <img
+            src={info?.image ?? ""}
+            alt={info?.name ?? step.modelSlug}
+            className={`${compact ? "h-5 w-5" : "h-6 w-6"} rounded-full object-cover`}
+          />
+          <span className={`${compact ? "text-xs" : "text-sm"} font-medium text-gray-900 dark:text-white`}>
+            {info?.name ?? step.modelSlug}
+          </span>
+          {!compact && (
+            <span className="text-xs text-gray-900/50 dark:text-white/50">
+              {info?.role ?? step.role}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <StatusBadge status={step.status} />
+          {step.verdict && <StatusBadge status={step.verdict} />}
+        </div>
+      </div>
+      {(step.inputTokens > 0 || step.outputTokens > 0) && (
+        <div className={`${compact ? "mt-1" : "mt-2"} flex flex-wrap items-center justify-center gap-2`}>
+          <MetricPill label="In" value={formatTokens(step.inputTokens)} />
+          <MetricPill label="Out" value={formatTokens(step.outputTokens)} />
+          <MetricPill label="Cost" value={formatCost(Number(step.costUsd))} />
+          {step.durationMs != null && (
+            <MetricPill label="Time" value={formatDuration(step.durationMs)} />
+          )}
+          {step.retryCount > 0 && (
+            <MetricPill label="Retries" value={String(step.retryCount)} />
+          )}
+        </div>
+      )}
+      {step.errorMessage && (
+        <div className="mt-2 rounded-lg border border-red-500/20 bg-red-500/5 px-2 py-1.5">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[9px] font-semibold uppercase tracking-wider text-red-600/70 dark:text-red-400/70">
+              Step Error
+            </span>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(
+                  `Job: ${job.id}\nStep: ${step.modelSlug} (${step.role})\nError: ${step.errorMessage}`
+                );
+                setCopiedId(`step-${step.id}`);
+                setTimeout(() => setCopiedId(null), 1500);
+              }}
+              className="rounded-full bg-red-500/10 px-1.5 py-0.5 text-[9px] font-medium text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400"
+            >
+              {copiedId === `step-${step.id}` ? "Copied!" : "Copy"}
+            </button>
+          </div>
+          <p className="select-text break-words text-[10px] leading-relaxed text-red-600 dark:text-red-400">
+            {step.errorMessage}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===========================================================================
 // Tab 3: Pipeline Jobs
 // ===========================================================================
 
@@ -1205,6 +1318,8 @@ function PipelineTab({
   onCancel: (id: string) => void;
   onRetry: (id: string) => void;
 }) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   return (
     <div className="space-y-4">
       <StatusFilter
@@ -1262,8 +1377,17 @@ function PipelineTab({
                   {/* Top: ID + Status */}
                   <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
                     <div className="flex flex-col items-center gap-1 sm:flex-row sm:gap-3">
-                      <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">
-                        {job.id.slice(0, 8)}...
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(job.id);
+                          setCopiedId(job.id);
+                          setTimeout(() => setCopiedId(null), 1500);
+                        }}
+                        title="Click to copy full UUID"
+                        className="cursor-copy select-all font-mono text-sm font-medium text-gray-900 transition-colors hover:text-[#5227FF] dark:text-white dark:hover:text-[#8B6FFF]"
+                      >
+                        {copiedId === job.id ? "Copied!" : `${job.id.slice(0, 8)}...`}
                       </span>
                       <span className="text-xs text-gray-900/50 dark:text-white/50">
                         Course: {job.courseId.slice(0, 12)}
@@ -1281,8 +1405,11 @@ function PipelineTab({
                   {/* Metrics */}
                   <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                     <MetricPill
-                      label="Step"
-                      value={`${job.currentStep}/5`}
+                      label={job.currentStep >= 100 ? "Generating" : "Council"}
+                      value={job.currentStep >= 100
+                        ? `${job.currentStep - 99}/${outputTypes.length * 5}`
+                        : `${job.currentStep}/5`
+                      }
                     />
                     <MetricPill
                       label="Tokens In"
@@ -1317,15 +1444,33 @@ function PipelineTab({
                     </div>
                   )}
 
-                  {/* Error */}
-                  {job.status === "failed" && job.errorMessage && (
-                    <div className="mt-3 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2">
-                      <p className="break-words text-xs text-red-600 dark:text-red-400">
-                        {job.errorMessage}
-                      </p>
-                    </div>
-                  )}
                 </button>
+
+                {/* Error — outside button so text is selectable/copyable */}
+                {job.status === "failed" && job.errorMessage && (
+                  <div className="mx-4 mb-3 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-red-600/70 dark:text-red-400/70">
+                        Error Details
+                      </span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            `Job: ${job.id}\nStatus: ${job.status}\nStep: ${job.currentStep}/5\nError: ${job.errorMessage}`
+                          );
+                          setCopiedId(`err-${job.id}`);
+                          setTimeout(() => setCopiedId(null), 1500);
+                        }}
+                        className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400"
+                      >
+                        {copiedId === `err-${job.id}` ? "Copied!" : "Copy Error"}
+                      </button>
+                    </div>
+                    <p className="select-text break-words text-xs leading-relaxed text-red-600 dark:text-red-400">
+                      {job.errorMessage}
+                    </p>
+                  </div>
+                )}
 
                 {/* Action Buttons */}
                 {!["completed", "failed", "cancelled"].includes(job.status) && (
@@ -1364,9 +1509,6 @@ function PipelineTab({
                       <MiniPipelineFlow steps={expandedSteps} jobStatus={job.status} />
                     )}
 
-                    <h4 className="mb-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-900/50 dark:text-white/50">
-                      Step Details
-                    </h4>
                     {stepsLoading ? (
                       <div className="space-y-2">
                         {Array.from({ length: 3 }).map((_, i) => (
@@ -1377,74 +1519,57 @@ function PipelineTab({
                       <p className="py-4 text-center text-xs text-gray-900/40 dark:text-white/40">
                         No steps recorded yet.
                       </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {expandedSteps.map((step) => {
-                          const info = MODEL_INFO[step.modelSlug];
-                          return (
-                            <div
-                              key={step.id}
-                              className="rounded-xl border border-gray-900/5 bg-white/50 p-3 dark:border-white/5 dark:bg-white/5"
-                            >
-                              <div className="flex flex-col items-center gap-1 sm:flex-row sm:justify-between">
-                                <div className="flex items-center gap-2">
-                                  <img
-                                    src={info?.image ?? ""}
-                                    alt={info?.name ?? step.modelSlug}
-                                    className="h-6 w-6 rounded-full object-cover"
-                                  />
-                                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                    {info?.name ?? step.modelSlug}
-                                  </span>
-                                  <span className="text-xs text-gray-900/50 dark:text-white/50">
-                                    {info?.role ?? step.role}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <StatusBadge status={step.status} />
-                                  {step.verdict && (
-                                    <StatusBadge status={step.verdict} />
-                                  )}
-                                </div>
+                    ) : (() => {
+                      const councilSteps = expandedSteps.filter((s) => s.stepOrder < 100);
+                      const genSteps = expandedSteps.filter((s) => s.stepOrder >= 100);
+                      // Group generation steps by content type (from inputSummary "generate:xxx")
+                      const genGroups = new Map<string, typeof genSteps>();
+                      for (const s of genSteps) {
+                        const ct = (s.inputSummary ?? "").replace("generate:", "") || "unknown";
+                        if (!genGroups.has(ct)) genGroups.set(ct, []);
+                        genGroups.get(ct)!.push(s);
+                      }
+                      return (
+                        <div className="space-y-4">
+                          {/* Council Steps */}
+                          {councilSteps.length > 0 && (
+                            <div>
+                              <h4 className="mb-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-900/50 dark:text-white/50">
+                                Council Review (Steps 1-5)
+                              </h4>
+                              <div className="space-y-2">
+                                {councilSteps.map((step) => (
+                                  <StepCard key={step.id} step={step} job={job} copiedId={copiedId} setCopiedId={setCopiedId} />
+                                ))}
                               </div>
-                              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
-                                <MetricPill
-                                  label="In"
-                                  value={formatTokens(step.inputTokens)}
-                                />
-                                <MetricPill
-                                  label="Out"
-                                  value={formatTokens(step.outputTokens)}
-                                />
-                                <MetricPill
-                                  label="Cost"
-                                  value={formatCost(Number(step.costUsd))}
-                                />
-                                {step.durationMs != null && (
-                                  <MetricPill
-                                    label="Time"
-                                    value={formatDuration(step.durationMs)}
-                                  />
-                                )}
-                                {step.retryCount > 0 && (
-                                  <MetricPill
-                                    label="Retries"
-                                    value={String(step.retryCount)}
-                                  />
-                                )}
-                              </div>
-                              {step.errorMessage && (
-                                <div className="mt-2 rounded-lg border border-red-500/20 bg-red-500/5 px-2 py-1">
-                                  <p className="break-words text-[10px] text-red-600 dark:text-red-400">
-                                    {step.errorMessage}
-                                  </p>
-                                </div>
-                              )}
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                          )}
+
+                          {/* Generation Steps — grouped by content type */}
+                          {genGroups.size > 0 && (
+                            <div>
+                              <h4 className="mb-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-900/50 dark:text-white/50">
+                                Content Generation ({genSteps.filter(s => s.status === "completed").length}/{genSteps.length} Done)
+                              </h4>
+                              <div className="space-y-3">
+                                {Array.from(genGroups.entries()).map(([ct, steps]) => (
+                                  <div key={ct}>
+                                    <p className="mb-1.5 text-center text-[11px] font-medium text-[#5227FF]">
+                                      {titleCase(ct.replace(/_/g, " "))}
+                                    </p>
+                                    <div className="space-y-1.5">
+                                      {steps.map((step) => (
+                                        <StepCard key={step.id} step={step} job={job} copiedId={copiedId} setCopiedId={setCopiedId} compact />
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Generated Content */}
                     {job.status === "completed" && (

@@ -74,7 +74,7 @@ export function AdminTicketDetailClient({ ticketId }: { ticketId: string }) {
 
   if (!data) {
     return (
-      <div className="space-y-4 p-6">
+      <div className="space-y-4 px-6 py-6 sm:px-8">
         <div className="h-8 w-1/3 mx-auto animate-pulse rounded-xl bg-gray-900/5 dark:bg-white/5" />
         <div className="h-[400px] animate-pulse rounded-2xl bg-gray-900/5 dark:bg-white/5" />
       </div>
@@ -88,7 +88,7 @@ export function AdminTicketDetailClient({ ticketId }: { ticketId: string }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.6, ease }}
-      className="space-y-6 p-6"
+      className="space-y-6 px-6 py-6 sm:px-8"
     >
       {/* Back */}
       <div className="flex justify-center">
@@ -104,9 +104,9 @@ export function AdminTicketDetailClient({ ticketId }: { ticketId: string }) {
       <div className="rounded-2xl border border-gray-900/10 bg-white/50 p-6 backdrop-blur-xl dark:border-white/15 dark:bg-white/5">
         <div className="flex flex-col items-center gap-4">
           <div className="text-center">
-            <h1 dir={isRtl ? "rtl" : undefined} className="text-xl font-semibold text-gray-900 dark:text-white">
+            <h2 dir={isRtl ? "rtl" : undefined} className="font-display text-xl font-light text-gray-900 dark:text-white">
               {ticket.subject}
-            </h1>
+            </h2>
             <div dir={isRtl ? "rtl" : undefined} className="mt-2 flex flex-wrap items-center justify-center gap-3">
               <TicketStatusBadge status={ticket.status} />
               <span className="text-sm capitalize text-gray-900/50 dark:text-white/50">

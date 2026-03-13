@@ -37,7 +37,7 @@ export async function getSupportOverview() {
 export async function listAllTickets(
   status?: string,
   page = 1,
-  limit = 15,
+  limit = 25,
   search?: string
 ) {
   const session = await getAdminSession();
@@ -45,40 +45,37 @@ export async function listAllTickets(
 
   const offset = (page - 1) * limit;
 
-  // Fetch all tickets with user info, then filter in-memory
-  // (raw SQL with JOIN to neon_auth schema)
+  // Build WHERE clause dynamically for SQL-level filtering
+  const statusFilter = status && status !== "all" ? status : null;
+  const searchTerm = search?.trim() || null;
+
+  const whereParts = [];
+  if (statusFilter) whereParts.push(sql`st.status = ${statusFilter}`);
+  if (searchTerm) whereParts.push(sql`st.subject ILIKE ${"%" + searchTerm + "%"}`);
+  const whereClause = whereParts.length > 0
+    ? sql`WHERE ${sql.join(whereParts, sql` AND `)}`
+    : sql``;
+
+  // Count query (SQL-level filtering)
+  const countResult = await db.execute<{ count: string }>(
+    sql`SELECT count(*) FROM support_ticket st ${whereClause}`
+  );
+  const total = parseInt(countResult[0]?.count ?? "0");
+
+  // Data query with SQL-level filtering, pagination, and JOIN
   const ticketsResult = await db.execute(sql`
-    SELECT
-      st.id,
-      st.user_id,
-      st.subject,
-      st.category,
-      st.priority,
-      st.status,
-      st.message_count,
-      st.last_message_at,
-      st.created_at,
-      u.name as user_name,
-      u.email as user_email
+    SELECT st.id, st.user_id, st.subject, st.category, st.priority, st.status,
+           st.message_count, st.last_message_at, st.created_at,
+           u.name as user_name, u.email as user_email
     FROM support_ticket st
-    LEFT JOIN neon_auth."user" u ON u.id = st.user_id
+    LEFT JOIN neon_auth."user" u ON u.id = st.user_id::uuid
+    ${whereClause}
     ORDER BY st.last_message_at DESC
+    LIMIT ${limit} OFFSET ${offset}
   `);
 
-  let filtered = ticketsResult as any[];
-  if (status && status !== "all") {
-    filtered = filtered.filter((t: any) => t.status === status);
-  }
-  if (search?.trim()) {
-    const s = search.trim().toLowerCase();
-    filtered = filtered.filter((t: any) => t.subject?.toLowerCase().includes(s));
-  }
-
-  const total = filtered.length;
-  const paginated = filtered.slice(offset, offset + limit);
-
   return {
-    tickets: paginated.map((t: any) => ({
+    tickets: (ticketsResult as any[]).map((t: any) => ({
       id: t.id,
       userId: t.user_id,
       subject: t.subject,
@@ -107,7 +104,7 @@ export async function getAdminTicketDetail(ticketId: string) {
       u.name as user_name,
       u.email as user_email
     FROM support_ticket st
-    LEFT JOIN neon_auth."user" u ON u.id = st.user_id
+    LEFT JOIN neon_auth."user" u ON u.id = st.user_id::uuid
     WHERE st.id = ${ticketId}
     LIMIT 1
   `);
