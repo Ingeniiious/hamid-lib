@@ -148,6 +148,21 @@ export function useTranslation() {
   return { locale, setLocale: changeLocale, t };
 }
 
+/**
+ * Resolve a DB field from a JSONB translations column.
+ * Usage: localized(locale, faculty.name, faculty.translations, "name")
+ * Falls back to the source value if no translation exists.
+ */
+export function localized(
+  locale: Locale,
+  sourceValue: string,
+  translations: Record<string, Record<string, string | undefined>> | null | undefined,
+  field: string,
+): string {
+  if (!translations || locale === "en") return sourceValue;
+  return translations[locale]?.[field] || sourceValue;
+}
+
 // ─── Provider (pass-through — keeps layout.tsx import compatible) ────────────
 
 export function I18nProvider({ children }: { children: ReactNode }) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, localized } from "@/lib/i18n";
 import { CourseGrid } from "@/components/CourseGrid";
 import { BackButton } from "@/components/BackButton";
 import { PageHeader } from "@/components/PageHeader";
@@ -15,7 +15,7 @@ interface Course {
 }
 
 interface FacultyCoursesContentProps {
-  faculty: { id: number; name: string; slug: string };
+  faculty: { id: number; name: string; slug: string; translations?: Record<string, { name?: string }> | null };
   courses: Course[];
   facultySlug: string;
   isContributor: boolean;
@@ -27,7 +27,8 @@ export function FacultyCoursesContent({
   facultySlug,
   isContributor,
 }: FacultyCoursesContentProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const facultyName = localized(locale, faculty.name, faculty.translations, "name");
 
   const subtitle = `${courses.length} ${
     courses.length === 1 ? t("courses.course") : t("courses.title")
@@ -37,7 +38,7 @@ export function FacultyCoursesContent({
     <div className="flex h-full flex-col">
       {/* Fixed header */}
       <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
-        <PageHeader title={faculty.name} subtitle={subtitle} />
+        <PageHeader title={facultyName} subtitle={subtitle} />
       </div>
 
       {/* Scrollable content */}

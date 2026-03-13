@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { GrainientButton } from "@/components/GrainientButton";
 import { FadeImage } from "@/components/FadeImage";
+import { useTranslation } from "@/lib/i18n";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 const CDN = "https://lib.thevibecodedcompany.com";
@@ -26,6 +27,7 @@ export function ContributorCTA({
   variant = "full",
   isContributor = false,
 }: ContributorCTAProps) {
+  const { t } = useTranslation();
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -52,7 +54,7 @@ export function ContributorCTA({
       </p>
       <div className="mt-6">
         <GrainientButton href={href}>
-          {isContributor ? "Upload Your Materials" : "Become A Contributor"}
+          {isContributor ? t("contribute.uploadYourMaterials") : t("contribute.becomeContributor")}
         </GrainientButton>
       </div>
     </motion.div>

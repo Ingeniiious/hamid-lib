@@ -71,7 +71,7 @@ export default async function FacultyCoursesPage({ params }: Props) {
 
   return (
     <FacultyCoursesContent
-      faculty={{ id: fac.id, name: fac.name, slug: fac.slug }}
+      faculty={{ id: fac.id, name: fac.name, slug: fac.slug, translations: fac.translations }}
       courses={courses.map((c) => ({
         id: c.id,
         title: c.title,

@@ -510,6 +510,18 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
               <ArrowsClockwise size={14} className="mr-1" />
               Refresh
             </Button>
+            {generatedItems.length > 0 && (
+              <Button
+                size="sm"
+                className="rounded-full bg-[#5227FF] text-white hover:opacity-90"
+                onClick={() =>
+                  router.push(`/admin/ai-council/view/${jobId}`)
+                }
+              >
+                <Eye size={14} className="mr-1" />
+                View Preview
+              </Button>
+            )}
           </div>
         </motion.div>
 

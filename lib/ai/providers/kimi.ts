@@ -12,7 +12,7 @@ function getClient(): OpenAI {
     client = new OpenAI({
       apiKey,
       baseURL: "https://api.moonshot.ai/v1",
-      timeout: 120_000, // 120s — Vercel Pro allows 300s maxDuration
+      timeout: 240_000, // 240s — Kimi creator can take 100-120s+ on large sources
       maxRetries: 0, // Disable SDK auto-retry — orchestrator handles retries
     });
   }

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Separator } from "@/components/ui/separator";
 import { GrainientButton } from "@/components/GrainientButton";
 import { FadeImage, preloadImages } from "@/components/FadeImage";
+import { useTranslation } from "@/lib/i18n";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 const CDN = "https://lib.thevibecodedcompany.com";
@@ -23,6 +24,7 @@ interface CourseDetailProps {
 }
 
 export function CourseDetail({ course, isContributor, facultySlug }: CourseDetailProps) {
+  const { t } = useTranslation();
   // Preload on mount so the image is ready before user scrolls down
   useEffect(() => {
     preloadImages([`${CDN}/images/expert.webp`]);
@@ -77,21 +79,21 @@ export function CourseDetail({ course, isContributor, facultySlug }: CourseDetai
         />
         <h3 className="mt-6 font-display text-xl font-light text-gray-900 dark:text-white">
           {isContributor
-            ? "Share Your Materials"
-            : "Be The First To Contribute"}
+            ? t("contribute.shareYourMaterials")
+            : t("contribute.beFirstToContribute")}
         </h3>
         <p className="mt-3 text-sm leading-relaxed text-gray-900/50 dark:text-white/50">
           {isContributor
-            ? "Upload your notes, slides, or documents for this course and help fellow students learn."
-            : "This course needs your help. Share your notes and we\u2019ll create study resources with AI so everyone can learn."}
+            ? t("contribute.uploadNotesHelp")
+            : t("contribute.courseNeedsHelp")}
         </p>
         <div className="mt-6">
           <GrainientButton
             href={`/dashboard/contribute?courseId=${course.id}${facultySlug ? `&facultySlug=${facultySlug}` : ""}`}
           >
             {isContributor
-              ? "Contribute To This Course"
-              : "Become A Contributor"}
+              ? t("contribute.contributeToCourse")
+              : t("contribute.becomeContributor")}
           </GrainientButton>
         </div>
       </motion.div>

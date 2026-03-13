@@ -12,6 +12,8 @@ export const faculty = pgTable("faculty", {
   university: text("university").notNull(),
   illustration: text("illustration"),
   description: text("description"),
+  /** i18n overrides: {"tr": {"name": "..."}, "fa": {"name": "..."}} */
+  translations: jsonb("translations").$type<Record<string, { name?: string; description?: string }>>().default({}),
   displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -27,6 +29,8 @@ export const program = pgTable("program", {
   facultyId: integer("faculty_id")
     .notNull()
     .references(() => faculty.id, { onDelete: "cascade" }),
+  /** i18n overrides: {"tr": {"name": "..."}, "fa": {"name": "..."}} */
+  translations: jsonb("translations").$type<Record<string, { name?: string }>>().default({}),
   displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -43,6 +47,8 @@ export const course = pgTable("course", {
   semester: text("semester"),
   professor: text("professor"),
   coverImage: text("cover_image"),
+  /** i18n overrides: {"tr": {"title": "..."}, "fa": {"title": "..."}} */
+  translations: jsonb("translations").$type<Record<string, { title?: string; description?: string }>>().default({}),
   facultyId: integer("faculty_id").references(() => faculty.id, { onDelete: "set null" }),
   programId: integer("program_id").references(() => program.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),

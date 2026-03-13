@@ -10,7 +10,7 @@ function getClient(): OpenAI {
     if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
     client = new OpenAI({
       apiKey,
-      timeout: 120_000, // 120s — Vercel Pro allows 300s maxDuration
+      timeout: 240_000, // 240s — orchestrator timeout is 270s, SDK shouldn't fire first
       maxRetries: 0, // Disable SDK auto-retry — orchestrator handles retries
     });
   }

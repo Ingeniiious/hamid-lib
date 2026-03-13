@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, localized } from "@/lib/i18n";
 import { FacultyCard } from "@/components/FacultyCard";
 import { BackButton } from "@/components/BackButton";
 import { PageHeader } from "@/components/PageHeader";
@@ -15,6 +15,7 @@ interface Faculty {
   slug: string;
   illustration: string | null;
   courseCount: number;
+  translations?: Record<string, { name?: string }> | null;
 }
 
 interface CoursesPageContentProps {
@@ -28,7 +29,7 @@ export function CoursesPageContent({
   userFacultyId,
   faculties,
 }: CoursesPageContentProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   if (!university) {
     return (
@@ -101,7 +102,7 @@ export function CoursesPageContent({
                 </motion.p>
                 <div className="mx-auto max-w-xs">
                   <FacultyCard
-                    name={pinnedFaculty.name}
+                    name={localized(locale, pinnedFaculty.name, pinnedFaculty.translations, "name")}
                     slug={pinnedFaculty.slug}
                     illustration={pinnedFaculty.illustration}
                     courseCount={pinnedFaculty.courseCount}
@@ -127,7 +128,7 @@ export function CoursesPageContent({
                   {otherFaculties.map((f, index) => (
                     <FacultyCard
                       key={f.id}
-                      name={f.name}
+                      name={localized(locale, f.name, f.translations, "name")}
                       slug={f.slug}
                       illustration={f.illustration}
                       courseCount={f.courseCount}

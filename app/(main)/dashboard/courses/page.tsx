@@ -36,6 +36,7 @@ export default async function CoursesPage() {
     slug: string;
     illustration: string | null;
     courseCount: number;
+    translations: Record<string, { name?: string }> | null;
   }[] = [];
 
   if (university) {
@@ -46,6 +47,7 @@ export default async function CoursesPage() {
         slug: faculty.slug,
         illustration: faculty.illustration,
         courseCount: sql<number>`count(${course.id})::int`,
+        translations: faculty.translations,
       })
       .from(faculty)
       .leftJoin(course, eq(course.facultyId, faculty.id))
