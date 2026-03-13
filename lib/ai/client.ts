@@ -39,15 +39,3 @@ export async function complete(
   }
   return provider(request);
 }
-
-/**
- * Calculate cost for a completion based on per-token rates.
- */
-export function calculateCost(
-  inputTokens: number,
-  outputTokens: number,
-  costPerInputToken: number,
-  costPerOutputToken: number
-): number {
-  return inputTokens * costPerInputToken + outputTokens * costPerOutputToken;
-}

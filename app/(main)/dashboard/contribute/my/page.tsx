@@ -59,7 +59,7 @@ export default async function MyContributionsPage({
           )}
         </div>
       </div>
-      <BackButton href="/dashboard/contribute" labelKey="contribute.title" floating />
+      <BackButton href="/dashboard/courses" labelKey="courses.title" floating />
     </div>
   );
 }

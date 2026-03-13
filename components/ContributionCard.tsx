@@ -3,25 +3,38 @@
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/lib/i18n";
+import Link from "next/link";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
 const statusStyles = {
   pending:
     "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  processing:
+    "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
   approved:
     "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   rejected:
     "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   under_review:
     "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  re_evaluating:
+    "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
 } as const;
 
 const statusKeys: Record<string, string> = {
   pending: "contribute.statusPending",
+  processing: "contribute.statusProcessing",
   approved: "contribute.statusApproved",
   rejected: "contribute.statusRejected",
   under_review: "contribute.statusUnderReview",
+  re_evaluating: "contribute.statusReEvaluating",
+};
+
+const rejectionSourceLabels: Record<string, string> = {
+  ai: "AI Rejected",
+  admin: "Admin Rejected",
+  duplicate: "Duplicate",
 };
 
 interface ContributionCardProps {
@@ -33,6 +46,8 @@ interface ContributionCardProps {
     fileName: string | null;
     status: string;
     reviewNote: string | null;
+    rejectionSource?: string | null;
+    rejectionReason?: string | null;
     createdAt: Date;
     courseTitle: string | null;
   };
@@ -78,9 +93,19 @@ export function ContributionCard({
             )}
           </div>
         </div>
-        <Badge variant="secondary" className={style}>
-          {statusLabel}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {c.status === "rejected" && c.rejectionSource && (
+            <Badge
+              variant="secondary"
+              className="bg-red-50 text-red-500 dark:bg-red-950/20 dark:text-red-400 text-[10px]"
+            >
+              {rejectionSourceLabels[c.rejectionSource] || c.rejectionSource}
+            </Badge>
+          )}
+          <Badge variant="secondary" className={style}>
+            {statusLabel}
+          </Badge>
+        </div>
       </div>
 
       {c.description && (
@@ -89,7 +114,17 @@ export function ContributionCard({
         </p>
       )}
 
-      {c.reviewNote && c.status === "rejected" && (
+      {/* Show rejection reason (from AI pipeline or admin) */}
+      {c.status === "rejected" && c.rejectionReason && (
+        <div className="mt-2 rounded-lg bg-red-50/50 p-2 dark:bg-red-950/10">
+          <p className="text-xs text-red-600 dark:text-red-400">
+            {c.rejectionReason}
+          </p>
+        </div>
+      )}
+
+      {/* Fallback to reviewNote if no rejectionReason */}
+      {c.reviewNote && c.status === "rejected" && !c.rejectionReason && (
         <div className="mt-2 rounded-lg bg-red-50/50 p-2 dark:bg-red-950/10">
           <p className="text-xs text-red-600 dark:text-red-400">
             {c.reviewNote}
@@ -97,13 +132,25 @@ export function ContributionCard({
         </div>
       )}
 
-      <p className="mt-2 text-[11px] text-gray-900/30 dark:text-white/30">
-        {new Date(c.createdAt).toLocaleDateString(dateLocale, {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })}
-      </p>
+      <div className="mt-2 flex items-center justify-between">
+        <p className="text-[11px] text-gray-900/30 dark:text-white/30">
+          {new Date(c.createdAt).toLocaleDateString(dateLocale, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}
+        </p>
+
+        {/* Appeal button for rejected contributions */}
+        {c.status === "rejected" && (
+          <Link
+            href={`/dashboard/contribute/${c.id}/appeal`}
+            className="rounded-full bg-[#5227FF] px-4 py-1 text-xs font-medium text-white hover:opacity-90 transition-opacity"
+          >
+            {t("contribute.appeal")}
+          </Link>
+        )}
+      </div>
     </motion.div>
   );
 }

@@ -859,6 +859,12 @@ async function autoCreatePipelineJob(
         .where(eq(extractionJob.id, completedJob.id));
     }
 
+    // Update contribution status to "processing" — pipeline is now handling them
+    await db
+      .update(contribution)
+      .set({ status: "processing", updatedAt: new Date() })
+      .where(inArray(contribution.id, contributionIds));
+
     console.log(
       `[extraction] Auto-created ${pipelineJobIds.length} pipeline job(s) for ${completedJobs.length} extraction(s)`
     );
@@ -886,6 +892,24 @@ async function handleFailure(
         updatedAt: new Date(),
       })
       .where(eq(extractionJob.id, jobId));
+
+    // Propagate extraction failure to contribution
+    const [job] = await db
+      .select({ contributionId: extractionJob.contributionId })
+      .from(extractionJob)
+      .where(eq(extractionJob.id, jobId))
+      .limit(1);
+    if (job) {
+      await db
+        .update(contribution)
+        .set({
+          status: "rejected",
+          rejectionSource: "ai",
+          rejectionReason: `Content extraction failed: ${errorMessage}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(contribution.id, job.contributionId));
+    }
   } else {
     // Reset to pending for retry
     await db

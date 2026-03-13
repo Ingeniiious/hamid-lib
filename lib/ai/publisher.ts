@@ -24,6 +24,7 @@ import { complete } from "@/lib/ai/client";
 import { calculateStepCost } from "@/lib/ai/cost";
 import { getGeneratorPrompt } from "@/lib/ai/prompts";
 import type { ModelSlug, ContentType, ModelRole } from "@/lib/ai/types";
+import { validateGeneratedContent } from "@/lib/ai/content-schemas";
 
 // ---------------------------------------------------------------------------
 // Get best verified content from completed teacher steps
@@ -265,6 +266,15 @@ export async function processGenerationStep(
   } catch {
     throw new Error(`Generator returned invalid JSON for ${contentType}`);
   }
+
+  // Validate schema — ensure the AI output matches the expected structure
+  const validation = validateGeneratedContent(contentType, parsed);
+  if (!validation.success) {
+    throw new Error(
+      `Generator output failed schema validation for ${contentType}: ${validation.errors.join("; ")}`
+    );
+  }
+  parsed = validation.data;
 
   const costUsd =
     response.inputTokens * config.costPerInputToken +

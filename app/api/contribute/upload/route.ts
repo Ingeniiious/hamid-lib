@@ -8,6 +8,7 @@ import {
 } from "@/database/schema";
 import { uploadToR2 } from "@/lib/r2";
 import { watermarkFile } from "@/lib/watermark";
+import { createExtractionJob } from "@/lib/ai/extraction/orchestrator";
 import { eq, and, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -89,6 +90,8 @@ export async function POST(request: NextRequest) {
   const title = (formData.get("title") as string)?.trim();
   const courseId = (formData.get("courseId") as string) || null;
   const description = (formData.get("description") as string)?.trim() || null;
+  const professorIdRaw = formData.get("professorId") as string | null;
+  const professorId = professorIdRaw ? parseInt(professorIdRaw, 10) || null : null;
 
   if (!file) {
     return NextResponse.json({ error: "No file provided." }, { status: 400 });
@@ -139,8 +142,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Watermark the file
+  // Read raw file buffer
   const rawBuffer = new Uint8Array(await file.arrayBuffer());
+
+  // Duplicate detection — hash raw content before watermark
+  const { computeContentHash, checkDuplicate } = await import(
+    "@/lib/contribution/duplicate"
+  );
+  const contentHash = computeContentHash(rawBuffer);
+  const dupCheck = await checkDuplicate(contentHash, courseId, session.user.id);
+  if (dupCheck.isDuplicate) {
+    return NextResponse.json(
+      { error: dupCheck.reason },
+      { status: 409 }
+    );
+  }
+
+  // Watermark the file
   const { buffer: watermarkedBuffer, mimeType: finalMime } =
     await watermarkFile(rawBuffer, file.type);
 
@@ -164,6 +182,7 @@ export async function POST(request: NextRequest) {
     .values({
       userId: session.user.id,
       courseId: courseId || null,
+      professorId,
       title,
       description,
       type: "file",
@@ -172,6 +191,7 @@ export async function POST(request: NextRequest) {
       fileName: file.name,
       fileSize: watermarkedBuffer.length,
       fileType: finalMime,
+      contentHash,
     })
     .returning();
 
@@ -186,5 +206,31 @@ export async function POST(request: NextRequest) {
     })
     .where(eq(contributorStats.userId, session.user.id));
 
-  return NextResponse.json({ contribution: row });
+  // Create extraction job — cron picks it up within 2 minutes.
+  // Only when courseId is present (extraction_job requires a course).
+  let extractionJobId: string | null = null;
+  if (courseId) {
+    try {
+      extractionJobId = await createExtractionJob({
+        contributionId: row.id,
+        courseId,
+        fileName: file.name,
+        fileKey: objectKey,
+        fileUrl: result.url,
+        fileType: finalMime,
+        fileSize: watermarkedBuffer.length,
+      });
+      console.log(
+        `[upload] Extraction job ${extractionJobId} created for contribution ${row.id}`
+      );
+    } catch (error) {
+      // Non-fatal — contribution is saved, extraction can be triggered later
+      console.error(
+        `[upload] Failed to create extraction job for contribution ${row.id}:`,
+        error
+      );
+    }
+  }
+
+  return NextResponse.json({ contribution: row, extractionJobId });
 }

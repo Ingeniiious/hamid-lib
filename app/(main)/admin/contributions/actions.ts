@@ -7,6 +7,7 @@ import {
   contentReport,
   contributorStats,
   contributorVerification,
+  contributionAppeal,
   universityDomain,
   faculty,
   course,
@@ -538,6 +539,121 @@ export async function reviewReport(
     action: `content_report.${decision}`,
     entityType: "content_report",
     entityId: String(reportId),
+  });
+
+  return { success: true };
+}
+
+// ==================
+// Appeal Overrides
+// ==================
+
+export async function overrideAppeal(
+  appealId: number,
+  decision: "overturned" | "upheld",
+  note?: string
+) {
+  const session = await getAdminSession();
+  await requirePermission(session, "contributions.moderate");
+
+  const [appeal] = await db
+    .select()
+    .from(contributionAppeal)
+    .where(eq(contributionAppeal.id, appealId))
+    .limit(1);
+
+  if (!appeal) return { error: "Appeal not found." };
+
+  // Update appeal
+  await db
+    .update(contributionAppeal)
+    .set({
+      status: decision,
+      adminOverrideBy: session.user.id,
+      adminOverrideAt: new Date(),
+      adminNote: note || null,
+      updatedAt: new Date(),
+    })
+    .where(eq(contributionAppeal.id, appealId));
+
+  if (decision === "overturned") {
+    // Reset contribution to processing, re-submit to pipeline
+    await db
+      .update(contribution)
+      .set({ status: "processing", updatedAt: new Date() })
+      .where(eq(contribution.id, appeal.contributionId));
+
+    // Re-create pipeline job for text contributions
+    try {
+      const [contrib] = await db
+        .select({
+          courseId: contribution.courseId,
+          textContent: contribution.textContent,
+          title: contribution.title,
+        })
+        .from(contribution)
+        .where(eq(contribution.id, appeal.contributionId))
+        .limit(1);
+
+      if (contrib?.courseId && contrib.textContent) {
+        const { detectLanguageFromText } = await import("@/lib/ai/translation");
+        const { createJob } = await import("@/lib/ai/orchestrator");
+        const sourceContent = `# Source: ${contrib.title}\n\n## Text Content\n\n### Page 1\n\n${contrib.textContent}`;
+        const lang = detectLanguageFromText(sourceContent);
+
+        const jobId = await createJob({
+          courseId: contrib.courseId,
+          contributionIds: [appeal.contributionId],
+          outputTypes: ["study_guide", "flashcards", "quiz"],
+          startedBy: session.user.id,
+          sourceContent,
+          sourceLanguage: lang,
+        });
+
+        await db
+          .update(contributionAppeal)
+          .set({ reEvaluationJobId: jobId, updatedAt: new Date() })
+          .where(eq(contributionAppeal.id, appealId));
+      }
+    } catch (err) {
+      console.error("[admin-appeal] Failed to re-create pipeline job:", err);
+    }
+
+    // Notify user
+    try {
+      const { dispatchNotification } = await import("@/lib/notification-dispatch");
+      await dispatchNotification(appeal.userId, {
+        category: "contribution",
+        title: "Appeal Overturned",
+        body: note
+          ? `Your appeal has been overturned by an admin: ${note}`
+          : "Your appeal has been overturned by an admin. Your contribution is being re-evaluated.",
+        url: "/dashboard/contribute/my",
+        metadata: { contributionId: appeal.contributionId, appealId },
+      });
+    } catch {}
+  } else {
+    // Upheld — keep rejected, notify user
+    try {
+      const { dispatchNotification } = await import("@/lib/notification-dispatch");
+      await dispatchNotification(appeal.userId, {
+        category: "contribution",
+        title: "Appeal Upheld",
+        body: note
+          ? `Your appeal was reviewed and the rejection stands: ${note}`
+          : "Your appeal was reviewed and the original rejection has been upheld.",
+        url: "/dashboard/contribute/my",
+        metadata: { contributionId: appeal.contributionId, appealId },
+      });
+    } catch {}
+  }
+
+  await logAdminAction({
+    adminUserId: session.user.id,
+    action: `appeal.${decision}`,
+    entityType: "contribution_appeal",
+    entityId: String(appealId),
+    details: note ? { note } : undefined,
   });
 
   return { success: true };

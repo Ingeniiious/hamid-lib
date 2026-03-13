@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { faculty, course, userProfile } from "@/database/schema";
+import { faculty, course, program, userProfile } from "@/database/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { FacultyCoursesContent } from "@/components/FacultyCoursesContent";
@@ -48,8 +48,16 @@ export default async function FacultyCoursesPage({ params }: Props) {
   if (!fac) notFound();
 
   const courses = await db
-    .select()
+    .select({
+      id: course.id,
+      title: course.title,
+      slug: course.slug,
+      professor: course.professor,
+      semester: course.semester,
+      programName: program.name,
+    })
     .from(course)
+    .leftJoin(program, eq(course.programId, program.id))
     .where(eq(course.facultyId, fac.id))
     .orderBy(course.title);
 
@@ -78,6 +86,7 @@ export default async function FacultyCoursesPage({ params }: Props) {
         slug: c.slug,
         professor: c.professor,
         semester: c.semester,
+        programName: c.programName,
       }))}
       facultySlug={facultySlug}
       isContributor={isContributor}

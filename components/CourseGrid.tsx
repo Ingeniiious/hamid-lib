@@ -8,6 +8,7 @@ interface Course {
   slug: string | null;
   professor: string | null;
   semester: string | null;
+  programName?: string | null;
 }
 
 interface CourseGridProps {

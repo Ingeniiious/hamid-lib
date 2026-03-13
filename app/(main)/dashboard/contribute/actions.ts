@@ -11,6 +11,7 @@ import {
   course,
   faculty,
   program,
+  professor,
 } from "@/database/schema";
 import { eq, sql, like, ilike, and, desc, inArray } from "drizzle-orm";
 import { sendOTP, verifyOTP } from "@/app/(main)/auth/actions";
@@ -227,16 +228,53 @@ export async function verifyContributorOTP(email: string, code: string) {
   return { success: true, autoVerified: true, universityName };
 }
 
+export async function searchProfessors(query: string, offset = 0) {
+  const { data: session } = await auth.getSession();
+  if (!session?.user?.id) return { items: [] as { id: number; name: string; department: string | null }[], hasMore: false };
+
+  const trimmed = query.trim();
+  const PAGE = 25;
+
+  const profile = await db
+    .select({ university: userProfile.university })
+    .from(userProfile)
+    .where(eq(userProfile.userId, session.user.id))
+    .limit(1);
+
+  const uni = profile[0]?.university;
+  if (!uni) return { items: [], hasMore: false };
+
+  const conditions = [eq(professor.university, uni)];
+  if (trimmed.length >= 2) {
+    conditions.push(ilike(professor.name, `%${trimmed}%`));
+  }
+
+  const items = await db
+    .select({ id: professor.id, name: professor.name, department: professor.department })
+    .from(professor)
+    .where(and(...conditions))
+    .orderBy(professor.name)
+    .offset(offset)
+    .limit(PAGE + 1);
+
+  const hasMore = items.length > PAGE;
+  if (hasMore) items.pop();
+
+  return { items, hasMore };
+}
+
 export async function submitTextContribution({
   courseId,
   title,
   textContent,
   description,
+  professorId,
 }: {
   courseId: string;
   title: string;
   textContent: string;
   description?: string;
+  professorId?: number | null;
 }) {
   const { data: session } = await auth.getSession();
   if (!session?.user?.id) return { error: "Not authenticated." };
@@ -260,6 +298,16 @@ export async function submitTextContribution({
   if (title.length > 200) return { error: "Title too long (max 200 chars)." };
   if (textContent.length > 50000) return { error: "Content too long (max 50,000 chars)." };
 
+  // Duplicate detection
+  const { computeTextHash, checkDuplicate } = await import(
+    "@/lib/contribution/duplicate"
+  );
+  const contentHash = computeTextHash(textContent);
+  const dupCheck = await checkDuplicate(contentHash, courseId, session.user.id);
+  if (dupCheck.isDuplicate) {
+    return { error: dupCheck.reason };
+  }
+
   // Check pending limit
   const [pending] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -280,10 +328,12 @@ export async function submitTextContribution({
     .values({
       userId: session.user.id,
       courseId: courseId || null,
+      professorId: professorId || null,
       title: title.trim(),
       description: description?.trim() || null,
       type: "text",
       textContent: textContent.trim(),
+      contentHash,
     })
     .returning();
 
@@ -298,7 +348,45 @@ export async function submitTextContribution({
     })
     .where(eq(contributorStats.userId, session.user.id));
 
-  return { success: true, contributionId: row.id };
+  // Auto-create pipeline job for text contributions with a course
+  let pipelineJobId: string | null = null;
+  if (courseId) {
+    try {
+      const { detectLanguageFromText } = await import("@/lib/ai/translation");
+      const { createJob } = await import("@/lib/ai/orchestrator");
+
+      // Build sourceContent matching extraction output format
+      const sourceContent = `# Source: ${title.trim()}\n\n## Text Content\n\n### Page 1\n\n${textContent.trim()}`;
+      const lang = detectLanguageFromText(sourceContent);
+
+      pipelineJobId = await createJob({
+        courseId,
+        contributionIds: [row.id],
+        outputTypes: ["study_guide", "flashcards", "quiz"],
+        startedBy: "system",
+        sourceContent,
+        sourceLanguage: lang,
+      });
+
+      // Update contribution status to processing
+      await db
+        .update(contribution)
+        .set({ status: "processing", updatedAt: new Date() })
+        .where(eq(contribution.id, row.id));
+
+      console.log(
+        `[text-contribution] Pipeline job ${pipelineJobId} created for contribution ${row.id}`
+      );
+    } catch (error) {
+      // Non-fatal — contribution is saved, pipeline can be triggered later
+      console.error(
+        `[text-contribution] Failed to create pipeline job for contribution ${row.id}:`,
+        error
+      );
+    }
+  }
+
+  return { success: true, contributionId: row.id, pipelineJobId };
 }
 
 export async function getMyContributions(page = 1, limit = 10) {
@@ -321,6 +409,8 @@ export async function getMyContributions(page = 1, limit = 10) {
       fileName: contribution.fileName,
       status: contribution.status,
       reviewNote: contribution.reviewNote,
+      rejectionSource: contribution.rejectionSource,
+      rejectionReason: contribution.rejectionReason,
       createdAt: contribution.createdAt,
       courseTitle: course.title,
     })

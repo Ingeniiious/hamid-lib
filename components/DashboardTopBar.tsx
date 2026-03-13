@@ -14,6 +14,7 @@ import {
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTranslation } from "@/lib/i18n";
 import { LanguagePicker } from "@/components/LanguagePicker";
+import NotificationBell from "@/components/NotificationBell";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -136,6 +137,7 @@ export function DashboardTopBar({
       {/* Right — language + theme */}
       <div className="pointer-events-auto flex items-center gap-2">
         <LanguagePicker />
+        <NotificationBell />
         <ThemeToggle />
       </div>
     </motion.div>

@@ -5,6 +5,7 @@ import { CourseGrid } from "@/components/CourseGrid";
 import { BackButton } from "@/components/BackButton";
 import { PageHeader } from "@/components/PageHeader";
 import { ContributorCTA } from "@/components/ContributorCTA";
+import { GrainientButton } from "@/components/GrainientButton";
 
 interface Course {
   id: string;
@@ -12,6 +13,7 @@ interface Course {
   slug: string | null;
   professor: string | null;
   semester: string | null;
+  programName: string | null;
 }
 
 interface FacultyCoursesContentProps {
@@ -39,6 +41,13 @@ export function FacultyCoursesContent({
       {/* Fixed header */}
       <div className="mx-auto w-full max-w-5xl shrink-0 px-6">
         <PageHeader title={facultyName} subtitle={subtitle} />
+        {courses.length > 3 && (
+          <div className="mt-3 flex justify-center">
+            <GrainientButton href={`/dashboard/contribute?facultySlug=${facultySlug}`}>
+              {isContributor ? t("contribute.uploadYourMaterials") : t("contribute.becomeContributor")}
+            </GrainientButton>
+          </div>
+        )}
       </div>
 
       {/* Scrollable content */}
@@ -68,14 +77,16 @@ export function FacultyCoursesContent({
               />
 
               {/* Persistent CTA below course grid */}
-              <ContributorCTA
-                heading={t("courses.cantFindCourse")}
-                subtext={t("courses.helpUsGrow")}
-                href={`/dashboard/contribute?facultySlug=${facultySlug}`}
-                imageHeight={120}
-                variant="compact"
-                isContributor={isContributor}
-              />
+              <div className="mt-12">
+                <ContributorCTA
+                  heading={t("courses.cantFindCourse")}
+                  subtext={t("courses.helpUsGrow")}
+                  href={`/dashboard/contribute?facultySlug=${facultySlug}`}
+                  imageHeight={200}
+                  variant="compact"
+                  isContributor={isContributor}
+                />
+              </div>
             </>
           )}
         </div>

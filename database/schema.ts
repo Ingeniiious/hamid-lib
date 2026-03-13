@@ -257,6 +257,8 @@ export const adminUser = pgTable("admin_user", {
     .references(() => adminRole.id, { onDelete: "restrict" }),
   invitedBy: text("invited_by"),
   otpVerifiedAt: timestamp("otp_verified_at"),
+  modeSwitchOtp: text("mode_switch_otp"),
+  modeSwitchOtpExpiresAt: timestamp("mode_switch_otp_expires_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -437,6 +439,7 @@ export const contribution = pgTable("contribution", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull(),
   courseId: text("course_id").references(() => course.id, { onDelete: "set null" }),
+  professorId: integer("professor_id").references(() => professor.id),
   title: text("title").notNull(),
   description: text("description"),
   type: text("type").notNull(), // 'file' | 'text'
@@ -449,18 +452,25 @@ export const contribution = pgTable("contribution", {
   // Text field
   textContent: text("text_content"),
   // Moderation
-  status: text("status").notNull().default("pending"), // pending, approved, rejected, under_review
+  status: text("status").notNull().default("pending"), // pending, processing, approved, rejected, under_review, re_evaluating
   reviewedBy: text("reviewed_by"),
   reviewedAt: timestamp("reviewed_at"),
   reviewNote: text("review_note"),
   reportCount: integer("report_count").notNull().default(0),
+  // Duplicate detection
+  contentHash: text("content_hash"),
+  // Rejection tracking
+  rejectionSource: text("rejection_source"), // "ai" | "admin" | "duplicate"
+  rejectionReason: text("rejection_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   index("contribution_user_id_idx").on(table.userId),
   index("contribution_course_id_idx").on(table.courseId),
+  index("contribution_professor_id_idx").on(table.professorId),
   index("contribution_status_idx").on(table.status),
   index("contribution_created_at_idx").on(table.createdAt),
+  index("contribution_content_hash_idx").on(table.contentHash),
 ]);
 
 export const contentRequest = pgTable("content_request", {
@@ -710,6 +720,8 @@ export const pipelineStep = pgTable("pipeline_step", {
   durationMs: integer("duration_ms"),
   errorMessage: text("error_message"),
   retryCount: integer("retry_count").notNull().default(0),
+  // Batch API tracking — when set, step uses async batch instead of real-time API
+  batchJobId: text("batch_job_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("pipeline_step_job_id_idx").on(table.jobId),
@@ -935,3 +947,105 @@ export const examAttempt = pgTable("exam_attempt", {
   index("exam_attempt_status_idx").on(table.status),
   index("exam_attempt_user_content_idx").on(table.userId, table.contentId),
 ]);
+
+// ==================
+// Contribution Appeals
+// ==================
+
+export const contributionAppeal = pgTable("contribution_appeal", {
+  id: serial("id").primaryKey(),
+  contributionId: integer("contribution_id").notNull().references(() => contribution.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  appealText: text("appeal_text").notNull(),
+  status: text("status").notNull().default("pending"), // pending, vouching, re_evaluating, overturned, upheld
+  requiredVouches: integer("required_vouches").notNull().default(3),
+  currentVouches: integer("current_vouches").notNull().default(0),
+  adminOverrideBy: text("admin_override_by"),
+  adminOverrideAt: timestamp("admin_override_at"),
+  adminNote: text("admin_note"),
+  reEvaluationJobId: uuid("re_evaluation_job_id").references(() => pipelineJob.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("contribution_appeal_contribution_id_idx").on(table.contributionId),
+  index("contribution_appeal_user_id_idx").on(table.userId),
+  index("contribution_appeal_status_idx").on(table.status),
+]);
+
+export const appealVouch = pgTable("appeal_vouch", {
+  id: serial("id").primaryKey(),
+  appealId: integer("appeal_id").notNull().references(() => contributionAppeal.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  comment: text("comment"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  unique("appeal_vouch_unique").on(table.appealId, table.userId),
+]);
+
+// ==================
+// In-App Notifications
+// ==================
+
+export const inAppNotification = pgTable("in_app_notification", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  url: text("url"),
+  category: text("category").notNull().default("general"), // contribution, course_update, faculty_update, system
+  isRead: boolean("is_read").notNull().default(false),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("in_app_notification_user_id_read_idx").on(table.userId, table.isRead),
+  index("in_app_notification_created_at_idx").on(table.createdAt),
+]);
+
+// ==================
+// User Subscriptions (course/faculty follows)
+// ==================
+
+export const userSubscription = pgTable("user_subscription", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  entityType: text("entity_type").notNull(), // "course" | "faculty"
+  entityId: text("entity_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  unique("user_subscription_unique").on(table.userId, table.entityType, table.entityId),
+  index("user_subscription_entity_idx").on(table.entityType, table.entityId),
+]);
+
+// ==================
+// User Bookmarks
+// ==================
+
+export const userBookmark = pgTable("user_bookmark", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  contentId: uuid("content_id").notNull().references(() => generatedContent.id, { onDelete: "cascade" }),
+  note: text("note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  unique("user_bookmark_unique").on(table.userId, table.contentId),
+  index("user_bookmark_user_id_idx").on(table.userId),
+]);
+
+// ==================
+// Notification Preferences
+// ==================
+
+export const notificationPreference = pgTable("notification_preference", {
+  userId: text("user_id").primaryKey(),
+  contributionPush: boolean("contribution_push").notNull().default(true),
+  contributionEmail: boolean("contribution_email").notNull().default(true),
+  courseUpdatePush: boolean("course_update_push").notNull().default(true),
+  courseUpdateEmail: boolean("course_update_email").notNull().default(false),
+  facultyUpdatePush: boolean("faculty_update_push").notNull().default(true),
+  facultyUpdateEmail: boolean("faculty_update_email").notNull().default(false),
+  systemPush: boolean("system_push").notNull().default(true),
+  systemEmail: boolean("system_email").notNull().default(false),
+  weeklyDigestEmail: boolean("weekly_digest_email").notNull().default(false),
+  mutedUntil: timestamp("muted_until"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

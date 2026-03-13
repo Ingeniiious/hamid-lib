@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { BackButton } from "@/components/BackButton";
+import NotificationPreferences from "@/components/NotificationPreferences";
 import { PageHeader } from "@/components/PageHeader";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -949,6 +950,14 @@ export default function AccountPage() {
                 </motion.p>
               )}
             </AnimatePresence>
+          </motion.div>
+
+          {/* ── Notification Preferences — full width ── */}
+          <motion.div
+            variants={fadeUp}
+            className="rounded-2xl border border-gray-900/10 bg-white/50 p-6 backdrop-blur-xl dark:border-white/15 dark:bg-white/5 md:col-span-2"
+          >
+            <NotificationPreferences />
           </motion.div>
 
           {/* ── Delete Account — full width, danger zone ── */}

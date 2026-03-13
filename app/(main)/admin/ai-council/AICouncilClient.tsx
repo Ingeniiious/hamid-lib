@@ -1633,89 +1633,162 @@ function PipelineTab({
 // Tab 4: Models
 // ===========================================================================
 
+/** Batch-capable model slugs — Kimi has no batch API. */
+const BATCH_CAPABLE_SLUGS = new Set(["chatgpt", "claude", "gemini", "grok"]);
+
+/** Display metadata for each model (not from DB). */
+const MODEL_META: Record<string, { color: string; description: string }> = {
+  kimi: {
+    color: "#3B82F6",
+    description:
+      "Extracts and generates initial structured content from student-contributed source material. Handles 90% of token work at ~1/10th the price.",
+  },
+  chatgpt: {
+    color: "#10B981",
+    description:
+      "Reviews for accuracy, completeness, clarity, and pedagogical quality. Catches factual errors the creator may have introduced.",
+  },
+  claude: {
+    color: "#D97706",
+    description:
+      "Enriches with examples, explanations, and polish while preserving factual accuracy. Adds depth and nuance.",
+  },
+  gemini: {
+    color: "#8B5CF6",
+    description:
+      "Validates factual accuracy and internal consistency across all content. Cross-references with known truths.",
+  },
+  grok: {
+    color: "#EF4444",
+    description:
+      "Cross-references claims against real-world knowledge for final verification. The last line of defense.",
+  },
+};
+
+interface ModelConfigRow {
+  id: number;
+  name: string;
+  slug: string;
+  provider: string;
+  modelId: string;
+  role: string;
+  pipelineOrder: number;
+  costPerInputToken: string;
+  costPerOutputToken: string;
+  maxInputTokens: number;
+  maxOutputTokens: number;
+  enabled: boolean;
+  config: Record<string, unknown> | null;
+}
+
 function ModelsTab() {
-  const models = [
-    {
-      slug: "kimi",
-      name: "Kimi K2.5",
-      provider: "Moonshot AI",
-      modelId: "kimi-2.5",
-      role: "Creator",
-      pipelineOrder: 1,
-      costPerInputToken: "0.0000006000",
-      costPerOutputToken: "0.0000030000",
-      maxInputTokens: 128000,
-      maxOutputTokens: 8192,
-      enabled: true,
-      color: "#3B82F6",
-      description:
-        "Extracts and generates initial structured content from student-contributed source material. Handles 90% of token work at ~1/10th the price.",
-    },
-    {
-      slug: "chatgpt",
-      name: "GPT-5.4",
-      provider: "OpenAI",
-      modelId: "gpt-5.4",
-      role: "Reviewer",
-      pipelineOrder: 2,
-      costPerInputToken: "0.0000025000",
-      costPerOutputToken: "0.0000150000",
-      maxInputTokens: 1050000,
-      maxOutputTokens: 128000,
-      enabled: true,
-      color: "#10B981",
-      description:
-        "Reviews for accuracy, completeness, clarity, and pedagogical quality. Catches factual errors the creator may have introduced.",
-    },
-    {
-      slug: "claude",
-      name: "Claude Opus 4.6",
-      provider: "Anthropic",
-      modelId: "claude-opus-4-6",
-      role: "Enricher",
-      pipelineOrder: 3,
-      costPerInputToken: "0.0000050000",
-      costPerOutputToken: "0.0000250000",
-      maxInputTokens: 200000,
-      maxOutputTokens: 32768,
-      enabled: true,
-      color: "#D97706",
-      description:
-        "Enriches with examples, explanations, and polish while preserving factual accuracy. Adds depth and nuance.",
-    },
-    {
-      slug: "gemini",
-      name: "Gemini 3.1 Pro",
-      provider: "Google",
-      modelId: "gemini-3.1-pro-preview",
-      role: "Validator",
-      pipelineOrder: 4,
-      costPerInputToken: "0.0000012500",
-      costPerOutputToken: "0.0000050000",
-      maxInputTokens: 1000000,
-      maxOutputTokens: 8192,
-      enabled: true,
-      color: "#8B5CF6",
-      description:
-        "Validates factual accuracy and internal consistency across all content. Cross-references with known truths.",
-    },
-    {
-      slug: "grok",
-      name: "Grok 4.20",
-      provider: "xAI",
-      modelId: "grok-4.20-beta-0309-non-reasoning",
-      role: "Fact Checker",
-      pipelineOrder: 5,
-      costPerInputToken: "0.0000020000",
-      costPerOutputToken: "0.0000060000",
-      maxInputTokens: 2000000,
-      maxOutputTokens: 131072,
-      enabled: true,
-      color: "#EF4444",
-      description:
-        "Cross-references claims against real-world knowledge for final verification. The last line of defense.",
-    },
-  ];
+  const [models, setModels] = useState<ModelConfigRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // OTP modal state
+  const [otpModal, setOtpModal] = useState<{
+    slug: string;
+    name: string;
+    targetBatch: boolean;
+  } | null>(null);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+
+  const fetchModels = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/ai-council/model-config");
+      if (res.ok) {
+        const data = await res.json();
+        setModels(
+          (data.models as ModelConfigRow[]).sort(
+            (a, b) => a.pipelineOrder - b.pipelineOrder
+          )
+        );
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchModels();
+  }, [fetchModels]);
+
+  const handleToggleClick = (model: ModelConfigRow) => {
+    if (!BATCH_CAPABLE_SLUGS.has(model.slug)) return;
+    const currentUseBatch = (model.config as Record<string, unknown>)?.useBatch !== false;
+    setOtpModal({
+      slug: model.slug,
+      name: model.name,
+      targetBatch: !currentUseBatch,
+    });
+    setOtpCode("");
+    setOtpSent(false);
+    setOtpError(null);
+  };
+
+  const sendOtp = async () => {
+    setOtpSending(true);
+    setOtpError(null);
+    try {
+      const res = await fetch("/api/admin/ai-council/model-config/otp", {
+        method: "POST",
+      });
+      if (res.ok) {
+        setOtpSent(true);
+      } else {
+        const data = await res.json();
+        setOtpError(data.error || "Failed to send verification code");
+      }
+    } catch {
+      setOtpError("Network error");
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const verifyAndToggle = async () => {
+    if (!otpModal || !otpCode) return;
+    setOtpVerifying(true);
+    setOtpError(null);
+    try {
+      const res = await fetch("/api/admin/ai-council/model-config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug: otpModal.slug,
+          useBatch: otpModal.targetBatch,
+          otp: otpCode,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setOtpModal(null);
+        fetchModels(); // Refresh
+      } else {
+        setOtpError(data.error || "Verification failed");
+      }
+    } catch {
+      setOtpError("Network error");
+    } finally {
+      setOtpVerifying(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Skeleton key={i} className="h-72 rounded-2xl" />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -1724,79 +1797,218 @@ function ModelsTab() {
         determines execution sequence.
       </p>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {models.map((model, idx) => (
+        {models.map((model, idx) => {
+          const meta = MODEL_META[model.slug] ?? {
+            color: "#6B7280",
+            description: "",
+          };
+          const isBatchCapable = BATCH_CAPABLE_SLUGS.has(model.slug);
+          const useBatch =
+            isBatchCapable &&
+            (model.config as Record<string, unknown>)?.useBatch !== false;
+
+          return (
+            <motion.div
+              key={model.slug}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5, delay: idx * 0.06, ease }}
+              className="rounded-2xl border border-gray-900/10 bg-white/50 p-5 backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
+            >
+              {/* Header */}
+              <div className="flex flex-col items-center gap-2">
+                <img
+                  src={`${TEACHER_IMG_BASE}/${model.slug}.webp`}
+                  alt={model.name}
+                  className="h-12 w-12 rounded-full object-cover"
+                />
+                <div className="text-base font-medium text-gray-900 dark:text-white">
+                  {model.name}
+                </div>
+                <div className="text-xs text-gray-900/50 dark:text-white/50">
+                  {model.provider}
+                </div>
+                <span
+                  className="inline-block rounded-full px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                  style={{
+                    backgroundColor: meta.color + "18",
+                    color: meta.color,
+                  }}
+                >
+                  {titleCase(model.role.replace("_", " "))}
+                </span>
+              </div>
+
+              {/* Description */}
+              <p className="mt-4 text-center text-xs leading-relaxed text-gray-900/60 dark:text-white/60">
+                {meta.description}
+              </p>
+
+              {/* Details */}
+              <div className="mt-4 space-y-1.5">
+                <DetailRow label="Model ID" value={model.modelId} />
+                <DetailRow
+                  label="Input Cost"
+                  value={`$${Number(model.costPerInputToken).toFixed(10)}/token`}
+                />
+                <DetailRow
+                  label="Output Cost"
+                  value={`$${Number(model.costPerOutputToken).toFixed(10)}/token`}
+                />
+                <DetailRow
+                  label="Max Input"
+                  value={formatTokens(model.maxInputTokens)}
+                />
+                <DetailRow
+                  label="Max Output"
+                  value={formatTokens(model.maxOutputTokens)}
+                />
+              </div>
+
+              {/* Enabled + Mode Badges */}
+              <div className="mt-4 flex flex-col items-center gap-2">
+                <span
+                  className={`inline-block rounded-full px-3 py-1 text-[10px] font-semibold ${
+                    model.enabled
+                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                      : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                  }`}
+                >
+                  {model.enabled ? "Enabled" : "Disabled"}
+                </span>
+
+                {/* Batch / Real-time Toggle */}
+                {isBatchCapable && (
+                  <button
+                    onClick={() => handleToggleClick(model)}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-semibold transition-colors hover:opacity-80 ${
+                      useBatch
+                        ? "bg-[#5227FF]/10 text-[#5227FF] dark:bg-[#5227FF]/20 dark:text-[#8B6FFF]"
+                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-1.5 w-1.5 rounded-full ${
+                        useBatch ? "bg-[#5227FF]" : "bg-amber-500"
+                      }`}
+                    />
+                    {useBatch ? "Batch Mode (50% Off)" : "Real-Time Mode"}
+                  </button>
+                )}
+                {!isBatchCapable && (
+                  <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-[10px] font-semibold text-gray-500 dark:bg-gray-900/30 dark:text-gray-400">
+                    Real-Time Only
+                  </span>
+                )}
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* OTP Verification Modal */}
+      {otpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <motion.div
-            key={model.slug}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: idx * 0.06, ease }}
-            className="rounded-2xl border border-gray-900/10 bg-white/50 p-5 backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2 }}
+            className="mx-4 w-full max-w-sm rounded-3xl border border-gray-900/10 bg-white p-6 shadow-2xl dark:border-white/15 dark:bg-gray-900"
           >
-            {/* Header */}
-            <div className="flex flex-col items-center gap-2">
-              <img
-                src={`${TEACHER_IMG_BASE}/${model.slug}.webp`}
-                alt={model.name}
-                className="h-12 w-12 rounded-full object-cover"
-              />
-              <div className="text-base font-medium text-gray-900 dark:text-white">
-                {model.name}
-              </div>
-              <div className="text-xs text-gray-900/50 dark:text-white/50">
-                {model.provider}
-              </div>
-              <span
-                className="inline-block rounded-full px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
-                style={{
-                  backgroundColor: model.color + "18",
-                  color: model.color,
-                }}
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                Mode Switch Verification
+              </h3>
+              <button
+                onClick={() => setOtpModal(null)}
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/10 dark:hover:text-white"
               >
-                {model.role}
-              </span>
+                <X size={16} />
+              </button>
             </div>
 
-            {/* Description */}
-            <p className="mt-4 text-center text-xs leading-relaxed text-gray-900/60 dark:text-white/60">
-              {model.description}
-            </p>
-
-            {/* Details */}
-            <div className="mt-4 space-y-1.5">
-              <DetailRow label="Model ID" value={model.modelId} />
-              <DetailRow
-                label="Input Cost"
-                value={`$${Number(model.costPerInputToken).toFixed(10)}/token`}
-              />
-              <DetailRow
-                label="Output Cost"
-                value={`$${Number(model.costPerOutputToken).toFixed(10)}/token`}
-              />
-              <DetailRow
-                label="Max Input"
-                value={formatTokens(model.maxInputTokens)}
-              />
-              <DetailRow
-                label="Max Output"
-                value={formatTokens(model.maxOutputTokens)}
-              />
-            </div>
-
-            {/* Enabled Badge */}
-            <div className="mt-4 text-center">
+            <p className="mt-3 text-center text-xs text-gray-900/60 dark:text-white/60">
+              Switch{" "}
+              <span className="font-semibold text-gray-900 dark:text-white">
+                {otpModal.name}
+              </span>{" "}
+              to{" "}
               <span
-                className={`inline-block rounded-full px-3 py-1 text-[10px] font-semibold ${
-                  model.enabled
-                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                    : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                className={`font-semibold ${
+                  otpModal.targetBatch
+                    ? "text-[#5227FF]"
+                    : "text-amber-600 dark:text-amber-400"
                 }`}
               >
-                {model.enabled ? "Enabled" : "Disabled"}
+                {otpModal.targetBatch ? "Batch Mode" : "Real-Time Mode"}
               </span>
-            </div>
+            </p>
+
+            {!otpSent ? (
+              <div className="mt-4 text-center">
+                <p className="text-[11px] text-gray-900/50 dark:text-white/50">
+                  A 6-digit verification code will be sent to your email.
+                </p>
+                <Button
+                  onClick={sendOtp}
+                  disabled={otpSending}
+                  className="mt-3 rounded-full bg-[#5227FF] px-6 text-xs text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  {otpSending ? (
+                    <CircleNotch size={14} className="animate-spin" />
+                  ) : (
+                    "Send Verification Code"
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                <p className="text-center text-[11px] text-green-600 dark:text-green-400">
+                  Code sent to your email. Expires in 5 minutes.
+                </p>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={otpCode}
+                  onChange={(e) =>
+                    setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                  className="w-full rounded-full border border-gray-900/10 bg-white px-4 py-2.5 text-center font-mono text-lg tracking-[0.5em] text-gray-900 outline-none focus:border-[#5227FF] dark:border-white/15 dark:bg-white/5 dark:text-white dark:focus:border-[#5227FF]"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setOtpModal(null)}
+                    variant="outline"
+                    className="flex-1 rounded-full text-xs"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={verifyAndToggle}
+                    disabled={otpCode.length !== 6 || otpVerifying}
+                    className="flex-1 rounded-full bg-[#5227FF] text-xs text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    {otpVerifying ? (
+                      <CircleNotch size={14} className="animate-spin" />
+                    ) : (
+                      "Verify & Switch"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {otpError && (
+              <p className="mt-3 text-center text-[11px] text-red-500">
+                {otpError}
+              </p>
+            )}
           </motion.div>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -12,6 +12,8 @@ import {
   pipelineStep,
   course,
   faculty,
+  contribution,
+  contributorStats,
 } from "@/database/schema";
 import {
   eq,
@@ -36,6 +38,81 @@ import type {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Propagate pipeline result back to linked contributions.
+ * Updates contribution status, rejection info, and dispatches notifications.
+ */
+async function propagateToContributions(
+  contributionIds: number[],
+  update: {
+    status: "processing" | "approved" | "rejected";
+    rejectionSource?: "ai" | "admin";
+    rejectionReason?: string;
+  }
+): Promise<void> {
+  if (contributionIds.length === 0) return;
+
+  try {
+    const setValues: Record<string, unknown> = {
+      status: update.status,
+      updatedAt: new Date(),
+    };
+    if (update.rejectionSource) setValues.rejectionSource = update.rejectionSource;
+    if (update.rejectionReason) setValues.rejectionReason = update.rejectionReason;
+
+    await db
+      .update(contribution)
+      .set(setValues)
+      .where(inArray(contribution.id, contributionIds));
+
+    // Dispatch notifications asynchronously (don't block pipeline)
+    for (const contribId of contributionIds) {
+      try {
+        const [c] = await db
+          .select({ userId: contribution.userId, title: contribution.title })
+          .from(contribution)
+          .where(eq(contribution.id, contribId))
+          .limit(1);
+
+        if (!c) continue;
+
+        const { dispatchNotification } = await import("@/lib/notification-dispatch");
+
+        if (update.status === "rejected") {
+          await dispatchNotification(c.userId, {
+            category: "contribution",
+            title: "Contribution Rejected",
+            body: `Your contribution "${c.title}" was not accepted: ${update.rejectionReason || "Content validation failed"}`,
+            url: "/dashboard/contribute/my",
+            metadata: { contributionId: contribId, reason: update.rejectionReason },
+          });
+        } else if (update.status === "approved") {
+          await dispatchNotification(c.userId, {
+            category: "contribution",
+            title: "Contribution Approved",
+            body: `Your contribution "${c.title}" has been approved and content is being generated.`,
+            url: "/dashboard/contribute/my",
+            metadata: { contributionId: contribId },
+          });
+
+          // Increment approved count in contributor stats
+          await db
+            .update(contributorStats)
+            .set({
+              approvedContributions: sql`${contributorStats.approvedContributions} + 1`,
+              updatedAt: new Date(),
+            })
+            .where(eq(contributorStats.userId, c.userId));
+        }
+      } catch (notifErr) {
+        console.log(`[ai-pipeline] Failed to notify for contribution ${contribId}: ${(notifErr as Error).message}`);
+      }
+    }
+  } catch (e) {
+    console.log(`[ai-pipeline] Failed to propagate to contributions: ${(e as Error).message}`);
+  }
+}
 
 const TERMINAL_STATUSES: PipelineStatus[] = ["completed", "failed", "cancelled"];
 
@@ -485,6 +562,13 @@ export async function processNextStep(): Promise<{
             updatedAt: new Date(),
           }).where(eq(pipelineJob.id, job.id));
 
+          // Propagate rejection to linked contributions
+          await propagateToContributions(job.contributionIds as number[], {
+            status: "rejected",
+            rejectionSource: "ai",
+            rejectionReason: reason,
+          });
+
           return { jobId: job.id, step: step.stepOrder, status: "rejected" };
         }
 
@@ -535,17 +619,26 @@ export async function processNextStep(): Promise<{
 
     // 9. Check verdict for gating roles
     if (isGatingRole && verdict === "rejected") {
+      const rejectionReason = Array.isArray(issues)
+        ? issues.map((i: any) => i.description ?? i).join("; ")
+        : "No details";
+
       await db
         .update(pipelineJob)
         .set({
           status: "failed",
-          errorMessage: `Rejected by ${role} (${step.modelSlug}): ${
-            Array.isArray(issues) ? issues.map((i: any) => i.description ?? i).join("; ") : "No details"
-          }`,
+          errorMessage: `Rejected by ${role} (${step.modelSlug}): ${rejectionReason}`,
           completedAt: new Date(),
           updatedAt: new Date(),
         })
         .where(eq(pipelineJob.id, job.id));
+
+      // Propagate rejection to linked contributions
+      await propagateToContributions(job.contributionIds as number[], {
+        status: "rejected",
+        rejectionSource: "ai",
+        rejectionReason: `Rejected by ${role}: ${rejectionReason}`,
+      });
 
       return { jobId: job.id, step: step.stepOrder, status: "rejected" };
     }
@@ -813,6 +906,29 @@ async function checkJobCompletion(
     `[ai-pipeline] Job ${job.id} completed — total $${updatedJob?.totalCostUsd ?? "unknown"}`
   );
 
+  // Propagate approval to linked contributions + notify subscribers
+  await propagateToContributions(job.contributionIds as number[], {
+    status: "approved",
+  });
+
+  // Notify course subscribers about new content
+  try {
+    const { dispatchNotification } = await import("@/lib/notification-dispatch");
+    const { getSubscriberIds } = await import("@/lib/subscriptions");
+    const subscriberIds = await getSubscriberIds("course", job.courseId);
+    for (const subUserId of subscriberIds) {
+      await dispatchNotification(subUserId, {
+        category: "course_update",
+        title: "New Content Available",
+        body: "New study content has been published for a course you follow.",
+        url: `/dashboard/courses`,
+        metadata: { courseId: job.courseId, jobId: job.id },
+      });
+    }
+  } catch (subErr) {
+    console.log(`[ai-pipeline] Failed to notify subscribers: ${(subErr as Error).message}`);
+  }
+
   return "completed";
 }
 
@@ -916,6 +1032,25 @@ export async function createJob(params: {
   sourceContent: string;
   sourceLanguage?: string;
 }): Promise<string> {
+  // Validate contribution IDs exist before creating job
+  if (params.contributionIds.length === 0) {
+    throw new Error("At least one contribution ID is required");
+  }
+
+  const existingContribs = await db
+    .select({ id: contribution.id })
+    .from(contribution)
+    .where(inArray(contribution.id, params.contributionIds));
+
+  const existingIds = new Set(existingContribs.map((c) => c.id));
+  const missingIds = params.contributionIds.filter((id) => !existingIds.has(id));
+
+  if (missingIds.length > 0) {
+    throw new Error(
+      `Contribution ID(s) not found: ${missingIds.join(", ")}. Cannot create pipeline job with invalid references.`
+    );
+  }
+
   // Fetch all enabled models, ordered by pipeline position
   const models = await db
     .select()

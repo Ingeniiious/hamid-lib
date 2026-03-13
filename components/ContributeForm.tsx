@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,13 +12,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CaretUpDown, Check } from "@phosphor-icons/react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   submitTextContribution,
   getCoursesForProgram,
   findOrCreateProgram,
   findOrCreateCourse,
+  searchProfessors,
 } from "@/app/(main)/dashboard/contribute/actions";
 import { useTranslation } from "@/lib/i18n";
+import ConfettiBurst from "@/components/ConfettiBurst";
 import Link from "next/link";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
@@ -53,6 +61,13 @@ export function ContributeForm({
   const [otherProgramName, setOtherProgramName] = useState("");
   const [courseSelection, setCourseSelection] = useState(initialCourseId || "");
   const [otherCourseName, setOtherCourseName] = useState("");
+  const [professorSearch, setProfessorSearch] = useState("");
+  const [professorResults, setProfessorResults] = useState<{ id: number; name: string; department: string | null }[]>([]);
+  const [selectedProfessor, setSelectedProfessor] = useState<{ id: number; name: string } | null>(null);
+  const [professorDropdownOpen, setProfessorDropdownOpen] = useState(false);
+  const [searchingProfessors, setSearchingProfessors] = useState(false);
+  const [professorHasMore, setProfessorHasMore] = useState(false);
+  const [loadingMoreProfessors, setLoadingMoreProfessors] = useState(false);
   const [availableCourses, setAvailableCourses] = useState(initialCourses);
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [title, setTitle] = useState("");
@@ -63,11 +78,74 @@ export function ContributeForm({
   const [isPending, startTransition] = useTransition();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   const isOtherProgram = programSelection === "other";
   const isOtherCourse = courseSelection === "other" || isOtherProgram;
   const hasPrograms = programs.length > 0;
   const busy = isPending || uploading;
+
+  // Load initial professors when popover opens
+  const professorsFetched = useRef(false);
+  useEffect(() => {
+    if (!professorDropdownOpen) return;
+    if (!professorsFetched.current) {
+      professorsFetched.current = true;
+      setSearchingProfessors(true);
+      searchProfessors("", 0).then(({ items, hasMore }) => {
+        setProfessorResults(items);
+        setProfessorHasMore(hasMore);
+        setSearchingProfessors(false);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [professorDropdownOpen]);
+
+  // Debounced professor search
+  useEffect(() => {
+    const trimmed = professorSearch.trim();
+    if (trimmed.length === 0 && professorsFetched.current) {
+      // Reset to initial list
+      searchProfessors("", 0).then(({ items, hasMore }) => {
+        setProfessorResults(items);
+        setProfessorHasMore(hasMore);
+      });
+      return;
+    }
+    if (trimmed.length === 0) return;
+    setSearchingProfessors(true);
+    const timeout = setTimeout(() => {
+      searchProfessors(trimmed, 0).then(({ items, hasMore }) => {
+        setProfessorResults(items);
+        setProfessorHasMore(hasMore);
+        setSearchingProfessors(false);
+      });
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [professorSearch]);
+
+  // Load more professors on scroll
+  const professorListRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && professorHasMore && !loadingMoreProfessors && !searchingProfessors) {
+          setLoadingMoreProfessors(true);
+          searchProfessors(professorSearch.trim(), professorResults.length).then(({ items, hasMore }) => {
+            setProfessorResults((prev) => [...prev, ...items]);
+            setProfessorHasMore(hasMore);
+            setLoadingMoreProfessors(false);
+          });
+        }
+      },
+      { root: professorListRef.current, threshold: 0.1 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [professorHasMore, loadingMoreProfessors, searchingProfessors, professorResults.length, professorSearch]);
 
   // Fetch courses when program selection changes
   useEffect(() => {
@@ -155,6 +233,7 @@ export function ContributeForm({
           title,
           textContent,
           description,
+          professorId: selectedProfessor?.id || null,
         });
         if (result.error) {
           setError(result.error);
@@ -186,6 +265,7 @@ export function ContributeForm({
       formData.append("title", title.trim());
       formData.append("courseId", courseId || "");
       if (description) formData.append("description", description.trim());
+      if (selectedProfessor?.id) formData.append("professorId", String(selectedProfessor.id));
 
       const res = await fetch("/api/contribute/upload", {
         method: "POST",
@@ -213,7 +293,21 @@ export function ContributeForm({
     setCourseSelection("");
     setOtherCourseName("");
     setOtherProgramName("");
+    setProfessorSearch("");
+    setProfessorResults([]);
+    setSelectedProfessor(null);
+    setProfessorDropdownOpen(false);
   }
+
+  // Trigger confetti 1s after success
+  useEffect(() => {
+    if (!success) {
+      setShowConfetti(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowConfetti(true), 1000);
+    return () => clearTimeout(timer);
+  }, [success]);
 
   if (success) {
     return (
@@ -221,39 +315,31 @@ export function ContributeForm({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, ease }}
-        className="mx-auto max-w-md text-center"
+        className="mx-auto flex max-w-sm flex-col items-center justify-center text-center"
       >
-        <div className="rounded-2xl border border-gray-900/10 bg-white/50 p-8 backdrop-blur-xl dark:border-white/15 dark:bg-white/10">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
-            <svg
-              className="h-8 w-8 text-green-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-          </div>
+        {showConfetti && <ConfettiBurst particleCount={130} startVelocity={20} spread={130} decay={0.95} duration={4} />}
+        <img
+          src="https://lib.thevibecodedcompany.com/images/submitted-docs.webp"
+          alt=""
+          className="mb-6 w-48 sm:w-56"
+          draggable={false}
+        />
+        <div className="w-full rounded-3xl border border-gray-900/10 bg-white/50 px-6 py-6 backdrop-blur-xl dark:border-white/15 dark:bg-white/10">
           <h3 className="font-display text-xl font-light text-gray-900 dark:text-white">
             {t("contribute.contributionSubmitted")}
           </h3>
           <p className="mt-2 text-sm text-gray-900/50 dark:text-white/50">
             {t("contribute.pendingReview")}
           </p>
-          <div className="mt-6 flex gap-3">
+          <div className="mt-5 flex gap-3">
             <Button
               onClick={() => setSuccess(false)}
               variant="outline"
-              className="flex-1"
+              className="flex-1 rounded-full border-gray-900/15 font-medium text-gray-900 hover:bg-gray-900/5 dark:border-white/20 dark:text-white dark:hover:bg-white/10"
             >
               {t("contribute.submitAnother")}
             </Button>
-            <Button asChild className="flex-1">
+            <Button asChild className="flex-1 rounded-full bg-[#5227FF] font-medium text-white hover:opacity-90">
               <Link href="/dashboard/contribute/my">{t("contribute.myContributions")}</Link>
             </Button>
           </div>
@@ -427,6 +513,110 @@ export function ContributeForm({
                   </AnimatePresence>
                 </>
               )}
+            </motion.div>
+
+            {/* Professor picker — search on type */}
+            <motion.div
+              layout
+              transition={{ layout: { duration: 0.3, ease } }}
+            >
+              <label className="mb-1.5 block text-center text-sm font-medium text-gray-900/70 dark:text-white/70">
+                {t("contribute.professor")}
+              </label>
+              <Popover
+                open={professorDropdownOpen}
+                onOpenChange={(o) => {
+                  setProfessorDropdownOpen(o);
+                  if (!o) setProfessorSearch("");
+                }}
+              >
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    role="combobox"
+                    aria-expanded={professorDropdownOpen}
+                    disabled={busy}
+                    className={`relative flex h-10 w-full items-center justify-center rounded-full border border-gray-900/15 bg-gray-900/5 px-5 text-center text-sm transition-colors hover:bg-gray-900/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:hover:bg-white/15 dark:focus-visible:ring-white/30 ${
+                      selectedProfessor
+                        ? "text-gray-900 dark:text-white"
+                        : "text-gray-900/40 dark:text-white/50"
+                    }`}
+                  >
+                    <span>{selectedProfessor ? selectedProfessor.name : t("contribute.selectProfessor")}</span>
+                    <CaretUpDown size={16} weight="duotone" className="absolute right-5 text-gray-900/30 dark:text-white/40" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="!w-[--radix-popover-trigger-width] rounded-2xl border-gray-900/15 bg-white/90 p-1 backdrop-blur-xl dark:border-white/20 dark:bg-gray-900/95 dark:backdrop-blur-xl"
+                  sideOffset={4}
+                  collisionPadding={16}
+                >
+                  <div className="flex h-[260px] flex-col">
+                    <div className="shrink-0 px-1 pb-1.5 pt-1">
+                      <input
+                        type="text"
+                        value={professorSearch}
+                        onChange={(e) => setProfessorSearch(e.target.value)}
+                        placeholder={t("contribute.searchProfessor")}
+                        className="w-full rounded-lg border border-gray-900/10 bg-gray-900/5 px-3 py-1.5 text-center text-sm text-gray-900 placeholder:text-gray-900/30 focus:outline-none dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-white/30"
+                        autoFocus
+                      />
+                    </div>
+                    <div ref={professorListRef} className="min-h-0 flex-1 overflow-y-auto">
+                      {/* Selected professor pinned at top with deselect */}
+                      {selectedProfessor && !professorSearch && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedProfessor(null);
+                          }}
+                          className="relative flex w-full items-center justify-center rounded-lg bg-gray-900/5 px-3 py-2 text-sm text-gray-900 dark:bg-white/10 dark:text-white"
+                        >
+                          <Check size={14} className="absolute left-3 text-gray-900 dark:text-white" />
+                          {selectedProfessor.name}
+                          <span className="absolute right-3 text-xs text-gray-900/40 dark:text-white/40">&times;</span>
+                        </button>
+                      )}
+                      {/* Professor list (skip selected to avoid duplicate) */}
+                      {professorResults
+                        .filter((p) => p.id !== selectedProfessor?.id)
+                        .map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedProfessor({ id: p.id, name: p.name });
+                              setProfessorSearch("");
+                              setProfessorDropdownOpen(false);
+                            }}
+                            className="flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm text-gray-900/80 transition-colors hover:bg-gray-900/5 hover:text-gray-900 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white"
+                          >
+                            {p.name}
+                            {p.department && (
+                              <span className="ml-1 text-gray-900/40 dark:text-white/40"> — {p.department}</span>
+                            )}
+                          </button>
+                        ))}
+                      {/* Infinite scroll sentinel */}
+                      {professorHasMore && (
+                        <div ref={sentinelRef} className="py-2 text-center text-xs text-gray-900/30 dark:text-white/30">
+                          {loadingMoreProfessors ? t("contribute.loadingCourses") : ""}
+                        </div>
+                      )}
+                      {searchingProfessors && professorResults.length === 0 && (
+                        <p className="py-3 text-center text-sm text-gray-900/40 dark:text-white/40">
+                          {t("contribute.loadingCourses")}
+                        </p>
+                      )}
+                      {!searchingProfessors && professorResults.length === 0 && (
+                        <p className="py-3 text-center text-sm text-gray-900/40 dark:text-white/40">
+                          {t("contribute.noResults")}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </motion.div>
 
             {/* Title */}

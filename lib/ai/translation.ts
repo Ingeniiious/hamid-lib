@@ -184,17 +184,18 @@ export async function requestTranslation(
 
 /** Cost per million tokens for translation models */
 const TRANSLATION_COSTS: Record<string, { input: number; output: number }> = {
-  chatgpt: { input: 2.5, output: 15 },  // GPT-5.4 real-time (batch would be 50% off)
-  kimi: { input: 0.6, output: 3 },       // Kimi K2.5
+  chatgpt: { input: 1.25, output: 7.5 },  // GPT-5.4 BATCH (50% off standard)
+  kimi: { input: 0.6, output: 3 },         // Kimi K2.5 real-time
 };
 
 /**
  * Process the next pending translation job.
  * Called by cron. Processes ONE job per invocation.
  *
- * Uses real-time API calls for both modes (batch API infra not built yet).
- * - "batch" mode → GPT-5.4 (best quality, especially Persian/Turkish)
- * - "instant" mode → Kimi K2.5 (cheapest, good enough)
+ * - "batch" mode → GPT-5.4 via Batch API (50% discount, best quality)
+ *   Submits batch job → saves batchJobId → returns "batch_submitted"
+ * - "instant" mode → Kimi K2.5 real-time (cheap, fast)
+ *   Calls API directly → saves result → returns "completed"
  */
 export async function processNextTranslation(): Promise<{
   id: string;
@@ -248,9 +249,40 @@ export async function processNextTranslation(): Promise<{
       original.description,
     );
 
-    // Call the AI model
-    const { complete } = await import("./client");
     const modelSlug = job.translatedBy as "chatgpt" | "kimi";
+
+    // ── BATCH MODE — submit to OpenAI Batch API (50% discount) ────────────
+    if (job.translationMode === "batch" && modelSlug === "chatgpt") {
+      const { submitBatch } = await import("./batch");
+
+      const batchJobId = await submitBatch(
+        "chatgpt",
+        {
+          model: "chatgpt",
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+          responseFormat: "json",
+          temperature: 0.3,
+        },
+        `translation-${job.id}`
+      );
+
+      await db
+        .update(contentTranslation)
+        .set({ batchJobId, updatedAt: new Date() })
+        .where(eq(contentTranslation.id, job.id));
+
+      console.log(
+        `[translation] Batch submitted ${job.id} → ${job.targetLanguage} (batch: ${batchJobId})`
+      );
+
+      return { id: job.id, status: "batch_submitted", targetLanguage: job.targetLanguage };
+    }
+
+    // ── INSTANT MODE — real-time call via Kimi K2.5 ───────────────────────
+    const { complete } = await import("./client");
 
     const response = await complete({
       model: modelSlug,
@@ -262,61 +294,8 @@ export async function processNextTranslation(): Promise<{
       temperature: 0.3,
     });
 
-    // Parse the translated content
-    let translatedContent: unknown = null;
-    let translatedRichText: string | null = null;
-    let translatedTitle = job.title;
-    let translatedDescription: string | null = job.description;
-
-    try {
-      const parsed = JSON.parse(response.content);
-
-      // If original was structured JSON (flashcards, quiz, etc.), the translation is too
-      if (original.content) {
-        translatedContent = parsed;
-      }
-      // If original was rich text, translation comes back as JSON with text fields
-      if (original.richText) {
-        translatedRichText = response.content;
-      }
-
-      // Try to extract translated title/description if the model included them
-      if (parsed.title && typeof parsed.title === "string") {
-        translatedTitle = parsed.title;
-      }
-      if (parsed.description && typeof parsed.description === "string") {
-        translatedDescription = parsed.description;
-      }
-    } catch {
-      // If JSON parse fails, treat the whole output as rich text
-      translatedRichText = response.content;
-    }
-
-    // Calculate cost
-    const costs = TRANSLATION_COSTS[modelSlug] ?? TRANSLATION_COSTS.kimi;
-    const costUsd =
-      (response.inputTokens * costs.input + response.outputTokens * costs.output) / 1_000_000;
-
     // Save completed translation
-    await db
-      .update(contentTranslation)
-      .set({
-        content: translatedContent as any,
-        richText: translatedRichText,
-        title: translatedTitle,
-        description: translatedDescription,
-        inputTokens: response.inputTokens,
-        outputTokens: response.outputTokens,
-        costUsd: costUsd.toFixed(6),
-        status: "completed",
-        completedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(contentTranslation.id, job.id));
-
-    console.log(
-      `[translation] Completed ${job.id} → ${job.targetLanguage} via ${modelSlug} — $${costUsd.toFixed(6)}`
-    );
+    await saveTranslationResult(job, original, response.content, modelSlug, response.inputTokens, response.outputTokens);
 
     return { id: job.id, status: "completed", targetLanguage: job.targetLanguage };
   } catch (error) {
@@ -334,6 +313,148 @@ export async function processNextTranslation(): Promise<{
 
     return { id: job.id, status: "failed", targetLanguage: job.targetLanguage };
   }
+}
+
+/**
+ * Poll batch translation jobs for completion.
+ * Called by cron alongside processNextTranslation.
+ * Checks ONE processing job with a batchJobId per invocation.
+ */
+export async function pollBatchTranslations(): Promise<{
+  id: string;
+  status: string;
+  targetLanguage: string;
+} | null> {
+  // Find oldest processing translation with a batch job
+  const [job] = await db
+    .select()
+    .from(contentTranslation)
+    .where(
+      and(
+        eq(contentTranslation.status, "processing"),
+        // batchJobId IS NOT NULL
+      )
+    )
+    .orderBy(contentTranslation.createdAt)
+    .limit(1);
+
+  if (!job || !job.batchJobId) return null;
+
+  try {
+    const { checkBatch } = await import("./batch");
+    const result = await checkBatch("chatgpt", job.batchJobId);
+
+    if (result.status === "completed" && result.response) {
+      // Fetch original content for context
+      const [original] = await db
+        .select()
+        .from(generatedContent)
+        .where(eq(generatedContent.id, job.contentId))
+        .limit(1);
+
+      if (!original) {
+        throw new Error(`Original content not found: ${job.contentId}`);
+      }
+
+      await saveTranslationResult(
+        job, original, result.response.content,
+        "chatgpt", result.response.inputTokens, result.response.outputTokens
+      );
+
+      return { id: job.id, status: "completed", targetLanguage: job.targetLanguage };
+    }
+
+    if (result.status === "failed") {
+      await db
+        .update(contentTranslation)
+        .set({
+          status: "failed",
+          errorMessage: result.error || "Batch translation failed",
+          updatedAt: new Date(),
+        })
+        .where(eq(contentTranslation.id, job.id));
+
+      return { id: job.id, status: "failed", targetLanguage: job.targetLanguage };
+    }
+
+    // Still processing
+    return { id: job.id, status: "processing", targetLanguage: job.targetLanguage };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    console.error(`[translation] Batch poll failed ${job.id}:`, errorMsg);
+
+    await db
+      .update(contentTranslation)
+      .set({
+        status: "failed",
+        errorMessage: errorMsg,
+        updatedAt: new Date(),
+      })
+      .where(eq(contentTranslation.id, job.id));
+
+    return { id: job.id, status: "failed", targetLanguage: job.targetLanguage };
+  }
+}
+
+/**
+ * Save a completed translation result (shared by real-time and batch paths).
+ */
+async function saveTranslationResult(
+  job: typeof contentTranslation.$inferSelect,
+  original: typeof generatedContent.$inferSelect,
+  responseContent: string,
+  modelSlug: string,
+  inputTokens: number,
+  outputTokens: number,
+): Promise<void> {
+  let translatedContent: unknown = null;
+  let translatedRichText: string | null = null;
+  let translatedTitle = job.title;
+  let translatedDescription: string | null = job.description;
+
+  try {
+    const parsed = JSON.parse(responseContent);
+
+    if (original.content) {
+      translatedContent = parsed;
+    }
+    if (original.richText) {
+      translatedRichText = responseContent;
+    }
+
+    if (parsed.title && typeof parsed.title === "string") {
+      translatedTitle = parsed.title;
+    }
+    if (parsed.description && typeof parsed.description === "string") {
+      translatedDescription = parsed.description;
+    }
+  } catch {
+    translatedRichText = responseContent;
+  }
+
+  const costs = TRANSLATION_COSTS[modelSlug] ?? TRANSLATION_COSTS.kimi;
+  const costUsd =
+    (inputTokens * costs.input + outputTokens * costs.output) / 1_000_000;
+
+  await db
+    .update(contentTranslation)
+    .set({
+      content: translatedContent as any,
+      richText: translatedRichText,
+      title: translatedTitle,
+      description: translatedDescription,
+      inputTokens,
+      outputTokens,
+      costUsd: costUsd.toFixed(6),
+      status: "completed",
+      completedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(contentTranslation.id, job.id));
+
+  console.log(
+    `[translation] Completed ${job.id} → ${job.targetLanguage} via ${modelSlug} — $${costUsd.toFixed(6)}`
+  );
 }
 
 // ---------------------------------------------------------------------------
