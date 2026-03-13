@@ -1,7 +1,9 @@
 // ---------------------------------------------------------------------------
 // DOCX Extraction — Phase 1 deterministic
-// Uses mammoth to extract text, images, and tables from Word documents.
-// DOCX files always have a text layer, so isScanned is always false.
+//
+// Strategy: mammoth (local, serverless-compatible) first → Kimi Files API
+// fallback. If mammoth fails or returns empty, fall back to Kimi which
+// handles DOCX natively for free.
 // ---------------------------------------------------------------------------
 
 import mammoth from "mammoth";
@@ -10,6 +12,7 @@ import type {
   ExtractedImage,
   ExtractedTable,
 } from "./types";
+import { extractViaKimi } from "./kimi-fallback";
 
 /**
  * Extract text, images, and tables from a DOCX buffer.
@@ -23,7 +26,52 @@ import type {
  */
 export async function extractFromDocx(
   buffer: Buffer,
+  fileName = "document.docx",
 ): Promise<DeterministicResult> {
+  // Try mammoth first
+  const mammothResult = await tryMammoth(buffer);
+
+  if (mammothResult && mammothResult.textByPage.length > 0) {
+    return mammothResult;
+  }
+
+  // mammoth failed or returned empty — try Kimi Files API
+  console.log(
+    `[docx] mammoth ${mammothResult ? "returned empty" : "failed"} — falling back to Kimi Files API`,
+  );
+
+  const kimiResult = await extractViaKimi(buffer, fileName);
+
+  if (kimiResult && kimiResult.textByPage.length > 0) {
+    return {
+      ...kimiResult,
+      warnings: [
+        ...(mammothResult?.warnings ?? []),
+        ...kimiResult.warnings,
+      ],
+    };
+  }
+
+  // Both failed
+  console.log("[docx] Both mammoth and Kimi Files API failed — extraction empty");
+  return {
+    textByPage: [],
+    images: [],
+    tables: [],
+    warnings: [
+      ...(mammothResult?.warnings ?? []),
+      ...(kimiResult?.warnings ?? []),
+      "DOCX extraction failed with both mammoth and Kimi Files API. No text content could be extracted.",
+    ],
+    isScanned: false,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// mammoth — local DOCX extraction
+// ---------------------------------------------------------------------------
+
+async function tryMammoth(buffer: Buffer): Promise<DeterministicResult | null> {
   const warnings: string[] = [];
   const images: ExtractedImage[] = [];
   const tables: ExtractedTable[] = [];

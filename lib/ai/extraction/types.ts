@@ -12,7 +12,7 @@ export type ExtractionStatus =
   | "failed";
 
 /** Supported input file types */
-export type InputFileType = "pdf" | "docx" | "pptx" | "image" | "video";
+export type InputFileType = "pdf" | "docx" | "pptx" | "image" | "video" | "document";
 
 /** Image classification categories from Kimi K2.5 multimodal */
 export type ImageClassification =

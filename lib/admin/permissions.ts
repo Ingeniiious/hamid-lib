@@ -35,6 +35,9 @@ export const PERMISSIONS = {
   "email.view": "View email inbox",
   "email.send": "Send emails",
   "email.delete": "Delete emails",
+  // Support
+  "support.view": "View support tickets",
+  "support.reply": "Reply to support tickets",
   // Settings
   "settings.view": "View settings",
   "settings.manage": "Manage settings",
@@ -67,6 +70,8 @@ export const ROLE_PRESETS = {
       "presentations.manage",
       "calendar.view",
       "calendar.manage",
+      "support.view",
+      "support.reply",
     ] as Permission[],
   },
   editor: {

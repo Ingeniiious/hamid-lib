@@ -4,6 +4,13 @@
 
 import type { ContentType, ModelRole } from "./types";
 
+/** Course context for content validation in the creator step */
+export interface CourseContext {
+  courseName: string;
+  facultyName?: string;
+  universityName?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Content type JSON schemas (human-readable descriptions for prompts)
 // ---------------------------------------------------------------------------
@@ -203,13 +210,40 @@ enrichedContent must always match the original content type schema, with your co
 // System prompts per role
 // ---------------------------------------------------------------------------
 
-function creatorSystem(contentType: ContentType): string {
+function creatorSystem(contentType: ContentType, courseContext?: CourseContext): string {
   const label = CONTENT_TYPE_LABELS[contentType];
   const schema = CONTENT_TYPE_SCHEMAS[contentType];
 
-  return `You are an exceptional university professor and teacher. You are passionate about helping students truly understand and master course material.
+  const validationBlock = courseContext
+    ? `
+CONTENT VALIDATION (MUST DO FIRST):
+Before generating any content, you MUST validate that the source material is genuinely related to the claimed course. The student claims this content is for:
+- Course: ${courseContext.courseName}${courseContext.facultyName ? `\n- Faculty/Department: ${courseContext.facultyName}` : ""}${courseContext.universityName ? `\n- University: ${courseContext.universityName}` : ""}
 
-Your task: You have been given extracted course material contributed by a student. Imagine you are teaching this course — your job is to create a comprehensive ${label} that teaches this material in the best possible way. Explain every concept thoroughly. Leave nothing out.
+Validation checks:
+1. Does the source material appear to be legitimate educational/academic content?
+2. Is the subject matter reasonably related to the claimed course name?
+3. Does the content appear to be genuine course material (lecture notes, textbook excerpts, assignments, etc.) rather than fabricated, random, or harmful content?
+
+If the content FAILS validation (clearly unrelated, fabricated, harmful, or designed to trick/harm other students), respond with ONLY this JSON:
+{
+  "validation": "rejected",
+  "reason": "Brief explanation of why this content was rejected"
+}
+
+If the content PASSES validation, proceed with generating the ${label} as instructed below. Do NOT include a "validation" field in your output — just output the content directly.
+
+`
+    : "";
+
+  return `You are an exceptional university professor and teacher. You are passionate about helping students truly understand and master course material.
+${validationBlock}Your task: You have been given extracted course material contributed by a student. Imagine you are teaching this course — your job is to create a comprehensive ${label} that teaches this material in the best possible way. Explain every concept thoroughly. Leave nothing out.
+
+LANGUAGE RULE (CRITICAL):
+- You MUST produce ALL content in the SAME LANGUAGE as the source material.
+- If the source material is in Turkish, write everything in Turkish. If it's in Persian, write in Persian. If it's in Spanish, write in Spanish. And so on.
+- Do NOT translate the source material into English or any other language. Match the source language exactly.
+- Use the academic register and terminology conventions appropriate for that language.
 
 CRITICAL RULES:
 - Do NOT delete, compress, or skip ANY information from the source material. Every single piece of information must be preserved and expanded upon.
@@ -238,6 +272,11 @@ function reviewerSystem(contentType: ContentType): string {
 
 Your task: review a generated ${label} for accuracy, completeness, clarity, and pedagogical quality.
 
+LANGUAGE RULE (CRITICAL):
+- The content and source material may be in ANY language (Turkish, Persian, Spanish, etc.).
+- You MUST review and write all feedback, corrections, and enrichedContent in the SAME LANGUAGE as the source material.
+- Do NOT translate the content into English. Preserve the original language throughout.
+
 Evaluate the content on these criteria:
 1. **Accuracy** — Does the content faithfully represent the source material? Are there factual errors or misrepresentations?
 2. **Completeness** — Are all important topics from the source covered? Are there significant gaps?
@@ -260,6 +299,12 @@ function enricherSystem(contentType: ContentType): string {
   return `You are an expert educational content enricher. You take reviewed academic content and make it exceptional.
 
 Your task: enhance a reviewed ${label} by adding depth, examples, and polish while preserving factual accuracy.
+
+LANGUAGE RULE (CRITICAL):
+- The content may be in ANY language (Turkish, Persian, Spanish, etc.).
+- You MUST enrich and write ALL content in the SAME LANGUAGE as the source material.
+- Do NOT translate the content into English. Preserve the original language throughout.
+- Add examples and analogies that are culturally relevant to the language/region of the source material.
 
 Enrichment goals:
 1. **Add examples** — Insert concrete, relatable examples that illustrate abstract concepts.
@@ -286,6 +331,11 @@ function validatorSystem(contentType: ContentType): string {
 
 Your task: validate a ${label} for factual correctness and internal consistency.
 
+LANGUAGE RULE (CRITICAL):
+- The content may be in ANY language (Turkish, Persian, Spanish, etc.).
+- You MUST validate and write all feedback, corrections, and enrichedContent in the SAME LANGUAGE as the source material.
+- Do NOT translate the content into English. Preserve the original language throughout.
+
 Validation checks:
 1. **Factual correctness** — Are all claims, definitions, and explanations accurate? Cross-reference against the original source material.
 2. **Internal consistency** — Do different parts of the content contradict each other? Are terms used consistently?
@@ -308,6 +358,11 @@ function factCheckerSystem(contentType: ContentType): string {
   return `You are a rigorous fact-checker for educational content. You cross-reference claims against established knowledge.
 
 Your task: fact-check a ${label} by verifying claims against your knowledge base.
+
+LANGUAGE RULE (CRITICAL):
+- The content may be in ANY language (Turkish, Persian, Spanish, etc.).
+- You MUST fact-check and write all feedback, corrections, and enrichedContent in the SAME LANGUAGE as the source material.
+- Do NOT translate the content into English. Preserve the original language throughout.
 
 Fact-checking process:
 1. **Verify key claims** — Check factual statements, statistics, dates, definitions, and formulas against known information.
@@ -402,6 +457,10 @@ function generatorSystem(contentType: ContentType): string {
 
 The content you receive has been reviewed and verified by an expert panel of AI teachers — treat it as authoritative source material.
 
+LANGUAGE RULE (CRITICAL):
+- You MUST produce ALL content in the SAME LANGUAGE as the verified content and source material.
+- Do NOT translate into English or any other language. Match the source language exactly.
+
 Output requirements:
 - Output ONLY valid JSON. No markdown, no code fences, no commentary outside the JSON.
 - The JSON must match this schema exactly:
@@ -479,14 +538,15 @@ export function getPrompt(
   role: ModelRole,
   contentType: ContentType,
   sourceContent: string,
-  previousStepOutputs?: { role: string; output: string }[]
+  previousStepOutputs?: { role: string; output: string }[],
+  courseContext?: CourseContext,
 ): { system: string; user: string } {
   const outputs = previousStepOutputs ?? [];
 
   switch (role) {
     case "creator":
       return {
-        system: creatorSystem(contentType),
+        system: creatorSystem(contentType, courseContext),
         user: creatorUser(sourceContent),
       };
 

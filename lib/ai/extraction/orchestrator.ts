@@ -12,6 +12,7 @@ import { extractionJob, contribution } from "@/database/schema";
 import { eq, and, not, inArray, asc, sql } from "drizzle-orm";
 import { downloadFromR2 } from "@/lib/r2";
 import { createJob as createPipelineJob } from "@/lib/ai/orchestrator";
+import { detectLanguageFromText } from "@/lib/ai/translation";
 import type {
   DeterministicResult,
   InputFileType,
@@ -61,6 +62,14 @@ const TERMINAL_STATUSES = ["completed", "failed"];
 
 /** Max images to process per cron invocation (Phase 2) */
 const IMAGES_PER_INVOCATION = 10;
+
+/**
+ * Maximum tokens per chunk when splitting large content for the AI Council.
+ * Kimi K2.5 (256K context) is the bottleneck. We reserve ~50K for system prompt
+ * + model output, leaving ~200K for source content. Using 100K as a safe default
+ * so there's ample room for the model to reason and generate output.
+ */
+const MAX_CHUNK_TOKENS = 100_000;
 
 // ---------------------------------------------------------------------------
 // Main entry point — called by cron
@@ -156,10 +165,10 @@ async function handlePhase1(
       result = await ext.extractFromPdf(fileBuffer);
       break;
     case "docx":
-      result = await ext.extractFromDocx(fileBuffer);
+      result = await ext.extractFromDocx(fileBuffer, job.fileName);
       break;
     case "pptx":
-      result = await ext.extractFromPptx(fileBuffer);
+      result = await ext.extractFromPptx(fileBuffer, job.fileName);
       break;
     case "image": {
       const img = await ext.fileToExtractedImage(fileBuffer, job.fileType);
@@ -170,6 +179,27 @@ async function handlePhase1(
         warnings: [],
         isScanned: true, // Images always need OCR
       };
+      break;
+    }
+    case "document": {
+      // Legacy/other formats (DOC, PPT, XLS, XLSX, etc.) — Kimi Files API handles directly
+      const { extractViaKimi } = await import("./kimi-fallback");
+      const kimiDocResult = await extractViaKimi(fileBuffer, job.fileName);
+
+      if (kimiDocResult && kimiDocResult.textByPage.length > 0) {
+        result = kimiDocResult;
+      } else {
+        result = {
+          textByPage: [],
+          images: [],
+          tables: [],
+          warnings: [
+            ...(kimiDocResult?.warnings ?? []),
+            `Kimi Files API could not extract content from ${job.fileName}`,
+          ],
+          isScanned: false,
+        };
+      }
       break;
     }
     case "video": {
@@ -192,12 +222,15 @@ async function handlePhase1(
         ["Source is a video file — extracted via Kimi K2.5 multimodal"]
       );
 
+      const videoLang = detectLanguageFromText(sourceContent);
+
       await db
         .update(extractionJob)
         .set({
           status: "completed",
           currentPhase: 2,
           sourceContent,
+          sourceLanguage: videoLang,
           extractionTokens: videoResult.tokens,
           extractionCostUsd: videoResult.cost.toFixed(6),
           completedAt: new Date(),
@@ -209,7 +242,7 @@ async function handlePhase1(
       await autoCreatePipelineJob(job);
 
       console.log(
-        `[extraction] Job ${job.id} completed (video) — $${videoResult.cost.toFixed(6)}`
+        `[extraction] Job ${job.id} completed (video, lang=${videoLang}) — $${videoResult.cost.toFixed(6)}`
       );
       return { jobId: job.id, phase: 2, status: "completed" };
     }
@@ -267,6 +300,8 @@ async function handlePhase1(
       return { jobId: job.id, phase: 1, status: "failed" };
     }
 
+    const earlyLang = detectLanguageFromText(sourceContent);
+
     await db
       .update(extractionJob)
       .set({
@@ -274,6 +309,7 @@ async function handlePhase1(
         currentPhase: 2,
         extractedContent: result as any,
         sourceContent,
+        sourceLanguage: earlyLang,
         totalImages: 0,
         processedImages: 0,
         completedAt: new Date(),
@@ -283,7 +319,7 @@ async function handlePhase1(
 
     await autoCreatePipelineJob(job);
 
-    console.log(`[extraction] Job ${job.id} completed (no images) — $0`);
+    console.log(`[extraction] Job ${job.id} completed (no images, lang=${earlyLang}) — $0`);
     return { jobId: job.id, phase: 1, status: "completed" };
   }
 
@@ -464,11 +500,16 @@ async function finalizeExtraction(
     return { jobId: job.id, phase: 2, status: "failed" };
   }
 
+  // Auto-detect source language from extracted text
+  const detectedLanguage = detectLanguageFromText(sourceContent);
+  console.log(`[extraction] Detected source language: ${detectedLanguage}`);
+
   await db
     .update(extractionJob)
     .set({
       status: "completed",
       sourceContent,
+      sourceLanguage: detectedLanguage,
       completedAt: new Date(),
       updatedAt: new Date(),
     })
@@ -487,6 +528,14 @@ async function finalizeExtraction(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** File extensions that Kimi Files API supports natively (beyond our local extractors) */
+const KIMI_SUPPORTED_EXTENSIONS = new Set([
+  "doc", "ppt", "xls", "xlsx", "csv", "tsv",
+  "rtf", "odt", "ods", "odp", "txt", "md",
+  "html", "htm", "xml", "json", "yaml", "yml",
+  "epub", "mobi", "pages", "numbers", "key",
+]);
 
 function detectFileType(
   mimeType: string,
@@ -518,9 +567,14 @@ function detectFileType(
   )
     return "video";
 
-  // Fallback: try extension
-  if (ext === "doc") return "docx"; // mammoth can handle .doc too
-  if (ext === "ppt") return "pptx";
+  // Legacy/other document formats — route to Kimi Files API directly
+  if (KIMI_SUPPORTED_EXTENSIONS.has(ext)) return "document";
+
+  // Legacy Office MIME types
+  if (mimeType === "application/msword") return "document"; // .doc
+  if (mimeType === "application/vnd.ms-powerpoint") return "document"; // .ppt
+  if (mimeType === "application/vnd.ms-excel") return "document"; // .xls
+  if (mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") return "document"; // .xlsx
 
   throw new Error(`Unsupported file type: ${mimeType} (${fileName})`);
 }
@@ -598,6 +652,100 @@ function buildSourceContent(
 }
 
 /**
+ * Estimate token count for a text string.
+ * Uses a character-based heuristic:
+ * - Latin/ASCII text: ~4 characters per token
+ * - CJK, Arabic, Persian, Cyrillic: ~2 characters per token
+ * Returns a conservative (higher) estimate to avoid exceeding limits.
+ */
+function estimateTokens(text: string): number {
+  if (!text) return 0;
+
+  // Count non-ASCII characters (CJK, Arabic, Persian, Cyrillic, etc.)
+  let nonAsciiCount = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text.charCodeAt(i) > 127) nonAsciiCount++;
+  }
+
+  const asciiCount = text.length - nonAsciiCount;
+
+  // Latin ≈ 4 chars/token, non-ASCII ≈ 2 chars/token
+  return Math.ceil(asciiCount / 4 + nonAsciiCount / 2);
+}
+
+/**
+ * Split source content into chunks that fit within model context limits.
+ * Splits at natural section boundaries (markdown headers, `---` separators)
+ * and never breaks mid-section. If a single section exceeds maxTokens,
+ * it becomes its own chunk.
+ *
+ * @returns string[] — array of content chunks (1 element if no splitting needed)
+ */
+function chunkSourceContent(content: string, maxTokens: number): string[] {
+  const totalTokens = estimateTokens(content);
+
+  // No chunking needed
+  if (totalTokens <= maxTokens) return [content];
+
+  // Split into sections by markdown structure:
+  // - `# Source:` headers (top-level file boundaries)
+  // - `## ` headers (Text Content, Tables, Image Descriptions, etc.)
+  // - `### Page N` / `### Slide N` headers (individual pages)
+  // - `---` separators (between multiple file extractions)
+  //
+  // We split at `### Page` / `### Slide` level for finest granularity,
+  // keeping `# Source:` and `## ` headers attached to their first section.
+  const sections: string[] = [];
+  const lines = content.split("\n");
+  let currentSection: string[] = [];
+
+  for (const line of lines) {
+    // Start a new section on page/slide headers or file separators
+    const isPageHeader = /^### (Page|Slide|Table|Image) /.test(line);
+    const isSeparator = line === "---";
+    const isSourceHeader = /^# Source: /.test(line);
+
+    if ((isPageHeader || isSeparator || isSourceHeader) && currentSection.length > 0) {
+      sections.push(currentSection.join("\n"));
+      currentSection = [];
+    }
+
+    currentSection.push(line);
+  }
+
+  // Don't forget the last section
+  if (currentSection.length > 0) {
+    sections.push(currentSection.join("\n"));
+  }
+
+  // Accumulate sections into chunks, respecting the token limit
+  const chunks: string[] = [];
+  let currentChunk: string[] = [];
+  let currentChunkTokens = 0;
+
+  for (const section of sections) {
+    const sectionTokens = estimateTokens(section);
+
+    // If adding this section would exceed the limit, finalize the current chunk
+    if (currentChunkTokens + sectionTokens > maxTokens && currentChunk.length > 0) {
+      chunks.push(currentChunk.join("\n\n"));
+      currentChunk = [];
+      currentChunkTokens = 0;
+    }
+
+    currentChunk.push(section);
+    currentChunkTokens += sectionTokens;
+  }
+
+  // Finalize the last chunk
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk.join("\n\n"));
+  }
+
+  return chunks;
+}
+
+/**
  * Auto-create a pipeline job ONLY when ALL extractions for this course are done.
  * A course can have multiple files (PDFs, DOCX, PPTX, etc.) uploaded at once or
  * over time. We wait for every extraction to complete, then combine all their
@@ -660,29 +808,43 @@ async function autoCreatePipelineJob(
 
     const contributionIds = completedJobs.map((j) => j.contributionId);
 
+    // Chunk content if too large for model context windows
+    const chunks = chunkSourceContent(combinedSource, MAX_CHUNK_TOKENS);
+
     console.log(
-      `[extraction] Creating pipeline job for course ${job.courseId} — ${completedJobs.length} file(s): ${completedJobs.map((j) => j.fileName).join(", ")}`
+      `[extraction] Creating ${chunks.length} pipeline job(s) for course ${job.courseId} — ${completedJobs.length} file(s): ${completedJobs.map((j) => j.fileName).join(", ")}`
     );
 
-    // Create ONE pipeline job with ALL sources combined
-    const pipelineJobId = await createPipelineJob({
-      courseId: job.courseId,
-      contributionIds,
-      outputTypes: ["study_guide", "flashcards", "quiz"],
-      startedBy: "extraction-pipeline",
-      sourceContent: combinedSource,
-    });
+    const pipelineJobIds: string[] = [];
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const chunkLabel = chunks.length > 1 ? ` (chunk ${i + 1}/${chunks.length})` : "";
 
-    // Link ALL completed extraction jobs to this pipeline job
+      const pipelineJobId = await createPipelineJob({
+        courseId: job.courseId,
+        contributionIds,
+        outputTypes: ["study_guide", "flashcards", "quiz"],
+        startedBy: "extraction-pipeline",
+        sourceContent: chunk,
+      });
+      pipelineJobIds.push(pipelineJobId);
+
+      console.log(
+        `[extraction] Created pipeline job ${pipelineJobId}${chunkLabel} — ${estimateTokens(chunk)} tokens`
+      );
+    }
+
+    // Link ALL completed extraction jobs to the FIRST pipeline job
+    // (all jobs share the same contributionIds so they're already linked logically)
     for (const completedJob of completedJobs) {
       await db
         .update(extractionJob)
-        .set({ pipelineJobId: pipelineJobId, updatedAt: new Date() })
+        .set({ pipelineJobId: pipelineJobIds[0], updatedAt: new Date() })
         .where(eq(extractionJob.id, completedJob.id));
     }
 
     console.log(
-      `[extraction] Auto-created pipeline job ${pipelineJobId} for ${completedJobs.length} extraction(s)`
+      `[extraction] Auto-created ${pipelineJobIds.length} pipeline job(s) for ${completedJobs.length} extraction(s)`
     );
   } catch (e) {
     console.log(

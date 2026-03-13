@@ -10,6 +10,8 @@ import {
   aiModelConfig,
   pipelineJob,
   pipelineStep,
+  course,
+  faculty,
 } from "@/database/schema";
 import {
   eq,
@@ -21,7 +23,7 @@ import {
 } from "drizzle-orm";
 import { complete } from "@/lib/ai/client";
 import { calculateStepCost } from "@/lib/ai/cost";
-import { getPrompt } from "@/lib/ai/prompts";
+import { getPrompt, type CourseContext } from "@/lib/ai/prompts";
 import { createGenerationSteps, processGenerationStep } from "@/lib/ai/publisher";
 import type {
   ModelSlug,
@@ -363,7 +365,41 @@ export async function processNextStep(): Promise<{
   // DEBUG: log what we're sending to each model
   console.log(`[ai-pipeline] Job ${job.id} step ${step.stepOrder} context: sourceContent=${sourceContent.length} chars, previousOutputs=${previousOutputStrings.length} entries: ${previousOutputStrings.map(o => `${o.role}=${o.output.length}chars`).join(", ")}`);
 
-  const prompt = getPrompt(role, contentType, sourceContent, previousOutputStrings);
+  // Fetch course context for content validation (creator step only)
+  let courseContext: CourseContext | undefined;
+  if (role === "creator") {
+    try {
+      const [courseRow] = await db
+        .select({
+          title: course.title,
+          facultyId: course.facultyId,
+        })
+        .from(course)
+        .where(eq(course.id, job.courseId))
+        .limit(1);
+
+      if (courseRow) {
+        courseContext = { courseName: courseRow.title };
+
+        if (courseRow.facultyId) {
+          const [facultyRow] = await db
+            .select({ name: faculty.name, university: faculty.university })
+            .from(faculty)
+            .where(eq(faculty.id, courseRow.facultyId))
+            .limit(1);
+
+          if (facultyRow) {
+            courseContext.facultyName = facultyRow.name;
+            courseContext.universityName = facultyRow.university;
+          }
+        }
+      }
+    } catch (e) {
+      console.log(`[ai-pipeline] Failed to fetch course context: ${(e as Error).message}`);
+    }
+  }
+
+  const prompt = getPrompt(role, contentType, sourceContent, previousOutputStrings, courseContext);
   const messages: AIMessage[] = [
     { role: "system", content: prompt.system },
     { role: "user", content: prompt.user },
@@ -413,6 +449,40 @@ export async function processNextStep(): Promise<{
     if (isJsonRole) {
       try {
         parsed = JSON.parse(response.content);
+
+        // Content validation check — creator step may reject invalid contributions
+        if (role === "creator" && parsed?.validation === "rejected") {
+          const reason = (parsed.reason as string) || "Content validation failed";
+          console.log(`[ai-pipeline] Job ${job.id} REJECTED by content validation: ${reason}`);
+
+          // Save the step with rejection
+          await db.update(pipelineStep).set({
+            status: "completed",
+            output: parsed,
+            verdict: "rejected",
+            issues: [{ field: "validation", description: reason, severity: "critical" }] as any,
+            inputTokens: response.inputTokens,
+            outputTokens: response.outputTokens,
+            costUsd: costUsd.toFixed(6),
+            startedAt: step.startedAt ?? new Date(),
+            completedAt: new Date(),
+            durationMs: Date.now() - startTime,
+          }).where(eq(pipelineStep.id, step.id));
+
+          // Fail the entire pipeline — content is not valid
+          await db.update(pipelineJob).set({
+            status: "failed",
+            errorMessage: `Content validation rejected: ${reason}`,
+            totalInputTokens: sql`${pipelineJob.totalInputTokens} + ${response.inputTokens}`,
+            totalOutputTokens: sql`${pipelineJob.totalOutputTokens} + ${response.outputTokens}`,
+            totalCostUsd: sql`${pipelineJob.totalCostUsd} + ${costUsd}`,
+            completedAt: new Date(),
+            updatedAt: new Date(),
+          }).where(eq(pipelineJob.id, job.id));
+
+          return { jobId: job.id, step: step.stepOrder, status: "rejected" };
+        }
+
         // Only extract verdict/issues for gating roles
         if (isGatingRole) {
           verdict = (parsed?.verdict as string) ?? null;

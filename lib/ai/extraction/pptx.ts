@@ -1,12 +1,14 @@
 // ---------------------------------------------------------------------------
 // PPTX Extraction — Phase 1 deterministic
-// PPTX files are ZIP archives containing XML. Uses adm-zip to unpack,
-// then parses PowerPoint Open XML for slide text, speaker notes, and
-// embedded images from ppt/media/.
+//
+// Strategy: adm-zip + XML parsing (local) first → Kimi Files API fallback.
+// If local extraction fails or returns empty, fall back to Kimi which
+// handles PPTX natively for free.
 // ---------------------------------------------------------------------------
 
 import AdmZip from "adm-zip";
 import type { DeterministicResult, ExtractedImage } from "./types";
+import { extractViaKimi } from "./kimi-fallback";
 
 /**
  * Extract text, speaker notes, and images from a PPTX buffer.
@@ -21,7 +23,52 @@ import type { DeterministicResult, ExtractedImage } from "./types";
  */
 export async function extractFromPptx(
   buffer: Buffer,
+  fileName = "presentation.pptx",
 ): Promise<DeterministicResult> {
+  // Try local extraction first
+  const localResult = await tryAdmZip(buffer);
+
+  if (localResult && localResult.textByPage.length > 0) {
+    return localResult;
+  }
+
+  // Local extraction failed or returned empty — try Kimi Files API
+  console.log(
+    `[pptx] adm-zip ${localResult ? "returned empty" : "failed"} — falling back to Kimi Files API`,
+  );
+
+  const kimiResult = await extractViaKimi(buffer, fileName);
+
+  if (kimiResult && kimiResult.textByPage.length > 0) {
+    return {
+      ...kimiResult,
+      warnings: [
+        ...(localResult?.warnings ?? []),
+        ...kimiResult.warnings,
+      ],
+    };
+  }
+
+  // Both failed
+  console.log("[pptx] Both adm-zip and Kimi Files API failed — extraction empty");
+  return {
+    textByPage: [],
+    images: [],
+    tables: [],
+    warnings: [
+      ...(localResult?.warnings ?? []),
+      ...(kimiResult?.warnings ?? []),
+      "PPTX extraction failed with both adm-zip and Kimi Files API. No text content could be extracted.",
+    ],
+    isScanned: false,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// adm-zip — local PPTX extraction (ZIP + XML parsing)
+// ---------------------------------------------------------------------------
+
+async function tryAdmZip(buffer: Buffer): Promise<DeterministicResult | null> {
   const warnings: string[] = [];
   const images: ExtractedImage[] = [];
   const textByPage: { page: number; text: string }[] = [];

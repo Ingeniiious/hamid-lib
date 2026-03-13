@@ -8,14 +8,13 @@
 // ---------------------------------------------------------------------------
 
 import type { DeterministicResult } from "./types";
+import { extractViaKimi } from "./kimi-fallback";
 
 /**
  * Minimum average text characters per page to consider the PDF as having a
  * real text layer (i.e. not a scanned document).
  */
 const MIN_TEXT_PER_PAGE = 20;
-
-const KIMI_BASE_URL = "https://api.moonshot.ai/v1";
 
 /**
  * Extract text from a PDF buffer.
@@ -39,10 +38,16 @@ export async function extractFromPdf(
     `[pdf] unpdf ${unpdfResult ? "returned empty" : "failed"} — falling back to Kimi Files API`
   );
 
-  const kimiResult = await tryKimiFilesApi(buffer);
+  const kimiResult = await extractViaKimi(buffer, "document.pdf", "application/pdf");
 
   if (kimiResult && kimiResult.textByPage.length > 0) {
-    return kimiResult;
+    return {
+      ...kimiResult,
+      warnings: [
+        ...(unpdfResult?.warnings ?? []),
+        ...kimiResult.warnings,
+      ],
+    };
   }
 
   // Both failed — return empty with clear error
@@ -124,111 +129,3 @@ async function tryUnpdf(buffer: Buffer): Promise<DeterministicResult | null> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Kimi Files API — server-side PDF extraction (free)
-// ---------------------------------------------------------------------------
-
-async function tryKimiFilesApi(
-  buffer: Buffer,
-): Promise<DeterministicResult | null> {
-  const warnings: string[] = [];
-
-  const apiKey = process.env.KIMI_API_KEY;
-  if (!apiKey) {
-    warnings.push("Kimi Files API fallback skipped: KIMI_API_KEY not set");
-    return { textByPage: [], images: [], tables: [], warnings, isScanned: true };
-  }
-
-  let fileId: string | null = null;
-
-  try {
-    // Step 1: Upload the PDF
-    const formData = new FormData();
-    formData.append(
-      "file",
-      new Blob([new Uint8Array(buffer)], { type: "application/pdf" }),
-      "document.pdf"
-    );
-    formData.append("purpose", "file-extract");
-
-    const uploadRes = await fetch(`${KIMI_BASE_URL}/files`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: formData,
-    });
-
-    if (!uploadRes.ok) {
-      const err = await uploadRes.text();
-      warnings.push(`Kimi Files API upload failed: ${uploadRes.status} ${err}`);
-      return { textByPage: [], images: [], tables: [], warnings, isScanned: true };
-    }
-
-    const uploadData = await uploadRes.json();
-    fileId = uploadData.id;
-
-    if (uploadData.status === "error") {
-      warnings.push(`Kimi file parsing failed: ${uploadData.status_details || "unknown error"}`);
-      return { textByPage: [], images: [], tables: [], warnings, isScanned: true };
-    }
-
-    // Step 2: Get extracted content
-    const contentRes = await fetch(`${KIMI_BASE_URL}/files/${fileId}/content`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-
-    if (!contentRes.ok) {
-      const err = await contentRes.text();
-      warnings.push(`Kimi Files API content fetch failed: ${contentRes.status} ${err}`);
-      return { textByPage: [], images: [], tables: [], warnings, isScanned: true };
-    }
-
-    const contentText = await contentRes.text();
-
-    // Parse the JSON response — Kimi returns { content, file_type, filename, ... }
-    let extractedText: string;
-    try {
-      const parsed = JSON.parse(contentText);
-      extractedText = parsed.content ?? contentText;
-    } catch {
-      extractedText = contentText;
-    }
-
-    // Clean up Kimi's HTML tags and normalize
-    extractedText = extractedText
-      .replace(/<header>.*?<\/header>/g, "")
-      .replace(/<footer>.*?<\/footer>/g, "")
-      .replace(/^#+\s*/gm, "")  // strip markdown headings (we'll re-structure later)
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-
-    if (!extractedText || extractedText.length < 50) {
-      warnings.push("Kimi Files API returned very little content");
-      return { textByPage: [], images: [], tables: [], warnings, isScanned: true };
-    }
-
-    warnings.push("Extracted via Kimi Files API fallback (free)");
-
-    return {
-      textByPage: [{ page: 1, text: extractedText }],
-      images: [],
-      tables: [],
-      warnings,
-      isScanned: false,
-    };
-  } catch (e) {
-    warnings.push(`Kimi Files API extraction failed: ${(e as Error).message}`);
-    return { textByPage: [], images: [], tables: [], warnings, isScanned: true };
-  } finally {
-    // Clean up uploaded file from Kimi
-    if (fileId && apiKey) {
-      try {
-        await fetch(`${KIMI_BASE_URL}/files/${fileId}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${apiKey}` },
-        });
-      } catch {
-        // ignore cleanup errors
-      }
-    }
-  }
-}

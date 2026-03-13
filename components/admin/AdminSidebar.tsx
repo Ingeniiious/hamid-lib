@@ -21,6 +21,7 @@ import {
   EnvelopeSimple,
   BellRinging,
   Brain,
+  Headset,
 } from "@phosphor-icons/react";
 import Image from "next/image";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -50,6 +51,7 @@ const navItems: NavItem[] = [
   { icon: Brain, label: "AI Council", href: "/admin/ai-council", permission: null },
   { icon: ChartLine, label: "Analytics", href: "/admin/analytics", permission: "analytics.view" },
   { icon: BellRinging, label: "Notifications", href: "/admin/notifications", permission: null },
+  { icon: Headset, label: "Support", href: "/admin/support", permission: "support.view" },
   { icon: EnvelopeSimple, label: "Email", href: "/admin/email", permission: "email.view" },
   { icon: UserGear, label: "Team", href: "/admin/team", permission: "team.view" },
   { icon: ClockCounterClockwise, label: "Audit Log", href: "/admin/audit-log", permission: "audit.view" },

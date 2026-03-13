@@ -91,6 +91,12 @@ export function DashboardTopBar({
             >
               {t("dashboard.mySpace")}
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => router.push("/dashboard/me/support")}
+              className="cursor-pointer rounded-lg text-gray-900/80 focus:bg-gray-900/5 focus:text-gray-900 dark:text-white/80 dark:focus:bg-white/10 dark:focus:text-white"
+            >
+              {t("support.title")}
+            </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-gray-900/10 dark:bg-white/10" />
             <DropdownMenuItem
               onClick={() => router.push("/dashboard/users")}

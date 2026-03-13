@@ -658,6 +658,7 @@ export const pipelineJob = pgTable("pipeline_job", {
   status: text("status").notNull().default("pending"),  // pending, extracting, reviewing, enriching, validating, publishing, completed, failed, cancelled
   currentStep: integer("current_step").notNull().default(0), // which pipeline_order step we're on
   outputTypes: jsonb("output_types").notNull(),          // requested output types: ["study_guide", "flashcards", ...]
+  sourceLanguage: text("source_language"),                // language of source content (e.g. "en", "tr", "fa")
   errorMessage: text("error_message"),
   retryCount: integer("retry_count").notNull().default(0),
   maxRetries: integer("max_retries").notNull().default(5),
@@ -742,6 +743,44 @@ export const generatedContent = pgTable("generated_content", {
   index("generated_content_course_type_idx").on(table.courseId, table.contentType),
 ]);
 
+// ==================
+// Content Translations
+// Stores translated versions of generated content as separate rows per language.
+// No empty columns — only rows that exist have been translated.
+// ==================
+
+export const contentTranslation = pgTable("content_translation", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  contentId: uuid("content_id").notNull().references(() => generatedContent.id, { onDelete: "cascade" }),
+  targetLanguage: text("target_language").notNull(),     // ISO 639-1: "en", "fa", "tr", "es", etc.
+  // Translated content (same structure as original, different language)
+  content: jsonb("content"),                             // translated structured content (flashcards, quiz, etc.)
+  richText: text("rich_text"),                           // translated rich text (study guides, reports)
+  title: text("title").notNull(),                        // translated title
+  description: text("description"),                      // translated description
+  // Translation metadata
+  translatedBy: text("translated_by").notNull(),         // model slug: "chatgpt", "kimi"
+  translationMode: text("translation_mode").notNull(),   // "batch" (GPT, 50% off) or "instant" (Kimi)
+  // Cost tracking
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
+  costUsd: numeric("cost_usd", { precision: 10, scale: 6 }).notNull().default("0"),
+  // Status
+  status: text("status").notNull().default("pending"),   // pending, processing, completed, failed
+  errorMessage: text("error_message"),
+  // Batch API tracking (for GPT batch jobs)
+  batchJobId: text("batch_job_id"),                      // OpenAI batch job ID
+  // Timestamps
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("content_translation_content_id_idx").on(table.contentId),
+  index("content_translation_lang_idx").on(table.targetLanguage),
+  index("content_translation_status_idx").on(table.status),
+  unique("content_translation_content_lang").on(table.contentId, table.targetLanguage),
+]);
+
 export const contentChallenge = pgTable("content_challenge", {
   id: serial("id").primaryKey(),
   contentId: uuid("content_id").notNull().references(() => generatedContent.id, { onDelete: "cascade" }),
@@ -789,6 +828,7 @@ export const extractionJob = pgTable("extraction_job", {
   // Extraction output
   extractedContent: jsonb("extracted_content"),    // DeterministicResult from Phase 1
   sourceContent: text("source_content"),           // Final flattened markdown (output of Phase 2)
+  sourceLanguage: text("source_language"),         // Auto-detected language code (e.g. "en", "tr", "fa", "es")
   // Image processing tracking
   totalImages: integer("total_images").notNull().default(0),
   processedImages: integer("processed_images").notNull().default(0),
@@ -811,4 +851,40 @@ export const extractionJob = pgTable("extraction_job", {
   index("extraction_job_course_id_idx").on(table.courseId),
   index("extraction_job_status_idx").on(table.status),
   index("extraction_job_created_at_idx").on(table.createdAt),
+]);
+
+// ==================
+// Support Ticketing System
+// ==================
+
+export const supportTicket = pgTable("support_ticket", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),
+  subject: text("subject").notNull(),
+  category: text("category").notNull().default("general"), // general, technical, billing, content, bug
+  priority: text("priority").notNull().default("medium"),   // low, medium, high
+  status: text("status").notNull().default("open"),         // open, awaiting_reply, resolved, closed
+  lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow(),
+  messageCount: integer("message_count").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("support_ticket_user_id_idx").on(table.userId),
+  index("support_ticket_status_idx").on(table.status),
+  index("support_ticket_created_at_idx").on(table.createdAt),
+  index("support_ticket_last_message_at_idx").on(table.lastMessageAt),
+]);
+
+export const supportMessage = pgTable("support_message", {
+  id: serial("id").primaryKey(),
+  ticketId: uuid("ticket_id").notNull().references(() => supportTicket.id, { onDelete: "cascade" }),
+  senderType: text("sender_type").notNull(), // user, admin, ai
+  senderId: text("sender_id"),
+  message: text("message").notNull(),
+  isAiGenerated: boolean("is_ai_generated").notNull().default(false),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("support_message_ticket_id_idx").on(table.ticketId),
+  index("support_message_created_at_idx").on(table.createdAt),
 ]);
