@@ -255,10 +255,13 @@ export async function processGenerationStep(
     responseFormat: "json",
   });
 
-  // Parse generated content
+  // Parse generated content — strip markdown fences if model wrapped JSON in ```json ... ```
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(response.content);
+    let raw = response.content.trim();
+    const fenceMatch = raw.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
+    if (fenceMatch) raw = fenceMatch[1].trim();
+    parsed = JSON.parse(raw);
   } catch {
     throw new Error(`Generator returned invalid JSON for ${contentType}`);
   }

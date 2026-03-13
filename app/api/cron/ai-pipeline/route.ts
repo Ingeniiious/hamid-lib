@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { processNextStep } from "@/lib/ai/orchestrator";
+import { processNextStep, processGenerationBatch } from "@/lib/ai/orchestrator";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // Vercel Pro plan allows up to 300s (5 min)
@@ -14,44 +14,55 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Process steps in a loop within one invocation — no more self-chaining
-    // which caused race conditions with parallel invocations grabbing steps
-    // out of order. Loop until no more steps or we approach the time limit.
     const startTime = Date.now();
-    const MAX_LOOP_MS = 25_000; // 25s — leave 275s for a single AI call (timeout=270s) + DB writes
-    const results: Array<{ jobId: string; step: number; status: string }> = [];
+    const MAX_LOOP_MS = 25_000; // 25s — leave 275s for AI calls
+    const results: Array<{ step: number | string; status: string }> = [];
 
     while (Date.now() - startTime < MAX_LOOP_MS) {
+      // Try council step first (sequential, steps 1-5)
       const result = await processNextStep();
 
-      if (!result) {
-        // No pending steps or no pending jobs — done
-        break;
+      if (result) {
+        results.push({ step: result.step, status: result.status });
+
+        if (result.status === "retrying" || result.status === "skipped" || result.status === "failed") {
+          await new Promise((r) => setTimeout(r, 1000));
+        } else if (result.status === "step_completed" || result.status === "generating") {
+          await new Promise((r) => setTimeout(r, 500));
+        }
+
+        // If processNextStep returned "generating", it means council is done
+        // and generation steps were just created. Switch to batch mode.
+        if (result.status === "generating") {
+          break; // Exit loop, fall through to generation batch below
+        }
+        if (result.status === "completed" || result.status === "rejected") {
+          break;
+        }
+        continue;
       }
 
-      results.push(result);
-
-      // If step failed/skipped/retrying, pause briefly for DB writes to settle
-      if (result.status === "retrying" || result.status === "skipped" || result.status === "failed") {
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-
-      // If step completed or generating, brief pause for DB consistency
-      if (result.status === "step_completed" || result.status === "generating" || result.status === "completed") {
+      // No council step found — try generation batch (parallel, steps 100+)
+      const batchResult = await processGenerationBatch();
+      if (batchResult) {
+        console.log(
+          `[ai-pipeline] Batch ${batchResult.contentType}: ` +
+          batchResult.results.map((r) => `${r.model}=${r.status}`).join(", ")
+        );
+        results.push(
+          ...batchResult.results.map((r) => ({ step: `gen:${r.model}`, status: r.status }))
+        );
+        // After a batch, pause briefly then continue loop for next content type
         await new Promise((r) => setTimeout(r, 500));
+        continue;
       }
 
-      // Job completed or rejected — no more steps for this job
-      if (result.status === "completed" || result.status === "rejected") {
-        break;
-      }
+      // Nothing to do
+      break;
     }
 
     if (results.length === 0) {
-      return NextResponse.json({
-        status: "idle",
-        message: "No pending jobs",
-      });
+      return NextResponse.json({ status: "idle", message: "No pending jobs" });
     }
 
     return NextResponse.json({
@@ -62,10 +73,7 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("[ai-pipeline] Cron error:", error);
     return NextResponse.json(
-      {
-        status: "error",
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
+      { status: "error", error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }

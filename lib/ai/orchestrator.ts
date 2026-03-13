@@ -151,20 +151,21 @@ export async function processNextStep(): Promise<{
       .where(eq(pipelineStep.id, stale.id));
   }
 
-  // 2b. Check if any step is currently running (not stale) — if so, wait.
-  //     Pipeline is sequential: don't start step N until step N-1 finishes.
-  const [activelyRunning] = await db
+  // 2b. Check if any COUNCIL step (< 100) is currently running — if so, wait.
+  //     Council steps are sequential. Generation steps (>= 100) can run in parallel.
+  const [runningCouncil] = await db
     .select({ count: sql<number>`count(*)` })
     .from(pipelineStep)
     .where(
       and(
         eq(pipelineStep.jobId, job.id),
-        eq(pipelineStep.status, "running")
+        eq(pipelineStep.status, "running"),
+        sql`${pipelineStep.stepOrder} < 100`
       )
     );
 
-  if (Number(activelyRunning.count) > 0) {
-    // Another step is still running (and not stale) — wait for it
+  if (Number(runningCouncil.count) > 0) {
+    // A council step is still running — wait for it
     return null;
   }
 
@@ -448,7 +449,11 @@ export async function processNextStep(): Promise<{
     // FIX 2: Parse JSON for all JSON_ROLES (gating + enricher)
     if (isJsonRole) {
       try {
-        parsed = JSON.parse(response.content);
+        // Strip markdown fences if model wrapped JSON in ```json ... ```
+        let rawJson = response.content.trim();
+        const fenceMatch = rawJson.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
+        if (fenceMatch) rawJson = fenceMatch[1].trim();
+        parsed = JSON.parse(rawJson);
 
         // Content validation check — creator step may reject invalid contributions
         if (role === "creator" && parsed?.validation === "rejected") {
@@ -554,6 +559,168 @@ export async function processNextStep(): Promise<{
     const action = await handleStepFailure(step, job, errorMsg);
     return { jobId: job.id, step: step.stepOrder, status: action };
   }
+}
+
+// ---------------------------------------------------------------------------
+// processGenerationBatch — run generation steps in parallel for one content type
+// ---------------------------------------------------------------------------
+
+/**
+ * Grab all pending generation steps for the next content type and process
+ * them concurrently (up to 5 = one per model). Returns results for all
+ * steps processed, or null if nothing to do.
+ */
+export async function processGenerationBatch(): Promise<{
+  jobId: string;
+  contentType: string;
+  results: Array<{ step: number; model: string; status: string }>;
+} | null> {
+  // 1. Find the oldest non-terminal job
+  const [job] = await db
+    .select()
+    .from(pipelineJob)
+    .where(not(inArray(pipelineJob.status, TERMINAL_STATUSES)))
+    .orderBy(asc(pipelineJob.createdAt))
+    .limit(1);
+
+  if (!job) return null;
+
+  // 2. Find pending generation steps (stepOrder >= 100)
+  const pendingGenSteps = await db
+    .select()
+    .from(pipelineStep)
+    .where(
+      and(
+        eq(pipelineStep.jobId, job.id),
+        eq(pipelineStep.status, "pending"),
+        sql`${pipelineStep.stepOrder} >= 100`
+      )
+    )
+    .orderBy(asc(pipelineStep.stepOrder));
+
+  if (pendingGenSteps.length === 0) return null;
+
+  // 3. Group by content type — process one content type at a time
+  const firstType = (pendingGenSteps[0].inputSummary ?? "").replace("generate:", "");
+  const batch = pendingGenSteps.filter(
+    (s) => (s.inputSummary ?? "").replace("generate:", "") === firstType
+  );
+
+  console.log(
+    `[ai-pipeline] Job ${job.id} generation batch: ${firstType} — ${batch.length} models in parallel`
+  );
+
+  // 4. Process all steps for this content type concurrently
+  const results = await Promise.allSettled(
+    batch.map(async (step) => {
+      // Optimistic lock
+      const lockResult = await db
+        .update(pipelineStep)
+        .set({ status: "running", startedAt: new Date() })
+        .where(
+          and(
+            eq(pipelineStep.id, step.id),
+            eq(pipelineStep.status, "pending")
+          )
+        )
+        .returning({ id: pipelineStep.id });
+
+      if (lockResult.length === 0) {
+        return { step: step.stepOrder, model: step.modelSlug, status: "already_taken" };
+      }
+
+      // Load model config
+      const [modelRow] = await db
+        .select()
+        .from(aiModelConfig)
+        .where(
+          and(
+            eq(aiModelConfig.slug, step.modelSlug),
+            eq(aiModelConfig.enabled, true)
+          )
+        )
+        .limit(1);
+
+      if (!modelRow) {
+        await db.update(pipelineStep).set({
+          status: "skipped",
+          errorMessage: `Model config not found: ${step.modelSlug}`,
+          completedAt: new Date(),
+        }).where(eq(pipelineStep.id, step.id));
+        return { step: step.stepOrder, model: step.modelSlug, status: "skipped" };
+      }
+
+      const config = toModelConfig(modelRow);
+      const genStartTime = Date.now();
+
+      try {
+        const genResult = await Promise.race([
+          processGenerationStep(step, job, {
+            slug: config.slug,
+            maxOutputTokens: config.maxOutputTokens,
+            costPerInputToken: config.costPerInputToken,
+            costPerOutputToken: config.costPerOutputToken,
+            config: config.config,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error(`Generator timed out after ${AI_CALL_TIMEOUT_MS}ms`)),
+              AI_CALL_TIMEOUT_MS
+            )
+          ),
+        ]);
+
+        const durationMs = Date.now() - genStartTime;
+
+        await db.update(pipelineStep).set({
+          status: "completed",
+          output: { generated: true, contentType: firstType },
+          inputTokens: genResult.inputTokens,
+          outputTokens: genResult.outputTokens,
+          costUsd: genResult.costUsd.toFixed(6),
+          completedAt: new Date(),
+          durationMs,
+        }).where(eq(pipelineStep.id, step.id));
+
+        // Update job totals
+        await db.update(pipelineJob).set({
+          totalInputTokens: sql`${pipelineJob.totalInputTokens} + ${genResult.inputTokens}`,
+          totalOutputTokens: sql`${pipelineJob.totalOutputTokens} + ${genResult.outputTokens}`,
+          totalCostUsd: sql`${pipelineJob.totalCostUsd} + ${genResult.costUsd}`,
+          currentStep: step.stepOrder,
+          updatedAt: new Date(),
+        }).where(eq(pipelineJob.id, job.id));
+
+        console.log(
+          `[ai-pipeline] Job ${job.id} gen ${firstType}/${step.modelSlug} done — ` +
+          `${genResult.inputTokens}+${genResult.outputTokens} tokens, $${genResult.costUsd.toFixed(6)}`
+        );
+
+        return { step: step.stepOrder, model: step.modelSlug, status: "completed" };
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : "Unknown error";
+        console.log(`[ai-pipeline] Job ${job.id} gen ${firstType}/${step.modelSlug} failed: ${errorMsg}`);
+        const action = await handleStepFailure(step, job, errorMsg);
+        return { step: step.stepOrder, model: step.modelSlug, status: action };
+      }
+    })
+  );
+
+  const processedResults = results.map((r, i) =>
+    r.status === "fulfilled"
+      ? r.value
+      : { step: batch[i].stepOrder, model: batch[i].modelSlug, status: "error" }
+  );
+
+  // Check if job is complete after this batch
+  const lastStep = batch[batch.length - 1];
+  await checkJobCompletion(lastStep, job);
+
+  return {
+    jobId: job.id,
+    contentType: firstType,
+    results: processedResults,
+  };
 }
 
 // ---------------------------------------------------------------------------

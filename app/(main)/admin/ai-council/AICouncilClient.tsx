@@ -383,6 +383,9 @@ export function AICouncilClient() {
   // Handle cancel / retry for extraction + pipeline jobs
   const handleJobAction = useCallback(
     async (action: "cancel" | "retry", type: "extraction" | "pipeline", jobId: string) => {
+      if (action === "cancel" && !window.confirm(`Cancel this ${type} job? This cannot be undone — the job cannot be resumed from the same step.`)) {
+        return;
+      }
       try {
         const res = await fetch("/api/admin/ai-council/job-actions", {
           method: "POST",
