@@ -144,13 +144,26 @@ async function tryAdmZip(buffer: Buffer): Promise<DeterministicResult | null> {
       warnings.push("No slides found in PPTX file");
     }
 
+    // Detect image-heavy presentations: if many slides have images but little text,
+    // mark as scanned so Phase 2 OCRs all non-decorative images
+    const totalTextChars = textByPage.reduce((sum, p) => sum + p.text.length, 0);
+    const avgCharsPerSlide = slideEntries.length > 0 ? totalTextChars / slideEntries.length : 0;
+    const isImageHeavy = images.length > 0 && (
+      avgCharsPerSlide < 50 ||                                    // very little text overall
+      (images.length >= slideEntries.length * 0.3 && avgCharsPerSlide < 150) // many images + sparse text
+    );
+
+    if (isImageHeavy) {
+      warnings.push(`Presentation appears image-heavy (${images.length} images, avg ${Math.round(avgCharsPerSlide)} chars/slide) — images will be OCR'd`);
+    }
+
     return {
       textByPage,
       images,
       tables: [], // handled in Phase 2 via Kimi multimodal
       speakerNotes: speakerNotes.length > 0 ? speakerNotes : undefined,
       warnings,
-      isScanned: false, // PPTX always has text in XML
+      isScanned: isImageHeavy,
     };
   } catch (e) {
     warnings.push(`PPTX extraction failed: ${(e as Error).message}`);

@@ -377,21 +377,23 @@ async function handlePhase2(
   // Classify images
   const { classified, tokens, cost } = await ext.classifyImages(preparedImages);
 
-  // For scanned documents or photo notes, run OCR on relevant images
+  // OCR ALL non-decorative images to extract embedded text.
+  // Educational slides, diagrams, and tables almost always contain text.
+  // The classification description is a brief summary — OCR captures the
+  // full text content. Cost is negligible (~$0.001/image via Kimi).
   let ocrTokens = 0;
   let ocrCost = 0;
   const ocrTexts: { page: number; text: string }[] = [];
 
   for (const img of classified) {
-    if (
-      img.classification === "photo_notes" ||
-      (extracted.isScanned && img.classification !== "decorative")
-    ) {
-      const ocrResult = await ext.ocrImage(img);
+    if (img.classification === "decorative") continue;
+
+    const ocrResult = await ext.ocrImage(img);
+    if (ocrResult.text.trim()) {
       ocrTexts.push({ page: img.pageOrSlide, text: ocrResult.text });
-      ocrTokens += ocrResult.tokens;
-      ocrCost += ocrResult.cost;
     }
+    ocrTokens += ocrResult.tokens;
+    ocrCost += ocrResult.cost;
   }
 
   // Update the extracted content with classified images
