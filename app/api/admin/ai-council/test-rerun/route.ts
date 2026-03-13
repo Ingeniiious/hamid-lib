@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
         fileUrl: contrib.fileUrl,
         fileType,
         fileSize: contrib.fileSize ?? 0,
+        outputTypes,
         status: "pending",
         currentPhase: 0,
       })

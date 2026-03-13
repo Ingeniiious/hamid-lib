@@ -780,6 +780,7 @@ async function autoCreatePipelineJob(
         sourceContent: extractionJob.sourceContent,
         contributionId: extractionJob.contributionId,
         fileName: extractionJob.fileName,
+        outputTypes: extractionJob.outputTypes,
       })
       .from(extractionJob)
       .where(
@@ -808,11 +809,19 @@ async function autoCreatePipelineJob(
 
     const contributionIds = completedJobs.map((j) => j.contributionId);
 
+    // Resolve output types — use the types stored on the extraction job,
+    // or fall back to defaults if not specified (e.g. production contributions)
+    const DEFAULT_OUTPUT_TYPES = ["study_guide", "flashcards", "quiz"];
+    const storedTypes = completedJobs
+      .map((j) => j.outputTypes)
+      .find((t) => Array.isArray(t) && t.length > 0) as string[] | undefined;
+    const resolvedOutputTypes = storedTypes ?? DEFAULT_OUTPUT_TYPES;
+
     // Chunk content if too large for model context windows
     const chunks = chunkSourceContent(combinedSource, MAX_CHUNK_TOKENS);
 
     console.log(
-      `[extraction] Creating ${chunks.length} pipeline job(s) for course ${job.courseId} — ${completedJobs.length} file(s): ${completedJobs.map((j) => j.fileName).join(", ")}`
+      `[extraction] Creating ${chunks.length} pipeline job(s) for course ${job.courseId} — ${completedJobs.length} file(s): ${completedJobs.map((j) => j.fileName).join(", ")} — types: ${resolvedOutputTypes.join(", ")}`
     );
 
     const pipelineJobIds: string[] = [];
@@ -823,7 +832,7 @@ async function autoCreatePipelineJob(
       const pipelineJobId = await createPipelineJob({
         courseId: job.courseId,
         contributionIds,
-        outputTypes: ["study_guide", "flashcards", "quiz"],
+        outputTypes: resolvedOutputTypes,
         startedBy: "extraction-pipeline",
         sourceContent: chunk,
       });
@@ -953,6 +962,7 @@ export async function createExtractionJob(params: {
   fileUrl: string;
   fileType: string;
   fileSize?: number;
+  outputTypes?: string[];
 }): Promise<string> {
   const [job] = await db
     .insert(extractionJob)
@@ -964,6 +974,7 @@ export async function createExtractionJob(params: {
       fileUrl: params.fileUrl,
       fileType: params.fileType,
       fileSize: params.fileSize ?? null,
+      outputTypes: params.outputTypes ?? null,
       status: "pending",
       currentPhase: 0,
       totalImages: 0,

@@ -839,6 +839,8 @@ export const extractionJob = pgTable("extraction_job", {
   errorMessage: text("error_message"),
   retryCount: integer("retry_count").notNull().default(0),
   maxRetries: integer("max_retries").notNull().default(5),
+  // Requested output types (carried through to pipeline job creation)
+  outputTypes: jsonb("output_types"),                // ["study_guide", "flashcards", "quiz", ...] — null = use defaults
   // Linking to AI Council pipeline
   pipelineJobId: uuid("pipeline_job_id").references(() => pipelineJob.id, { onDelete: "set null" }),
   // Timestamps

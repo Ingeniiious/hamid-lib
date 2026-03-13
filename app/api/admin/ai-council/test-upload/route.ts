@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
         fileUrl: uploadResult.url,
         fileType,
         fileSize: bytes.length,
+        outputTypes,
         status: "pending",
         currentPhase: 0,
       })
