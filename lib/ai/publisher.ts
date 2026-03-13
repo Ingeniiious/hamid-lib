@@ -240,8 +240,8 @@ export async function processGenerationStep(
   // Get source content (stored on first step)
   const sourceContent = teacherSteps[0]?.inputSummary ?? "";
 
-  // Build prompt
-  const prompt = getGeneratorPrompt(contentType, verified.content, sourceContent);
+  // Build prompt — pass explicit source language to prevent wrong language generation
+  const prompt = getGeneratorPrompt(contentType, verified.content, sourceContent, job.sourceLanguage);
 
   // Call AI
   const response = await complete({
@@ -276,14 +276,14 @@ export async function processGenerationStep(
     ? `${generateTitle(contentType, job)} — Variant ${config.slug}`
     : generateTitle(contentType, job);
 
-  // Save to generated_content
+  // Save to generated_content — use the detected source language, not hardcoded "en"
   await db.insert(generatedContent).values({
     courseId: job.courseId,
     jobId: job.id,
     contentType,
     title,
     content: parsed,
-    language: "en",
+    language: job.sourceLanguage ?? "en",
     modelSource: config.slug,
     version: job.version,
     isPublished: false,

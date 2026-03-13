@@ -3,12 +3,41 @@
 // ---------------------------------------------------------------------------
 
 import type { ContentType, ModelRole } from "./types";
+import { getLanguageName } from "./translation";
 
 /** Course context for content validation in the creator step */
 export interface CourseContext {
   courseName: string;
   facultyName?: string;
   universityName?: string;
+}
+
+/**
+ * Build the explicit language rule block for prompts.
+ * When sourceLanguage is provided, it gives an unambiguous instruction.
+ * This prevents models from inferring the wrong language from context
+ * (e.g., seeing a Turkish university name in English content).
+ */
+function languageRuleBlock(sourceLanguage?: string | null): string {
+  if (sourceLanguage) {
+    const langName = getLanguageName(sourceLanguage);
+    return `LANGUAGE RULE (CRITICAL — NON-NEGOTIABLE):
+- The source language has been detected as: **${langName}** (code: ${sourceLanguage}).
+- You MUST produce ALL content in ${langName}.
+- To determine the content language, look at the ENTIRE source text and check the language ratio across ALL of it — not just the header, title, or metadata at the top. The actual body text is what matters.
+- University names, professor names, institution names, and course metadata may be in a different language — IGNORE those for language detection. They are proper nouns, not indicators of the content language.
+- Do NOT switch to a different language even if you see names, institutions, or terms from another language/culture.
+- Use the academic register and terminology conventions appropriate for ${langName}.`;
+  }
+
+  // Fallback when language is unknown — use the old heuristic
+  return `LANGUAGE RULE (CRITICAL):
+- You MUST produce ALL content in the SAME LANGUAGE as the majority of the source material text.
+- To determine the content language, look at the ENTIRE source text and check the language ratio across ALL of it — not just the header, title, or metadata at the top. The actual body text is what matters.
+- University names, professor names, institution names, and course metadata may be in a different language — IGNORE those for language detection. They are proper nouns, not indicators of the content language.
+- If the source text body is 90%+ English but mentions Turkish/Persian/etc. names and institutions, the language is ENGLISH — write in English.
+- Do NOT translate the source material into a different language. Match the dominant language of the actual content.
+- Use the academic register and terminology conventions appropriate for that language.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -28,17 +57,29 @@ const CONTENT_TYPE_SCHEMAS: Record<ContentType, string> = {
 Aim for 15-30 cards. Each card should test a single concept. Tags help categorize cards by topic.`,
 
   quiz: `{
+  "suggestedTimeMinutes": 10,
   "questions": [
     {
       "question": "The question text (string)",
-      "type": "multiple_choice" | "true_false" | "short_answer",
+      "type": "multiple_choice" | "true_false",
       "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correct": "The correct answer — option text for multiple_choice, true/false for true_false, expected answer for short_answer (string | number)",
+      "correctIndex": 0,
       "explanation": "Why this answer is correct (string)"
     }
   ]
 }
-Generate 10-20 questions. Mix question types. Ensure distractors are plausible but clearly wrong. Every question must have an explanation.`,
+IMPORTANT — this quiz is graded AUTOMATICALLY by code, not by a human or AI:
+- "suggestedTimeMinutes": estimate how many minutes an average university student would need to complete this quiz. Be realistic — consider reading time, thinking time, and question difficulty.
+- ONLY use "multiple_choice" and "true_false" types. No short answer, no essay, no free-text.
+- "options" is REQUIRED for every question — always an array of strings.
+  - multiple_choice: exactly 4 options.
+  - true_false: exactly ["True", "False"].
+- "correctIndex" is the 0-based index of the correct option in the "options" array (integer).
+- Generate 10-20 questions. ~70% multiple choice, ~30% true/false.
+- Keep questions concise, focused on single concepts.
+- Distractors should be plausible but clearly wrong.
+- Every question must have a brief, helpful explanation.
+- Order randomly — this is casual practice, not a graded test.`,
 
   study_guide: `{
   "sections": [
@@ -53,17 +94,55 @@ Generate 10-20 questions. Mix question types. Ensure distractors are plausible b
 Organize logically from foundational to advanced. Each section should be self-contained but build on previous ones. Include 3-5 key points per section.`,
 
   mock_exam: `{
-  "questions": [
+  "title": "Exam title, e.g. Midterm Exam — Introduction to Economics (string)",
+  "totalPoints": 100,
+  "suggestedTimeMinutes": 90,
+  "instructions": "General exam instructions for the student (string)",
+  "sections": [
     {
-      "question": "The question text (string)",
-      "type": "multiple_choice" | "true_false" | "short_answer",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correct": "The correct answer (string | number)",
-      "explanation": "Why this answer is correct (string)"
+      "title": "Section name, e.g. Part A: Multiple Choice (string)",
+      "points": 25,
+      "questions": [
+        {
+          "question": "The question text (string)",
+          "type": "multiple_choice" | "true_false" | "short_answer" | "fill_in_blank" | "matching" | "essay" | "calculation",
+          "grading": "auto" | "ai",
+          "points": 2,
+          "options": ["Option A", "Option B", "Option C", "Option D"],
+          "correctIndex": 0,
+          "matchPairs": [{"left": "Term", "right": "Definition"}],
+          "correctMatchOrder": [2, 0, 1],
+          "rubric": "Grading criteria for AI-graded questions (string)",
+          "sampleAnswer": "A model answer for AI-graded questions (string)",
+          "explanation": "Why this answer is correct — shown AFTER the student submits (string)"
+        }
+      ]
     }
   ]
 }
-Generate 30-50 questions. Simulate a real exam: progress from easy to hard, cover all major topics proportionally, include a mix of recall, comprehension, and application questions.`,
+Simulate a REAL university exam paper with TWO grading modes:
+
+GRADING RULES (CRITICAL):
+- "grading": "auto" → graded instantly by code. Use for: multiple_choice, true_false, matching.
+- "grading": "ai" → graded by a cheap AI model. Use for: short_answer, fill_in_blank, essay, calculation.
+
+AUTO-GRADED questions (grading: "auto"):
+- multiple_choice: MUST have "options" (4 items) + "correctIndex" (0-based index). Omit rubric/sampleAnswer.
+- true_false: MUST have "options": ["True", "False"] + "correctIndex" (0 or 1). Omit rubric/sampleAnswer.
+- matching: MUST have "matchPairs" (array of {left, right} in SHUFFLED order for display) + "correctMatchOrder" (array of indices mapping each left item to its correct right item). Omit options/correctIndex.
+
+AI-GRADED questions (grading: "ai"):
+- short_answer / fill_in_blank / essay / calculation: MUST have "rubric" (clear grading criteria with point breakdown) + "sampleAnswer" (model answer for the AI grader to compare against). Omit options/correctIndex/matchPairs.
+
+EXAM STRUCTURE:
+- 3-5 sections with different question types (do NOT make all sections multiple choice).
+- Section 1: quick recall — multiple_choice + true_false (auto-graded, 1-2 pts each).
+- Section 2: applied — short_answer + fill_in_blank + matching (mix of auto + ai, 3-5 pts each).
+- Section 3+: deep understanding — essay + calculation (ai-graded, 10-20 pts each).
+- Total ~100 points across 25-40 questions.
+- Progress easy → medium → hard within and across sections.
+- Only include fields relevant to each question type — omit unused fields.
+- Cover all major topics proportionally.`,
 
   mind_map: `{
   "nodes": [
@@ -210,7 +289,7 @@ enrichedContent must always match the original content type schema, with your co
 // System prompts per role
 // ---------------------------------------------------------------------------
 
-function creatorSystem(contentType: ContentType, courseContext?: CourseContext): string {
+function creatorSystem(contentType: ContentType, courseContext?: CourseContext, sourceLanguage?: string | null): string {
   const label = CONTENT_TYPE_LABELS[contentType];
   const schema = CONTENT_TYPE_SCHEMAS[contentType];
 
@@ -239,11 +318,7 @@ If the content PASSES validation, proceed with generating the ${label} as instru
   return `You are an exceptional university professor and teacher. You are passionate about helping students truly understand and master course material.
 ${validationBlock}Your task: You have been given extracted course material contributed by a student. Imagine you are teaching this course — your job is to create a comprehensive ${label} that teaches this material in the best possible way. Explain every concept thoroughly. Leave nothing out.
 
-LANGUAGE RULE (CRITICAL):
-- You MUST produce ALL content in the SAME LANGUAGE as the source material.
-- If the source material is in Turkish, write everything in Turkish. If it's in Persian, write in Persian. If it's in Spanish, write in Spanish. And so on.
-- Do NOT translate the source material into English or any other language. Match the source language exactly.
-- Use the academic register and terminology conventions appropriate for that language.
+${languageRuleBlock(sourceLanguage)}
 
 CRITICAL RULES:
 - Do NOT delete, compress, or skip ANY information from the source material. Every single piece of information must be preserved and expanded upon.
@@ -264,7 +339,7 @@ Output requirements:
 ${schema}`;
 }
 
-function reviewerSystem(contentType: ContentType): string {
+function reviewerSystem(contentType: ContentType, sourceLanguage?: string | null): string {
   const label = CONTENT_TYPE_LABELS[contentType];
   const schema = CONTENT_TYPE_SCHEMAS[contentType];
 
@@ -272,10 +347,8 @@ function reviewerSystem(contentType: ContentType): string {
 
 Your task: review a generated ${label} for accuracy, completeness, clarity, and pedagogical quality.
 
-LANGUAGE RULE (CRITICAL):
-- The content and source material may be in ANY language (Turkish, Persian, Spanish, etc.).
-- You MUST review and write all feedback, corrections, and enrichedContent in the SAME LANGUAGE as the source material.
-- Do NOT translate the content into English. Preserve the original language throughout.
+${languageRuleBlock(sourceLanguage)}
+- You MUST write all feedback, corrections, and enrichedContent in the same language as the source content.
 
 Evaluate the content on these criteria:
 1. **Accuracy** — Does the content faithfully represent the source material? Are there factual errors or misrepresentations?
@@ -292,7 +365,7 @@ ${REVIEW_OUTPUT_SCHEMA}
 Be thorough but fair. Flag genuine issues, not stylistic preferences.`;
 }
 
-function enricherSystem(contentType: ContentType): string {
+function enricherSystem(contentType: ContentType, sourceLanguage?: string | null): string {
   const label = CONTENT_TYPE_LABELS[contentType];
   const schema = CONTENT_TYPE_SCHEMAS[contentType];
 
@@ -300,10 +373,7 @@ function enricherSystem(contentType: ContentType): string {
 
 Your task: enhance a reviewed ${label} by adding depth, examples, and polish while preserving factual accuracy.
 
-LANGUAGE RULE (CRITICAL):
-- The content may be in ANY language (Turkish, Persian, Spanish, etc.).
-- You MUST enrich and write ALL content in the SAME LANGUAGE as the source material.
-- Do NOT translate the content into English. Preserve the original language throughout.
+${languageRuleBlock(sourceLanguage)}
 - Add examples and analogies that are culturally relevant to the language/region of the source material.
 
 Enrichment goals:
@@ -323,7 +393,7 @@ Expected schema:
 ${schema}`;
 }
 
-function validatorSystem(contentType: ContentType): string {
+function validatorSystem(contentType: ContentType, sourceLanguage?: string | null): string {
   const label = CONTENT_TYPE_LABELS[contentType];
   const schema = CONTENT_TYPE_SCHEMAS[contentType];
 
@@ -331,10 +401,8 @@ function validatorSystem(contentType: ContentType): string {
 
 Your task: validate a ${label} for factual correctness and internal consistency.
 
-LANGUAGE RULE (CRITICAL):
-- The content may be in ANY language (Turkish, Persian, Spanish, etc.).
-- You MUST validate and write all feedback, corrections, and enrichedContent in the SAME LANGUAGE as the source material.
-- Do NOT translate the content into English. Preserve the original language throughout.
+${languageRuleBlock(sourceLanguage)}
+- You MUST write all feedback, corrections, and enrichedContent in the same language as the source content.
 
 Validation checks:
 1. **Factual correctness** — Are all claims, definitions, and explanations accurate? Cross-reference against the original source material.
@@ -351,7 +419,7 @@ ${REVIEW_OUTPUT_SCHEMA}
 Be precise. Only flag issues you are confident about. For uncertain claims, note the uncertainty in the issue description rather than marking them as definitively wrong.`;
 }
 
-function factCheckerSystem(contentType: ContentType): string {
+function factCheckerSystem(contentType: ContentType, sourceLanguage?: string | null): string {
   const label = CONTENT_TYPE_LABELS[contentType];
   const schema = CONTENT_TYPE_SCHEMAS[contentType];
 
@@ -359,10 +427,8 @@ function factCheckerSystem(contentType: ContentType): string {
 
 Your task: fact-check a ${label} by verifying claims against your knowledge base.
 
-LANGUAGE RULE (CRITICAL):
-- The content may be in ANY language (Turkish, Persian, Spanish, etc.).
-- You MUST fact-check and write all feedback, corrections, and enrichedContent in the SAME LANGUAGE as the source material.
-- Do NOT translate the content into English. Preserve the original language throughout.
+${languageRuleBlock(sourceLanguage)}
+- You MUST write all feedback, corrections, and enrichedContent in the same language as the source content.
 
 Fact-checking process:
 1. **Verify key claims** — Check factual statements, statistics, dates, definitions, and formulas against known information.
@@ -449,7 +515,7 @@ function factCheckerUser(
 // Generator prompts (used by publisher after teacher verification)
 // ---------------------------------------------------------------------------
 
-function generatorSystem(contentType: ContentType): string {
+function generatorSystem(contentType: ContentType, sourceLanguage?: string | null): string {
   const label = CONTENT_TYPE_LABELS[contentType];
   const schema = CONTENT_TYPE_SCHEMAS[contentType];
 
@@ -457,9 +523,7 @@ function generatorSystem(contentType: ContentType): string {
 
 The content you receive has been reviewed and verified by an expert panel of AI teachers — treat it as authoritative source material.
 
-LANGUAGE RULE (CRITICAL):
-- You MUST produce ALL content in the SAME LANGUAGE as the verified content and source material.
-- Do NOT translate into English or any other language. Match the source language exactly.
+${languageRuleBlock(sourceLanguage)}
 
 Output requirements:
 - Output ONLY valid JSON. No markdown, no code fences, no commentary outside the JSON.
@@ -517,10 +581,11 @@ export function getContentTypeSchema(contentType: ContentType): string {
 export function getGeneratorPrompt(
   contentType: ContentType,
   verifiedContent: string,
-  sourceContent: string
+  sourceContent: string,
+  sourceLanguage?: string | null,
 ): { system: string; user: string } {
   return {
-    system: generatorSystem(contentType),
+    system: generatorSystem(contentType, sourceLanguage),
     user: generatorUser(contentType, verifiedContent, sourceContent),
   };
 }
@@ -540,37 +605,38 @@ export function getPrompt(
   sourceContent: string,
   previousStepOutputs?: { role: string; output: string }[],
   courseContext?: CourseContext,
+  sourceLanguage?: string | null,
 ): { system: string; user: string } {
   const outputs = previousStepOutputs ?? [];
 
   switch (role) {
     case "creator":
       return {
-        system: creatorSystem(contentType, courseContext),
+        system: creatorSystem(contentType, courseContext, sourceLanguage),
         user: creatorUser(sourceContent),
       };
 
     case "reviewer":
       return {
-        system: reviewerSystem(contentType),
+        system: reviewerSystem(contentType, sourceLanguage),
         user: reviewerUser(sourceContent, outputs),
       };
 
     case "enricher":
       return {
-        system: enricherSystem(contentType),
+        system: enricherSystem(contentType, sourceLanguage),
         user: enricherUser(sourceContent, outputs),
       };
 
     case "validator":
       return {
-        system: validatorSystem(contentType),
+        system: validatorSystem(contentType, sourceLanguage),
         user: validatorUser(sourceContent, outputs),
       };
 
     case "fact_checker":
       return {
-        system: factCheckerSystem(contentType),
+        system: factCheckerSystem(contentType, sourceLanguage),
         user: factCheckerUser(sourceContent, outputs),
       };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Files,
@@ -1449,6 +1450,17 @@ function PipelineTab({
 
                 </button>
 
+                {/* View Details link */}
+                <div className="flex justify-center border-t border-gray-900/5 px-4 py-1.5 dark:border-white/5">
+                  <Link
+                    href={`/admin/ai-council/${job.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[11px] font-medium text-[#5227FF] transition-colors hover:text-[#5227FF]/70 dark:text-[#8B6FFF] dark:hover:text-[#8B6FFF]/70"
+                  >
+                    View Full Details
+                  </Link>
+                </div>
+
                 {/* Error — outside button so text is selectable/copyable */}
                 {job.status === "failed" && job.errorMessage && (
                   <div className="mx-4 mb-3 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2">
@@ -1574,8 +1586,8 @@ function PipelineTab({
                       );
                     })()}
 
-                    {/* Generated Content */}
-                    {job.status === "completed" && (
+                    {/* Generated Content — show during generation too, not just completed */}
+                    {(job.status === "completed" || job.currentStep >= 100) && (
                       <GeneratedContentViewer jobId={job.id} />
                     )}
                   </motion.div>

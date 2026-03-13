@@ -400,7 +400,7 @@ export async function processNextStep(): Promise<{
     }
   }
 
-  const prompt = getPrompt(role, contentType, sourceContent, previousOutputStrings, courseContext);
+  const prompt = getPrompt(role, contentType, sourceContent, previousOutputStrings, courseContext, job.sourceLanguage);
   const messages: AIMessage[] = [
     { role: "system", content: prompt.system },
     { role: "user", content: prompt.user },
@@ -914,6 +914,7 @@ export async function createJob(params: {
   outputTypes: string[];
   startedBy: string;
   sourceContent: string;
+  sourceLanguage?: string;
 }): Promise<string> {
   // Fetch all enabled models, ordered by pipeline position
   const models = await db
@@ -935,6 +936,7 @@ export async function createJob(params: {
       status: "pending",
       currentStep: 0,
       outputTypes: params.outputTypes,
+      sourceLanguage: params.sourceLanguage ?? null,
       startedBy: params.startedBy,
       totalInputTokens: 0,
       totalOutputTokens: 0,

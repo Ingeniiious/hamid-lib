@@ -780,6 +780,7 @@ async function autoCreatePipelineJob(
       .select({
         id: extractionJob.id,
         sourceContent: extractionJob.sourceContent,
+        sourceLanguage: extractionJob.sourceLanguage,
         contributionId: extractionJob.contributionId,
         fileName: extractionJob.fileName,
         outputTypes: extractionJob.outputTypes,
@@ -826,6 +827,9 @@ async function autoCreatePipelineJob(
       `[extraction] Creating ${chunks.length} pipeline job(s) for course ${job.courseId} — ${completedJobs.length} file(s): ${completedJobs.map((j) => j.fileName).join(", ")} — types: ${resolvedOutputTypes.join(", ")}`
     );
 
+    // Use the detected source language from the first completed extraction job
+    const detectedLang = completedJobs.find((j) => j.sourceLanguage)?.sourceLanguage ?? undefined;
+
     const pipelineJobIds: string[] = [];
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -837,6 +841,7 @@ async function autoCreatePipelineJob(
         outputTypes: resolvedOutputTypes,
         startedBy: "extraction-pipeline",
         sourceContent: chunk,
+        sourceLanguage: detectedLang,
       });
       pipelineJobIds.push(pipelineJobId);
 

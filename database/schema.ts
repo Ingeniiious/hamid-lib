@@ -890,3 +890,42 @@ export const supportMessage = pgTable("support_message", {
   index("support_message_ticket_id_idx").on(table.ticketId),
   index("support_message_created_at_idx").on(table.createdAt),
 ]);
+
+// ==================
+// Exam Attempts & AI Grading
+// ==================
+
+export const examAttempt = pgTable("exam_attempt", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),
+  contentId: uuid("content_id").notNull().references(() => generatedContent.id, { onDelete: "cascade" }),
+  courseId: text("course_id").notNull().references(() => course.id, { onDelete: "cascade" }),
+  contentType: text("content_type").notNull(),             // "quiz" or "mock_exam"
+  // Student answers — array of { questionIndex, sectionIndex?, answer }
+  answers: jsonb("answers").notNull(),
+  // Grading state
+  status: text("status").notNull().default("submitted"),   // submitted, grading, graded
+  // Scores
+  totalScore: numeric("total_score", { precision: 6, scale: 2 }),
+  totalPossible: numeric("total_possible", { precision: 6, scale: 2 }),
+  autoScore: numeric("auto_score", { precision: 6, scale: 2 }),     // points from code-graded questions
+  aiScore: numeric("ai_score", { precision: 6, scale: 2 }),         // points from AI-graded questions
+  // Per-question results — array of { questionId, verdict, pointsEarned, feedback? }
+  results: jsonb("results"),
+  // AI grading metadata
+  gradingModel: text("grading_model"),                     // "kimi" — which model graded AI questions
+  gradingTokens: integer("grading_tokens").notNull().default(0),
+  gradingCostUsd: numeric("grading_cost_usd", { precision: 10, scale: 6 }).notNull().default("0"),
+  // Timing
+  startedAt: timestamp("started_at"),
+  submittedAt: timestamp("submitted_at").notNull().defaultNow(),
+  gradedAt: timestamp("graded_at"),
+  timeSpentSeconds: integer("time_spent_seconds"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("exam_attempt_user_id_idx").on(table.userId),
+  index("exam_attempt_content_id_idx").on(table.contentId),
+  index("exam_attempt_course_id_idx").on(table.courseId),
+  index("exam_attempt_status_idx").on(table.status),
+  index("exam_attempt_user_content_idx").on(table.userId, table.contentId),
+]);

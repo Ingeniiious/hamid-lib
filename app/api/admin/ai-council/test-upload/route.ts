@@ -5,6 +5,7 @@ import { course, contribution, extractionJob } from "@/database/schema";
 import { uploadToR2 } from "@/lib/r2";
 import { eq } from "drizzle-orm";
 import { createJob as createPipelineJob } from "@/lib/ai/orchestrator";
+import { detectLanguageFromText } from "@/lib/ai/translation";
 
 export const dynamic = "force-dynamic";
 
@@ -111,12 +112,14 @@ export async function POST(request: NextRequest) {
       const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
       const sourceContent = `# Source: ${file.name}\n\n## Text Content\n\n${text.slice(0, 200_000)}`;
 
+      const detectedLang = detectLanguageFromText(sourceContent);
       const jobId = await createPipelineJob({
         courseId: TEST_COURSE_ID,
         contributionIds: [contrib.id],
         outputTypes,
         startedBy: session.user.id,
         sourceContent,
+        sourceLanguage: detectedLang,
       });
 
       return NextResponse.json({

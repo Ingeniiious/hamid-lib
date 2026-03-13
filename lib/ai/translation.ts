@@ -341,46 +341,71 @@ export async function processNextTranslation(): Promise<{
 // ---------------------------------------------------------------------------
 
 /**
- * Simple language detection from extracted text.
- * Uses the first ~500 chars to detect language.
+ * Detect the primary language of a text using a larger sample and word-level analysis.
+ * Uses up to 5000 chars, analyzes word-level patterns instead of just char presence.
+ * This prevents false positives when English text mentions Turkish/Persian names or places.
  * Returns ISO 639-1 code.
  */
 export function detectLanguageFromText(text: string): string {
-  const sample = text.slice(0, 1000);
+  // Use a larger sample for better accuracy
+  const sample = text.slice(0, 5000);
+  const words = sample.split(/\s+/).filter((w) => w.length > 1);
+  const totalWords = words.length || 1;
 
-  // Persian/Arabic script detection (Persian has specific characters)
-  if (/[\u0600-\u06FF]/.test(sample)) {
+  // --- Script-based detection (non-Latin scripts are unambiguous) ---
+
+  // Persian/Arabic script — count chars in Arabic block
+  const arabicChars = (sample.match(/[\u0600-\u06FF]/g) || []).length;
+  const arabicRatio = arabicChars / (sample.replace(/\s/g, "").length || 1);
+  if (arabicRatio > 0.3) {
     // Persian-specific characters: پ چ ژ گ ک ی
     if (/[پچژگکی]/.test(sample)) return "fa";
     return "ar";
   }
 
   // CJK detection
-  if (/[\u4e00-\u9fff]/.test(sample)) return "zh";
+  const cjkChars = (sample.match(/[\u4e00-\u9fff]/g) || []).length;
+  if (cjkChars / (sample.replace(/\s/g, "").length || 1) > 0.2) return "zh";
   if (/[\u3040-\u309f\u30a0-\u30ff]/.test(sample)) return "ja";
   if (/[\uac00-\ud7af]/.test(sample)) return "ko";
 
-  // Cyrillic
-  if (/[\u0400-\u04FF]/.test(sample)) {
+  // Cyrillic — ratio-based
+  const cyrillicChars = (sample.match(/[\u0400-\u04FF]/g) || []).length;
+  if (cyrillicChars / (sample.replace(/\s/g, "").length || 1) > 0.3) {
     if (/[\u0404\u0406\u0407\u0490\u0491]/.test(sample)) return "uk";
     return "ru";
   }
 
-  // Turkish-specific characters: İ ı Ş ş Ğ ğ Ü ü Ö ö Ç ç
-  const turkishChars = (sample.match(/[İıŞşĞğÜüÖöÇç]/g) || []).length;
-  if (turkishChars > 3) return "tr";
+  // --- Latin-script detection (Turkish vs English vs others) ---
+  // Count words containing Turkish-specific characters (not just individual chars).
+  // A Turkish proper noun in English text ("İstinye Üniversitesi") shouldn't flip the language.
+  const turkishWordCount = words.filter((w) => /[İıŞşĞğ]/.test(w)).length;
+  const turkishWordRatio = turkishWordCount / totalWords;
 
-  // German-specific: ß ä ö ü (when not Turkish)
-  if (/[ßÄäÖöÜü]/.test(sample) && turkishChars <= 1) return "de";
+  // Also check for common Turkish function words (strong signal)
+  const turkishFunctionWords = /\b(ve|ile|bir|bu|da|de|için|olan|gibi|ama|ancak|çok|değil|ise|ki|veya|hem|nasıl|neden)\b/gi;
+  const turkishFuncMatches = (sample.match(turkishFunctionWords) || []).length;
+  const turkishFuncRatio = turkishFuncMatches / totalWords;
 
-  // Spanish accents + ñ
-  if (/[ñ¿¡áéíóú]/i.test(sample)) return "es";
+  // Turkish if >15% of words have Turkish chars OR >5% are Turkish function words
+  if (turkishWordRatio > 0.15 || turkishFuncRatio > 0.05) return "tr";
 
-  // French accents
-  if (/[àâçèéêëîïôùûüÿœæ]/i.test(sample)) return "fr";
+  // German-specific: ß + high ä ö ü density
+  if (/ß/.test(sample)) return "de";
+  const germanChars = (sample.match(/[ÄäÖöÜü]/g) || []).length;
+  if (germanChars > 10 && turkishWordCount <= 1) return "de";
+
+  // Spanish
+  if (/[ñ¿¡]/i.test(sample)) return "es";
+  const spanishAccents = (sample.match(/[áéíóú]/gi) || []).length;
+  if (spanishAccents > 10) return "es";
+
+  // French
+  const frenchChars = (sample.match(/[àâçèêëîïôùûüÿœæ]/gi) || []).length;
+  if (frenchChars > 10) return "fr";
 
   // Portuguese
-  if (/[ãõçáàâéêíóôú]/i.test(sample)) return "pt";
+  if (/[ãõ]/i.test(sample)) return "pt";
 
   // Default to English
   return "en";

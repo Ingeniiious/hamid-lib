@@ -103,11 +103,12 @@ export interface FlashcardContent {
 }
 
 export interface QuizContent {
+  suggestedTimeMinutes: number;
   questions: {
     question: string;
-    type: "multiple_choice" | "true_false" | "short_answer";
-    options?: string[];
-    correct: string | number;
+    type: "multiple_choice" | "true_false";
+    options: string[];
+    correctIndex: number;
     explanation: string;
   }[];
 }
@@ -184,12 +185,27 @@ export interface ReportContent {
 }
 
 export interface MockExamContent {
-  questions: {
-    question: string;
-    type: "multiple_choice" | "true_false" | "short_answer";
-    options?: string[];
-    correct: string | number;
-    explanation: string;
+  title: string;
+  totalPoints: number;
+  suggestedTimeMinutes: number;
+  instructions: string;
+  sections: {
+    title: string;
+    points: number;
+    questions: {
+      question: string;
+      type: "multiple_choice" | "true_false" | "short_answer" | "fill_in_blank" | "matching" | "essay" | "calculation";
+      /** "auto" = code-gradable (MC, T/F, matching), "ai" = needs AI grading (essay, calculation, short answer, fill-in-blank) */
+      grading: "auto" | "ai";
+      points: number;
+      options?: string[];
+      correctIndex?: number;
+      matchPairs?: { left: string; right: string }[];
+      correctMatchOrder?: number[];
+      rubric?: string;
+      sampleAnswer?: string;
+      explanation: string;
+    }[];
   }[];
 }
 
