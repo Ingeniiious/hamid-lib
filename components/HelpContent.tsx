@@ -689,7 +689,7 @@ export function HelpContent() {
                 {t("help.ctaDesc")}
               </p>
               <Link
-                href="/auth"
+                href="/help/articles"
                 className="mt-8 inline-block rounded-full bg-[#5227FF] px-10 py-3.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
               >
                 {t("help.ctaButton")}
