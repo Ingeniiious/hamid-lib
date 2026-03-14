@@ -21,14 +21,6 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-/** Parse "MM:SS" timestamp string to seconds */
-function parseTimestamp(ts: string): number {
-  const parts = ts.split(":");
-  if (parts.length === 2) return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
-  if (parts.length === 3) return parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseInt(parts[2], 10);
-  return 0;
-}
-
 interface PodcastScriptRendererProps {
   content: PodcastScriptContent;
   mediaUrl?: string | null;
@@ -45,15 +37,6 @@ export function PodcastScriptRenderer({
   const [duration, setDuration] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
-
-  // Find current segment based on playback time
-  const currentSegmentIdx = (() => {
-    if (!isPlaying && currentTime === 0) return -1;
-    for (let i = segments.length - 1; i >= 0; i--) {
-      if (currentTime >= parseTimestamp(segments[i].timestamp)) return i;
-    }
-    return 0;
-  })();
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
@@ -99,7 +82,7 @@ export function PodcastScriptRenderer({
     audio.currentTime = ratio * duration;
   };
 
-  // No audio yet — show "audio generating" placeholder, NO transcript
+  // No audio yet — show placeholder, NO transcript
   if (!mediaUrl) {
     return (
       <div className="mx-auto max-w-3xl">
@@ -111,7 +94,7 @@ export function PodcastScriptRenderer({
         >
           <div className="mb-3 flex items-center justify-center">
             <span className="inline-flex items-center justify-center rounded-full bg-[#5227FF]/10 px-4 py-1.5 text-xs font-semibold text-[#5227FF] dark:text-[#8B6FFF]">
-              {content.totalDuration ?? "Podcast"}
+              Podcast
             </span>
           </div>
           <p className="text-sm text-gray-900/50 dark:text-white/50">
@@ -158,27 +141,6 @@ export function PodcastScriptRenderer({
             )}
           </button>
 
-          {/* Live subtitle — current segment text during playback */}
-          <AnimatePresence mode="wait">
-            {currentSegmentIdx >= 0 && (isPlaying || currentTime > 0) && (
-              <motion.div
-                key={currentSegmentIdx}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3, ease }}
-                className="w-full text-center"
-              >
-                <span className="mb-1 inline-flex items-center justify-center rounded-full bg-[#5227FF]/15 px-2.5 py-0.5 text-[10px] font-semibold text-[#5227FF] dark:text-[#8B6FFF]">
-                  {segments[currentSegmentIdx].speaker}
-                </span>
-                <p className="text-center text-sm leading-relaxed text-gray-900/70 dark:text-white/70">
-                  {stripSpeechTags(segments[currentSegmentIdx].text)}
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           {/* Progress bar */}
           <div className="w-full">
             <div
@@ -192,13 +154,13 @@ export function PodcastScriptRenderer({
             </div>
             <div className="mt-1.5 flex items-center justify-between text-[11px] tabular-nums text-gray-900/50 dark:text-white/50">
               <span>{formatTime(currentTime)}</span>
-              <span>{duration ? formatTime(duration) : content.totalDuration ?? "--:--"}</span>
+              <span>{duration ? formatTime(duration) : "--:--"}</span>
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* Transcript toggle — collapsed by default */}
+      {/* Transcript toggle */}
       <div className="flex items-center justify-center">
         <button
           onClick={() => setShowTranscript(!showTranscript)}
@@ -208,7 +170,7 @@ export function PodcastScriptRenderer({
         </button>
       </div>
 
-      {/* Full transcript — only visible when toggled */}
+      {/* Full transcript — collapsed by default */}
       <AnimatePresence>
         {showTranscript && (
           <motion.div
@@ -222,16 +184,9 @@ export function PodcastScriptRenderer({
               {segments.map((segment, idx) => (
                 <div
                   key={idx}
-                  className={`rounded-2xl border p-5 backdrop-blur-xl transition-colors ${
-                    idx === currentSegmentIdx && (isPlaying || currentTime > 0)
-                      ? "border-[#5227FF]/30 bg-[#5227FF]/5 dark:border-[#5227FF]/40 dark:bg-[#5227FF]/10"
-                      : "border-gray-900/10 bg-white/50 dark:border-white/15 dark:bg-white/10"
-                  }`}
+                  className="rounded-2xl border border-gray-900/10 bg-white/50 p-5 backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
                 >
                   <div className="mb-3 flex flex-wrap items-center justify-center gap-2">
-                    <span className="inline-flex items-center justify-center rounded-full bg-gray-900/5 px-3 py-1 text-[11px] font-medium tabular-nums text-gray-900/60 dark:bg-white/5 dark:text-white/60">
-                      {segment.timestamp}
-                    </span>
                     <span className="inline-flex items-center justify-center rounded-full bg-[#5227FF]/10 px-3 py-1 text-[11px] font-semibold text-[#5227FF] dark:text-[#8B6FFF]">
                       {segment.speaker}
                     </span>
