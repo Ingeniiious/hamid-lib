@@ -180,32 +180,42 @@ Generate 10-20 slides. Start with a title slide, end with a summary/Q&A slide. K
     {
       "timestamp": "MM:SS format (string)",
       "speaker": "Host or Expert (string — ALWAYS use exactly these two speakers)",
-      "text": "What the speaker says, with optional ElevenLabs v3 audio tags (string)"
+      "text": "What the speaker says, with optional Grok TTS speech tags (string)"
     }
   ],
   "totalDuration": "Estimated total duration, e.g. 15:00 (string)"
 }
 
-SPEAKERS: Use EXACTLY 2 speakers — "Host" and "Expert". No other speaker names. These map to specific ElevenLabs voice IDs.
+SPEAKERS: Use EXACTLY 2 speakers — "Host" and "Expert". No other speaker names.
 
-ELEVENLABS V3 AUDIO TAGS: Embed audio tags in the "text" field to control speech emotion and delivery. Tags are wrapped in square brackets and placed BEFORE or AFTER the dialogue they modify.
+GROK TTS SPEECH TAGS: Embed speech tags in the "text" field to control delivery, emotion, and vocal expression. There are two kinds of tags:
 
-Available tags:
-- Emotions/delivery: [sad], [excited], [angry], [cheerful], [nervous], [confident], [thoughtful], [surprised], [curious], [sarcastic], [mischievously], [warmly]
-- Non-verbal sounds: [laughs], [sighs], [exhales], [whispers], [giggling], [groaning], [snorts], [crying]
-- Direction/manner: [cautiously], [jumping in], [indecisive], [quizzically], [elated], [amazed]
+INLINE TAGS — placed at the point where the expression naturally occurs:
+- Pauses: [pause], [long-pause], [hum-tune]
+- Laughter: [laugh], [chuckle], [giggle], [cry]
+- Mouth sounds: [tsk], [tongue-click], [lip-smack]
+- Breathing: [breath], [inhale], [exhale], [sigh]
+
+WRAPPING TAGS — wrap around complete phrases (not individual words):
+- Volume: <soft>text</soft>, <whisper>text</whisper>, <loud>text</loud>, <build-intensity>text</build-intensity>, <decrease-intensity>text</decrease-intensity>
+- Pitch/speed: <higher-pitch>text</higher-pitch>, <lower-pitch>text</lower-pitch>, <slow>text</slow>, <fast>text</fast>
+- Style: <sing-song>text</sing-song>, <singing>text</singing>, <laugh-speak>text</laugh-speak>, <emphasis>text</emphasis>
 
 Tag placement examples:
-- Before: "[excited] That's a really fascinating concept!"
-- After: "I can't believe that actually works! [laughs]"
-- Combined: "[curious] Wait, so you're saying... [surprised] that changes EVERYTHING?"
+- Inline: "Really? [laugh] That's incredible!"
+- Wrapping: "<soft>Let me explain this carefully.</soft>"
+- Dramatic timing: "And the answer is... [long-pause] not what you'd expect."
+- Combined styles: "<slow><soft>Goodnight, sleep well.</soft></slow>"
+- With punctuation: "Wait, seriously? [chuckle] <emphasis>That changes everything!</emphasis>"
 
-PUNCTUATION FOR DELIVERY:
-- Ellipses (...) for pauses, hesitation, or adding weight: "So what you're really saying is... this changes everything."
-- CAPITALIZATION for emphasis: "This is NOT what most students expect."
-- Dashes (—) for interruptions or abrupt shifts: "I was thinking about— actually, let me rephrase that."
-
-USAGE GUIDELINES: Use audio tags naturally — do NOT tag every single line. Aim for roughly 30-40% of segments having at least one audio tag. Tags should add genuine emotion and make the podcast feel alive, not robotic or over-produced. Let some lines breathe without any tags.
+USAGE GUIDELINES:
+- Place inline tags where the expression would naturally occur in speech.
+- Use wrapping tags around complete phrases, not single words.
+- Combine tags with punctuation for natural results.
+- Use [pause] or [long-pause] for dramatic timing and emphasis.
+- You can nest wrapping tags for combined effects (e.g., <slow><soft>...</soft></slow>).
+- About 30-40% of segments should use speech tags. Do NOT tag every single line — let some lines breathe without any tags.
+- Tags should add genuine emotion and make the podcast feel alive, not robotic or over-produced.
 
 Structure as a conversational dialogue between Host and Expert. Include an intro, main discussion with 3-5 key segments, and a closing summary. Aim for 10-20 minutes of content.`,
 

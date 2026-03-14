@@ -3,7 +3,7 @@
 //
 // Orchestrates audio generation for a published podcast_script:
 //   1. Reads the podcast script content from the generated_content row
-//   2. Calls ElevenLabs Text-to-Dialogue API (chunked, multi-speaker)
+//   2. Calls Grok TTS API (per-segment, multi-voice)
 //   3. Uploads the MP3 audio to Cloudflare R2
 //   4. Updates the generated_content row with media fields
 // ---------------------------------------------------------------------------
@@ -11,7 +11,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { generatedContent } from "@/database/schema";
-import { generatePodcastAudio } from "./providers/elevenlabs";
+import { generatePodcastAudioGrok } from "./providers/grok-tts";
 import type { PodcastScriptContent } from "./types";
 
 // ── R2 upload config ────────────────────────────────────────────────────────
@@ -102,13 +102,13 @@ export async function generatePodcastAudioForContent(contentId: string): Promise
     );
   }
 
-  // 3. Generate audio via ElevenLabs Text-to-Dialogue API
-  const result = await generatePodcastAudio(script.segments, {
+  // 3. Generate audio via Grok TTS API (per-segment, multi-voice)
+  const result = await generatePodcastAudioGrok(script.segments, {
     language: row.language,
   });
 
   console.log(
-    `[podcast] Audio generated — ${result.totalCharacters} chars, ${result.chunks} chunks`
+    `[podcast] Audio generated — ${result.totalCharacters} chars, ${result.segments} segments`
   );
 
   // 4. Upload to R2
@@ -141,6 +141,6 @@ export async function generatePodcastAudioForContent(contentId: string): Promise
     mediaKey,
     mediaSize,
     totalCharacters: result.totalCharacters,
-    chunks: result.chunks,
+    chunks: result.segments,
   };
 }
