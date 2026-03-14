@@ -55,17 +55,6 @@ export async function complete(
     temperature: request.temperature ?? 0.3,
     ...(systemMessage && { system: systemMessage.content }),
     messages: nonSystemMessages,
-    // Structured outputs — guarantees valid JSON via constrained decoding.
-    // Uses a loose { type: "object" } schema so any JSON object is accepted.
-    // See: https://platform.claude.com/docs/en/build-with-claude/structured-outputs
-    ...(wantsJson && {
-      output_config: {
-        format: {
-          type: "json_schema" as const,
-          schema: { type: "object" },
-        },
-      },
-    }),
   });
 
   let firstTokenMs: number | null = null;
