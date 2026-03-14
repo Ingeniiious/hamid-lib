@@ -40,7 +40,7 @@ const STATIC_TITLES: Record<string, string> = {
 };
 
 const STATIC_DESCS: Record<string, string> = {
-  "create-account": "Sign up with your university email and get instant access to all courses and study materials.",
+  "create-account": "Sign up with your email and get instant access to all courses and study materials.",
   "navigate-dashboard": "Learn how to use the dashboard to find courses, track progress, and manage your studies.",
   "choose-language": "Switch between English, Persian, and Turkish at any time from the settings page.",
   "dark-mode": "Toggle between light and dark themes to match your preference and reduce eye strain.",
