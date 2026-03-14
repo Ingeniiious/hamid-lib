@@ -23,9 +23,11 @@ const GRAIN_SVG =
 function ArticleCard({
   article,
   index,
+  fixedWidth,
 }: {
   article: HelpArticle;
   index: number;
+  fixedWidth?: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -36,7 +38,7 @@ function ArticleCard({
       viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.6, ease, delay: index * 0.08 }}
       whileHover={{ scale: 1.02 }}
-      className="h-full"
+      className={fixedWidth ? "w-full sm:w-80" : "h-full"}
     >
       <Link href={`/help/articles/${article.slug}`} className="block h-full">
         <div className="group relative h-full cursor-pointer overflow-hidden rounded-3xl border border-gray-900/[0.06] bg-white/[0.03] backdrop-blur-sm transition-shadow duration-300 hover:shadow-lg dark:border-white/[0.06] dark:bg-white/[0.02]">
@@ -96,12 +98,19 @@ function CategorySection({
         {t(titleKey)}
       </h2>
 
-      <div className="mx-auto mt-6 grid w-full max-w-5xl auto-rows-[1fr] grid-cols-1 gap-4 sm:mt-8 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
+      <div
+        className={`mx-auto mt-6 w-full max-w-5xl sm:mt-8 ${
+          articles.length <= 2
+            ? "flex flex-col items-center gap-4 sm:flex-row sm:justify-center sm:gap-6"
+            : "grid auto-rows-[1fr] grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3"
+        }`}
+      >
         {articles.map((article, i) => (
           <ArticleCard
             key={article.slug}
             article={article}
             index={i}
+            fixedWidth={articles.length <= 2}
           />
         ))}
       </div>

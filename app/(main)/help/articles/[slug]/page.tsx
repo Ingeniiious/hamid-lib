@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { ALL_ARTICLES, getArticleBySlug } from "@/lib/help-articles";
 import { HelpArticleView } from "@/components/HelpArticleView";
 
-/* ─── Static params for all 24 articles ─── */
+/* ─── Static params for all 19 articles ─── */
 
 export function generateStaticParams() {
   return ALL_ARTICLES.map((a) => ({ slug: a.slug }));
@@ -14,56 +14,46 @@ export function generateStaticParams() {
 // Static English titles for metadata (translations are client-side only)
 const STATIC_TITLES: Record<string, string> = {
   "create-account": "Create Your Account",
+  "university-setup": "Set Up Your University",
+  "personalize": "Personalize Your Experience",
   "navigate-dashboard": "Navigate The Dashboard",
-  "choose-language": "Choose Your Language",
-  "dark-mode": "Dark Mode",
+  "my-space": "My Space",
+  "presentations": "Presentations & Sharing",
+  "support": "Get Support",
   "browse-courses": "Browse Courses",
-  "course-content": "Course Content",
-  "study-materials": "Study Materials",
-  "track-progress": "Track Your Progress",
-  "mock-exams": "Mock Exams",
-  "question-types": "Question Types",
-  "essay-grading": "Essay Grading",
-  "exam-results": "Exam Results",
+  "course-content": "Course Content & Study Materials",
+  "mock-exams": "Mock Exams & Question Types",
+  "grading-and-results": "Grading & Results",
   "how-to-contribute": "How To Contribute",
-  "file-formats": "Supported Formats",
   "moderation-process": "Moderation Process",
   "core-contributor": "Become A Core Contributor",
   "meet-the-teachers": "Meet The Teachers",
   "how-content-is-created": "How Content Is Created",
-  "content-types": "Content Types",
   "challenge-content": "Challenge Content",
-  "find-a-professor": "Find A Professor",
+  "find-a-professor": "Find & Rate Professors",
   "write-a-review": "Write A Review",
-  "verified-reviews": "Verified Reviews",
-  "choose-your-professor": "Choose Your Professor",
 };
 
 const STATIC_DESCS: Record<string, string> = {
   "create-account": "Sign up with your email and get instant access to all courses and study materials.",
+  "university-setup": "Select your university, faculty, and program to see courses relevant to your studies.",
+  "personalize": "Choose your language and theme to make Libraryyy feel like home.",
   "navigate-dashboard": "Learn how to use the dashboard to find courses, track progress, and manage your studies.",
-  "choose-language": "Switch between English, Persian, and Turkish at any time from the settings page.",
-  "dark-mode": "Toggle between light and dark themes to match your preference and reduce eye strain.",
+  "my-space": "Your personal workspace for notes, mind maps, and task tracking.",
+  "presentations": "Upload presentations and share them instantly using portal codes.",
+  "support": "Submit a support ticket and get help from the Libraryyy team.",
   "browse-courses": "Find courses by faculty, search by name, and explore what's available for your major.",
-  "course-content": "Each course has teaching materials, presentations, and practice exams — all created by our teachers.",
-  "study-materials": "Access study guides, flashcards, mind maps, and more — original content verified by our teaching council.",
-  "track-progress": "See your scores, improvement over time, and compare your performance across different courses.",
-  "mock-exams": "Take unique mock exams created by our teachers. At least 5 unique versions per course, with more on request.",
-  "question-types": "Multiple choice, essay, mathematical equations — our exams cover every format your university uses.",
-  "essay-grading": "Submit essay answers and receive detailed feedback from our teaching council within minutes.",
-  "exam-results": "Get instant scores with detailed breakdowns. Track your improvement and identify weak areas.",
-  "how-to-contribute": "Upload your course documents to help build the library. Your contributions help thousands of students.",
-  "file-formats": "We accept PDF, DOCX, PPTX, images, and even handwritten notes — our system handles them all.",
+  "course-content": "Teaching materials, study guides, flashcards, and 12 content types — all created by our AI teachers.",
+  "mock-exams": "Practice with seven question formats — multiple choice, essay, math, and more — graded instantly.",
+  "grading-and-results": "AI-powered grading with detailed feedback and score tracking for every exam attempt.",
+  "how-to-contribute": "Upload your course documents in any format to help build the library for thousands of students.",
   "moderation-process": "Every contribution is reviewed and verified before being used to create original study content.",
   "core-contributor": "Professors and active contributors can earn Core Contributor status with priority moderation.",
-  "meet-the-teachers": "Our teaching council is a team of 5 specialized teachers who create, review, and verify all content.",
-  "how-content-is-created": "Student contributions go through a 5-step review process. Each teacher independently verifies the content.",
-  "content-types": "Study guides, flashcards, quizzes, podcasts, mind maps, infographics — our teachers create it all.",
+  "meet-the-teachers": "Our teaching council is a team of 5 specialized AI teachers who create, review, and verify all content.",
+  "how-content-is-created": "Student contributions go through a 5-step review process producing 12 types of study content.",
   "challenge-content": "Found an error? Challenge any published content and our teaching council will re-evaluate it.",
-  "find-a-professor": "Search for professors by name, university, or course. See ratings and reviews from verified students.",
-  "write-a-review": "Rate your professors on quality, difficulty, and more. All reviews are anonymous and moderated.",
-  "verified-reviews": "Only students who attended a professor's class can submit reviews — ensuring authentic feedback.",
-  "choose-your-professor": "Use ratings and reviews to make informed decisions when choosing classes and professors.",
+  "find-a-professor": "Search professors by name, read reviews, compare ratings, and plan your semester strategically.",
+  "write-a-review": "Rate professors anonymously with verified reviews — only real students can submit feedback.",
 };
 
 export async function generateMetadata({

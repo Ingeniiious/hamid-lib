@@ -4,11 +4,27 @@ import { StudyGuideRenderer } from "./StudyGuideRenderer";
 import { FlashcardRenderer } from "./FlashcardRenderer";
 import { QuizRenderer } from "./QuizRenderer";
 import { MockExamRenderer } from "./MockExamRenderer";
+import { DataTableRenderer } from "./DataTableRenderer";
+import { SlideRenderer } from "./SlideRenderer";
+import { ReportRenderer } from "./ReportRenderer";
+import { PodcastScriptRenderer } from "./PodcastScriptRenderer";
+import { VideoScriptRenderer } from "./VideoScriptRenderer";
+import { MindMapRenderer } from "./MindMapRenderer";
+import { InfographicRenderer } from "./InfographicRenderer";
+import { InteractiveSectionRenderer } from "./InteractiveSectionRenderer";
 import type {
   StudyGuideContent,
   FlashcardContent,
   QuizContent,
   MockExamContent,
+  DataTableContent,
+  SlideContent,
+  ReportContent,
+  PodcastScriptContent,
+  VideoScriptContent,
+  MindMapContent,
+  InfographicContent,
+  InteractiveSectionContent,
 } from "@/lib/ai/types";
 
 export interface ContentRendererProps {
@@ -16,6 +32,7 @@ export interface ContentRendererProps {
   content: Record<string, unknown>;
   contentId?: string;
   mode?: "preview" | "interactive";
+  mediaUrl?: string | null;
 }
 
 export function ContentRenderer({
@@ -23,6 +40,7 @@ export function ContentRenderer({
   content,
   contentId,
   mode = "interactive",
+  mediaUrl,
 }: ContentRendererProps) {
   switch (contentType) {
     case "study_guide":
@@ -49,6 +67,57 @@ export function ContentRenderer({
           content={content as unknown as MockExamContent}
           contentId={contentId}
           mode={mode}
+        />
+      );
+
+    case "data_table":
+      return (
+        <DataTableRenderer
+          content={content as unknown as DataTableContent}
+        />
+      );
+
+    case "slide_deck":
+      return (
+        <SlideRenderer content={content as unknown as SlideContent} />
+      );
+
+    case "report":
+      return (
+        <ReportRenderer content={content as unknown as ReportContent} />
+      );
+
+    case "podcast_script":
+      return (
+        <PodcastScriptRenderer
+          content={content as unknown as PodcastScriptContent}
+          mediaUrl={mediaUrl}
+        />
+      );
+
+    case "video_script":
+      return (
+        <VideoScriptRenderer
+          content={content as unknown as VideoScriptContent}
+        />
+      );
+
+    case "mind_map":
+      return (
+        <MindMapRenderer content={content as unknown as MindMapContent} />
+      );
+
+    case "infographic_data":
+      return (
+        <InfographicRenderer
+          content={content as unknown as InfographicContent}
+        />
+      );
+
+    case "interactive_section":
+      return (
+        <InteractiveSectionRenderer
+          content={content as unknown as InteractiveSectionContent}
         />
       );
 

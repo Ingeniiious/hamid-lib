@@ -62,6 +62,8 @@ export interface AIMessage {
 
 export interface AICompletionRequest {
   model: ModelSlug;
+  /** Provider-specific model ID (e.g. "claude-sonnet-4-6"). Read from ai_model_config DB table. */
+  modelId?: string;
   messages: AIMessage[];
   temperature?: number;
   maxTokens?: number;

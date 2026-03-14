@@ -179,13 +179,35 @@ Generate 10-20 slides. Start with a title slide, end with a summary/Q&A slide. K
   "segments": [
     {
       "timestamp": "MM:SS format (string)",
-      "speaker": "Speaker name or role, e.g. Host, Expert, Student (string)",
-      "text": "What the speaker says (string)"
+      "speaker": "Host or Expert (string — ALWAYS use exactly these two speakers)",
+      "text": "What the speaker says, with optional ElevenLabs v3 audio tags (string)"
     }
   ],
   "totalDuration": "Estimated total duration, e.g. 15:00 (string)"
 }
-Structure as a conversational dialogue. Include an intro, main discussion with 3-5 key segments, and a closing summary. Aim for 10-20 minutes of content.`,
+
+SPEAKERS: Use EXACTLY 2 speakers — "Host" and "Expert". No other speaker names. These map to specific ElevenLabs voice IDs.
+
+ELEVENLABS V3 AUDIO TAGS: Embed audio tags in the "text" field to control speech emotion and delivery. Tags are wrapped in square brackets and placed BEFORE or AFTER the dialogue they modify.
+
+Available tags:
+- Emotions/delivery: [sad], [excited], [angry], [cheerful], [nervous], [confident], [thoughtful], [surprised], [curious], [sarcastic], [mischievously], [warmly]
+- Non-verbal sounds: [laughs], [sighs], [exhales], [whispers], [giggling], [groaning], [snorts], [crying]
+- Direction/manner: [cautiously], [jumping in], [indecisive], [quizzically], [elated], [amazed]
+
+Tag placement examples:
+- Before: "[excited] That's a really fascinating concept!"
+- After: "I can't believe that actually works! [laughs]"
+- Combined: "[curious] Wait, so you're saying... [surprised] that changes EVERYTHING?"
+
+PUNCTUATION FOR DELIVERY:
+- Ellipses (...) for pauses, hesitation, or adding weight: "So what you're really saying is... this changes everything."
+- CAPITALIZATION for emphasis: "This is NOT what most students expect."
+- Dashes (—) for interruptions or abrupt shifts: "I was thinking about— actually, let me rephrase that."
+
+USAGE GUIDELINES: Use audio tags naturally — do NOT tag every single line. Aim for roughly 30-40% of segments having at least one audio tag. Tags should add genuine emotion and make the podcast feel alive, not robotic or over-produced. Let some lines breathe without any tags.
+
+Structure as a conversational dialogue between Host and Expert. Include an intro, main discussion with 3-5 key segments, and a closing summary. Aim for 10-20 minutes of content.`,
 
   video_script: `{
   "scenes": [

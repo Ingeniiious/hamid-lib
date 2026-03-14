@@ -24,7 +24,7 @@ export async function complete(
   const ai = getClient();
 
   const response = await ai.chat.completions.create({
-    model: "grok-4.20-beta-0309-non-reasoning",
+    model: request.modelId ?? "grok-4.20-beta-0309-non-reasoning",
     messages: request.messages.map((m) => ({
       role: m.role,
       content: m.content,

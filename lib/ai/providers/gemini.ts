@@ -32,7 +32,7 @@ export async function complete(
   }
 
   const model = ai.getGenerativeModel({
-    model: "gemini-3.1-pro-preview",
+    model: request.modelId ?? "gemini-3.1-pro-preview",
     ...(systemMessage && { systemInstruction: systemMessage.content }),
     generationConfig: {
       temperature: request.temperature ?? 0.1,

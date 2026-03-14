@@ -2,12 +2,54 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useTranslation } from "@/lib/i18n";
 import { PageHeader } from "@/components/PageHeader";
 import { getArticleBySlug, HELP_CATEGORIES } from "@/lib/help-articles";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 const R2 = "https://lib.thevibecodedcompany.com/images";
+
+/* ─── Lazy-loaded demo components per article ─── */
+
+const SignUpDemo = dynamic(() => import("@/components/help/SignUpDemo").then((m) => ({ default: m.SignUpDemo })), { ssr: false });
+const UniversitySetupDemo = dynamic(() => import("@/components/help/UniversitySetupDemo").then((m) => ({ default: m.UniversitySetupDemo })), { ssr: false });
+const PersonalizeDemo = dynamic(() => import("@/components/help/PersonalizeDemo").then((m) => ({ default: m.PersonalizeDemo })), { ssr: false });
+const BrowseDemo = dynamic(() => import("@/components/help/BrowseDemo").then((m) => ({ default: m.BrowseDemo })), { ssr: false });
+const MySpaceDemo = dynamic(() => import("@/components/help/MySpaceDemo").then((m) => ({ default: m.MySpaceDemo })), { ssr: false });
+const PresentationsDemo = dynamic(() => import("@/components/help/PresentationsDemo").then((m) => ({ default: m.PresentationsDemo })), { ssr: false });
+const SupportDemo = dynamic(() => import("@/components/help/SupportDemo").then((m) => ({ default: m.SupportDemo })), { ssr: false });
+const ExamDemo = dynamic(() => import("@/components/help/ExamDemo").then((m) => ({ default: m.ExamDemo })), { ssr: false });
+const ContributeDemo = dynamic(() => import("@/components/help/ContributeDemo").then((m) => ({ default: m.ContributeDemo })), { ssr: false });
+const ModerationDemo = dynamic(() => import("@/components/help/ModerationDemo").then((m) => ({ default: m.ModerationDemo })), { ssr: false });
+const CoreContributorDemo = dynamic(() => import("@/components/help/CoreContributorDemo").then((m) => ({ default: m.CoreContributorDemo })), { ssr: false });
+const AICouncilDemo = dynamic(() => import("@/components/help/AICouncilDemo").then((m) => ({ default: m.AICouncilDemo })), { ssr: false });
+const ChallengeContentDemo = dynamic(() => import("@/components/help/ChallengeContentDemo").then((m) => ({ default: m.ChallengeContentDemo })), { ssr: false });
+const RateProfessorDemo = dynamic(() => import("@/components/help/RateProfessorDemo").then((m) => ({ default: m.RateProfessorDemo })), { ssr: false });
+const PortalDemo = dynamic(() => import("@/components/help/PortalDemo").then((m) => ({ default: m.PortalDemo })), { ssr: false });
+
+const SLUG_DEMO: Record<string, React.ComponentType> = {
+  "create-account": SignUpDemo,
+  "university-setup": UniversitySetupDemo,
+  "personalize": PersonalizeDemo,
+  "navigate-dashboard": BrowseDemo,
+  "my-space": MySpaceDemo,
+  "presentations": PresentationsDemo,
+  "portal": PortalDemo,
+  "support": SupportDemo,
+  "browse-courses": BrowseDemo,
+  "course-content": BrowseDemo,
+  "mock-exams": ExamDemo,
+  "grading-and-results": ExamDemo,
+  "how-to-contribute": ContributeDemo,
+  "moderation-process": ModerationDemo,
+  "core-contributor": CoreContributorDemo,
+  "meet-the-teachers": AICouncilDemo,
+  "how-content-is-created": AICouncilDemo,
+  "challenge-content": ChallengeContentDemo,
+  "find-a-professor": RateProfessorDemo,
+  "write-a-review": RateProfessorDemo,
+};
 
 /* ─── Hover overlays (same as FeatureCard) ─── */
 
@@ -69,6 +111,21 @@ export function HelpArticleView({ slug }: { slug: string }) {
               </span>
             </motion.div>
 
+            {/* Demo animation */}
+            {SLUG_DEMO[slug] && (() => {
+              const Demo = SLUG_DEMO[slug];
+              return (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.6, delay: 0.1, ease }}
+                  className="mx-auto mt-8 max-w-md"
+                >
+                  <Demo />
+                </motion.div>
+              );
+            })()}
+
             {/* Article body — glass card */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -104,7 +161,13 @@ export function HelpArticleView({ slug }: { slug: string }) {
                   {t("helpArticles.relatedArticles")}
                 </h3>
 
-                <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div
+                  className={`mt-6 ${
+                    siblings.length <= 2
+                      ? "flex flex-col items-center gap-3 sm:flex-row sm:justify-center"
+                      : "grid grid-cols-1 gap-3 sm:grid-cols-3"
+                  }`}
+                >
                   {siblings.map((a, i) => (
                     <motion.div
                       key={a.slug}
@@ -112,7 +175,7 @@ export function HelpArticleView({ slug }: { slug: string }) {
                       animate={{ opacity: 1 }}
                       transition={{ duration: 0.5, delay: 0.4 + i * 0.1, ease }}
                       whileHover={{ scale: 1.02 }}
-                      className="h-full"
+                      className={siblings.length <= 2 ? "w-full sm:w-56" : "h-full"}
                     >
                       <Link
                         href={`/help/articles/${a.slug}`}

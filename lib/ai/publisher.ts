@@ -210,7 +210,7 @@ export async function createGenerationSteps(jobId: string): Promise<number> {
 export async function processGenerationStep(
   step: typeof pipelineStep.$inferSelect,
   job: typeof pipelineJob.$inferSelect,
-  config: { slug: string; maxOutputTokens: number; costPerInputToken: number; costPerOutputToken: number; config: Record<string, unknown> | null }
+  config: { slug: string; modelId: string; maxOutputTokens: number; costPerInputToken: number; costPerOutputToken: number; config: Record<string, unknown> | null }
 ): Promise<{
   inputTokens: number;
   outputTokens: number;
@@ -247,6 +247,7 @@ export async function processGenerationStep(
   // Call AI
   const response = await complete({
     model: config.slug as ModelSlug,
+    modelId: config.modelId,
     messages: [
       { role: "system", content: prompt.system },
       { role: "user", content: prompt.user },

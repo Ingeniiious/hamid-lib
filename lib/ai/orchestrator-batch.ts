@@ -609,6 +609,7 @@ export async function processNextStep(): Promise<{
       const genResult = await Promise.race([
         processGenerationStep(step, job, {
           slug: config.slug,
+          modelId: config.modelId,
           maxOutputTokens: config.maxOutputTokens,
           costPerInputToken: config.costPerInputToken,
           costPerOutputToken: config.costPerOutputToken,
@@ -766,6 +767,7 @@ export async function processNextStep(): Promise<{
         config.slug,
         {
           model: config.slug,
+          modelId: config.modelId,
           messages,
           temperature: (config.config?.temperature as number | undefined) ?? 0.4,
           maxTokens: config.maxOutputTokens,
@@ -804,6 +806,7 @@ export async function processNextStep(): Promise<{
     const response = await Promise.race([
       complete({
         model: config.slug,
+        modelId: config.modelId,
         messages,
         temperature: (config.config?.temperature as number | undefined) ?? 0.4,
         maxTokens: config.maxOutputTokens,
@@ -911,6 +914,7 @@ export async function processGenerationBatch(): Promise<{
         const genResult = await Promise.race([
           processGenerationStep(step, job, {
             slug: config.slug,
+            modelId: config.modelId,
             maxOutputTokens: config.maxOutputTokens,
             costPerInputToken: config.costPerInputToken,
             costPerOutputToken: config.costPerOutputToken,

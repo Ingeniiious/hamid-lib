@@ -29,7 +29,7 @@ export async function complete(
   // max_tokens is DEPRECATED — use max_completion_tokens instead.
   // Context window: 262,144 tokens. Output default: 1024 if not specified.
   const body = {
-    model: "kimi-k2.5",
+    model: request.modelId ?? "kimi-k2.5",
     messages: request.messages.map((m) => ({
       role: m.role,
       content: m.content,

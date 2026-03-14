@@ -594,6 +594,14 @@ export function HelpContent() {
             title={t("help.title")}
             subtitle={t("help.subtitle")}
           />
+          <div className="mt-6 flex justify-center">
+            <Link
+              href="/help/articles"
+              className="inline-block rounded-full bg-[#5227FF] px-8 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90"
+            >
+              {t("helpArticles.viewAllArticles")}
+            </Link>
+          </div>
         </div>
 
         {/* Scrollable content */}

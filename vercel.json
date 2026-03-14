@@ -12,6 +12,10 @@
     {
       "path": "/api/cron/extraction",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/podcast-audio",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

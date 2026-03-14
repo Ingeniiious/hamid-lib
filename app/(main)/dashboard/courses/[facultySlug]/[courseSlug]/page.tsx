@@ -1,8 +1,8 @@
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { course, faculty, userProfile } from "@/database/schema";
+import { course, faculty, userProfile, generatedContent, contentTranslation } from "@/database/schema";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { BackButton } from "@/components/BackButton";
 import { PageHeader } from "@/components/PageHeader";
 import { CourseDetail } from "@/components/CourseDetail";
@@ -74,9 +74,48 @@ export default async function CoursePage({ params }: Props) {
     .where(eq(faculty.slug, facultySlug))
     .then((rows) => rows[0]);
 
-  // Check if user is a contributor + subscription status
+  // Fetch published content + user info in parallel
   let isContributor = false;
   let subscribed = false;
+
+  const publishedContentRows = await db
+    .select()
+    .from(generatedContent)
+    .where(
+      and(
+        eq(generatedContent.courseId, c.id),
+        eq(generatedContent.isPublished, true),
+      ),
+    )
+    .orderBy(generatedContent.contentType, generatedContent.displayOrder, generatedContent.createdAt);
+
+  // Fetch completed translations for all published content
+  const contentIds = publishedContentRows.map((r) => r.id);
+  const translationRows = contentIds.length > 0
+    ? await db
+        .select()
+        .from(contentTranslation)
+        .where(
+          and(
+            inArray(contentTranslation.contentId, contentIds),
+            eq(contentTranslation.status, "completed"),
+          ),
+        )
+    : [];
+
+  // Group translations by contentId
+  const availableTranslations: Record<string, { language: string; content: unknown; title: string }[]> = {};
+  for (const t of translationRows) {
+    if (!availableTranslations[t.contentId]) {
+      availableTranslations[t.contentId] = [];
+    }
+    availableTranslations[t.contentId].push({
+      language: t.targetLanguage,
+      content: t.content ?? t.richText,
+      title: t.title,
+    });
+  }
+
   try {
     const { data: session } = await auth.getSession();
     if (session?.user?.id) {
@@ -111,7 +150,14 @@ export default async function CoursePage({ params }: Props) {
         }}
       >
         <div className="mx-auto max-w-5xl pt-8">
-          <CourseDetail course={c} isContributor={isContributor} facultySlug={facultySlug} initialSubscribed={subscribed} />
+          <CourseDetail
+            course={c}
+            isContributor={isContributor}
+            facultySlug={facultySlug}
+            initialSubscribed={subscribed}
+            publishedContent={publishedContentRows}
+            availableTranslations={availableTranslations}
+          />
         </div>
       </div>
       <BackButton

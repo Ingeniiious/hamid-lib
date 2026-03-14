@@ -41,16 +41,18 @@ export async function complete(
 
   const wantsJson = request.responseFormat === "json";
 
+  const modelId = request.modelId ?? "claude-sonnet-4-6";
+
   const t0 = Date.now();
   const inputCharCount = nonSystemMessages.reduce((s, m) => s + m.content.length, 0) + (systemMessage?.content.length ?? 0);
-  console.log(`[anthropic] Starting stream — model=${request.maxTokens ?? 16384} max_tokens, ~${inputCharCount} input chars, json=${wantsJson}`);
+  console.log(`[anthropic] Starting stream — model=${modelId}, max_tokens=${request.maxTokens ?? 16384}, ~${inputCharCount} input chars, json=${wantsJson}`);
 
   // Use streaming + finalMessage() to prevent HTTP timeouts.
   // Non-streaming requests sit idle while Claude generates — the SDK sees
   // zero data flowing and fires "Request timed out." even though Claude is
   // working fine. Streaming keeps the connection alive with incremental data.
   const stream = ai.messages.stream({
-    model: "claude-opus-4-6",
+    model: modelId,
     max_tokens: request.maxTokens ?? 16384,
     temperature: request.temperature ?? 0.3,
     ...(systemMessage && { system: systemMessage.content }),

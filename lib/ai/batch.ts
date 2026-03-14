@@ -118,7 +118,7 @@ async function submitOpenAI(
 
   // Build the single JSONL request line
   const body: Record<string, unknown> = {
-    model: "gpt-5.4",
+    model: request.modelId ?? "gpt-5.4",
     messages: request.messages.map((m) => ({
       role: m.role === "system" ? "developer" : m.role,
       content: m.content,
@@ -179,7 +179,7 @@ async function submitAnthropic(
       {
         custom_id: customId,
         params: {
-          model: "claude-opus-4-6",
+          model: request.modelId ?? "claude-sonnet-4-6",
           max_tokens: request.maxTokens ?? 16384,
           temperature: request.temperature ?? 0.3,
           ...(systemMessage && { system: systemMessage.content }),
@@ -328,7 +328,7 @@ async function checkAnthropic(batchId: string): Promise<BatchCheckResult> {
           content,
           inputTokens: msg.usage?.input_tokens ?? 0,
           outputTokens: msg.usage?.output_tokens ?? 0,
-          modelId: msg.model ?? "claude-opus-4-6",
+          modelId: msg.model ?? "claude-sonnet-4-6",
           finishReason: msg.stop_reason ?? "unknown",
         },
       };
@@ -369,7 +369,7 @@ async function submitGemini(
   const wantsJson = request.responseFormat === "json";
 
   const batchJob = await ai.batches.create({
-    model: "gemini-3.1-pro-preview",
+    model: request.modelId ?? "gemini-3.1-pro-preview",
     src: [
       {
         contents: chatMessages,
@@ -488,7 +488,7 @@ async function submitGrok(
   const ai = getGrok();
 
   const body: Record<string, unknown> = {
-    model: "grok-4.20-beta-0309-non-reasoning",
+    model: request.modelId ?? "grok-4.20-beta-0309-non-reasoning",
     messages: request.messages.map((m) => ({
       role: m.role,
       content: m.content,

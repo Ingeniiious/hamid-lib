@@ -30,7 +30,7 @@ export async function complete(
   }));
 
   const response = await ai.chat.completions.create({
-    model: "gpt-5.4",
+    model: request.modelId ?? "gpt-5.4",
     messages,
     temperature: request.temperature ?? 0.2,
     // max_tokens is DEPRECATED and incompatible with o-series models — use max_completion_tokens
