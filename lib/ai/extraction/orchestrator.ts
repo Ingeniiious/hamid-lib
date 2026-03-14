@@ -814,7 +814,8 @@ async function autoCreatePipelineJob(
 
     // Resolve output types — use the types stored on the extraction job,
     // or fall back to defaults if not specified (e.g. production contributions)
-    const DEFAULT_OUTPUT_TYPES = ["study_guide", "flashcards", "quiz"];
+    const { ALL_CONTENT_TYPES } = await import("@/lib/ai/types");
+    const DEFAULT_OUTPUT_TYPES = ALL_CONTENT_TYPES;
     const storedTypes = completedJobs
       .map((j) => j.outputTypes)
       .find((t) => Array.isArray(t) && t.length > 0) as string[] | undefined;

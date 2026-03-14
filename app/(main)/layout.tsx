@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LanguagePicker } from "@/components/LanguagePicker";
 
 const Grainient = dynamic(() => import("@/components/Grainient"), {
   ssr: false,
@@ -40,9 +41,10 @@ export default function MainLayout({
         {children}
       </div>
 
-      {/* Theme toggle — top-right, only on non-dashboard/admin pages */}
+      {/* Language picker + Theme toggle — top-right, only on non-dashboard/admin pages */}
       {!isDashboard && !isAdmin && (
-        <div className="absolute right-6 top-6 z-20 sm:right-8 sm:top-8">
+        <div className="absolute right-6 top-6 z-20 flex items-center gap-1 sm:right-8 sm:top-8">
+          <LanguagePicker />
           <ThemeToggle />
         </div>
       )}

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useRef, useTransition } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   subscribeToCourse,
   unsubscribeFromCourse,
@@ -10,7 +10,13 @@ import {
 } from "@/lib/subscriptions";
 import { useTranslation } from "@/lib/i18n";
 
-const EASE = [0.25, 0.46, 0.45, 0.94] as const;
+const SPRING = {
+  type: "spring" as const,
+  stiffness: 600,
+  damping: 30,
+};
+
+type ButtonState = "follow" | "following" | "unfollow";
 
 export default function SubscribeButton({
   entityType,
@@ -46,11 +52,17 @@ export default function SubscribeButton({
     });
   };
 
-  const label = subscribed
+  const state: ButtonState = subscribed
     ? hovering
-      ? t("subscriptions.unfollow")
-      : t("subscriptions.following")
-    : t("subscriptions.follow");
+      ? "unfollow"
+      : "following"
+    : "follow";
+
+  const labels: Record<ButtonState, string> = {
+    follow: t("subscriptions.follow"),
+    following: t("subscriptions.following"),
+    unfollow: t("subscriptions.unfollow"),
+  };
 
   return (
     <motion.button
@@ -58,22 +70,69 @@ export default function SubscribeButton({
       disabled={isPending}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ ease: EASE, duration: 0.2 }}
+      whileTap={{ scale: 0.97 }}
       className={`
-        rounded-full px-5 py-2 text-sm font-medium transition-colors duration-200
-        disabled:opacity-50
+        relative rounded-full text-sm font-medium overflow-hidden disabled:opacity-50
+        transition-colors duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
+        hover:scale-[1.02]
         ${
           subscribed
             ? hovering
               ? "bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800"
-              : "bg-[#5227FF] text-white"
-            : "bg-transparent text-[#5227FF] border border-[#5227FF] hover:bg-[#5227FF]/10"
+              : "bg-[#5227FF] text-white border border-transparent"
+            : "bg-transparent text-[#5227FF] border border-[#5227FF]"
         }
       `}
     >
-      {label}
+      <SmoothLabel state={state} labels={labels} />
     </motion.button>
+  );
+}
+
+/** Measures the next label and spring-animates the button's inner size. */
+function SmoothLabel({
+  state,
+  labels,
+}: {
+  state: ButtonState;
+  labels: Record<ButtonState, string>;
+}) {
+  const [width, setWidth] = useState<number | "auto">("auto");
+  const measureRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (measureRef.current) {
+      setWidth(measureRef.current.getBoundingClientRect().width);
+    }
+  }, [state, labels]);
+
+  return (
+    <span className="relative flex items-center justify-center" style={{ padding: "8px 20px" }}>
+      {/* Invisible measurer */}
+      <span ref={measureRef} className="absolute invisible whitespace-nowrap text-sm font-medium">
+        {labels[state]}
+      </span>
+
+      {/* Animated width container */}
+      <motion.span
+        animate={{ width: typeof width === "number" ? width : undefined }}
+        transition={SPRING}
+        className="relative block overflow-hidden"
+        style={{ height: 20 }}
+      >
+        <AnimatePresence mode="sync" initial={false}>
+          <motion.span
+            key={state}
+            className="whitespace-nowrap text-sm font-medium text-current"
+            initial={{ y: -14, opacity: 0, filter: "blur(6px)", position: "absolute" }}
+            animate={{ y: 0, opacity: 1, filter: "blur(0px)", position: "relative" }}
+            exit={{ y: 14, opacity: 0, filter: "blur(6px)", position: "absolute" }}
+            transition={{ duration: 0.18, ease: "easeInOut" }}
+          >
+            {labels[state]}
+          </motion.span>
+        </AnimatePresence>
+      </motion.span>
+    </span>
   );
 }

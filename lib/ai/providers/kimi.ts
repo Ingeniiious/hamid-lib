@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import type { ChatCompletionCreateParamsNonStreaming } from "openai/resources/chat/completions";
 import type { AICompletionRequest, AICompletionResponse } from "../types";
 
 // Lazy-init client — only created on first call (env vars aren't available at build time on Vercel)
@@ -43,18 +42,67 @@ export async function complete(
     thinking: { type: "disabled" },
   };
 
-  // Cast to bypass OpenAI SDK type constraints on the `thinking` extension field
-  const response = await ai.chat.completions.create(
-    body as unknown as ChatCompletionCreateParamsNonStreaming
+  const t0 = Date.now();
+  const inputCharCount = request.messages.reduce((s, m) => s + m.content.length, 0);
+  console.log(`[kimi] Starting stream — model=kimi-k2.5, max_tokens=${request.maxTokens ?? 32768}, ~${inputCharCount} input chars, json=${request.responseFormat === "json"}`);
+
+  // Use streaming to prevent HTTP connection idle timeouts.
+  // Non-streaming requests sit idle while Kimi generates — the connection gets
+  // killed by intermediate proxies/infrastructure after 30-60s of no data flowing,
+  // even though Kimi is still working fine. Streaming keeps the connection alive
+  // with incremental data chunks (same fix applied to Claude provider).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stream = (await ai.chat.completions.create({
+    ...body,
+    stream: true,
+    stream_options: { include_usage: true },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any)) as unknown as AsyncIterable<any>;
+
+  let content = "";
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let modelId = "kimi-k2.5";
+  let finishReason = "unknown";
+  let firstTokenMs: number | null = null;
+  let chunkCount = 0;
+
+  for await (const chunk of stream) {
+    chunkCount++;
+    if (!firstTokenMs) {
+      firstTokenMs = Date.now() - t0;
+      console.log(`[kimi] First token at ${firstTokenMs}ms`);
+    }
+
+    const choice = chunk.choices?.[0];
+    if (choice?.delta?.content) {
+      content += choice.delta.content;
+    }
+    if (choice?.finish_reason) {
+      finishReason = choice.finish_reason;
+    }
+
+    // Usage comes in the final chunk when stream_options.include_usage is set
+    if (chunk.usage) {
+      inputTokens = chunk.usage.prompt_tokens ?? 0;
+      outputTokens = chunk.usage.completion_tokens ?? 0;
+    }
+    if (chunk.model) {
+      modelId = chunk.model;
+    }
+  }
+
+  const totalMs = Date.now() - t0;
+  console.log(
+    `[kimi] Done in ${totalMs}ms — first_token=${firstTokenMs ?? "never"}ms, ` +
+    `chunks=${chunkCount}, in=${inputTokens}, out=${outputTokens}, stop=${finishReason}`
   );
 
-  const choice = response.choices[0];
-
   return {
-    content: choice?.message?.content ?? "",
-    inputTokens: response.usage?.prompt_tokens ?? 0,
-    outputTokens: response.usage?.completion_tokens ?? 0,
-    modelId: response.model,
-    finishReason: choice?.finish_reason ?? "unknown",
+    content,
+    inputTokens,
+    outputTokens,
+    modelId,
+    finishReason,
   };
 }

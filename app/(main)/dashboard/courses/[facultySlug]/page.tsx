@@ -21,17 +21,32 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!fac) return { title: "Faculty Not Found", robots: { index: false } };
 
+  const description = `Browse ${fac.name} courses on Libraryyy`;
+
   return {
     title: fac.name,
-    description: `${fac.name} courses on Libraryyy`,
+    description,
     openGraph: {
       title: `${fac.name} | Libraryyy`,
-      description: `Browse ${fac.name} courses`,
+      description,
+      url: `/dashboard/courses/${facultySlug}`,
+      siteName: "Libraryyy",
+      type: "website",
+      images: [
+        {
+          url: "/og-image.jpg",
+          width: 1200,
+          height: 630,
+          alt: `${fac.name} — Libraryyy`,
+          type: "image/jpeg",
+        },
+      ],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title: `${fac.name} | Libraryyy`,
-      description: `Browse ${fac.name} courses`,
+      description,
+      images: ["/og-image.jpg"],
     },
   };
 }

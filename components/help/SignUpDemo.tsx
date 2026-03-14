@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, type RefObject } from "react";
 import { motion, AnimatePresence, useInView, useAnimate } from "framer-motion";
 import dynamic from "next/dynamic";
+import ConfettiBurst from "@/components/ConfettiBurst";
 
 const Grainient = dynamic(() => import("@/components/Grainient"), {
   ssr: false,
@@ -30,7 +31,7 @@ function getElPos(
   return { x, y };
 }
 
-type Scene = "landing" | "auth" | "otp" | "success";
+type Scene = "landing" | "auth" | "otp" | "confetti" | "dashboard";
 
 /* ─── Main component ─── */
 
@@ -62,6 +63,7 @@ export function SignUpDemo() {
   const [activeField, setActiveField] = useState<string | null>(null);
   const [showUnderline, setShowUnderline] = useState(false);
   const [btnPressed, setBtnPressed] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   /* Blinking text cursor */
   const [blink, setBlink] = useState(true);
@@ -135,6 +137,7 @@ export function SignUpDemo() {
       setActiveField(null);
       setShowUnderline(false);
       setBtnPressed(false);
+      setShowConfetti(false);
 
       if (!cursorScope.current) return;
 
@@ -267,16 +270,24 @@ export function SignUpDemo() {
       setBtnPressed(false);
       await pause(500);
 
-      /* ── SCENE 4: Success ── */
-      setScene("success");
+      /* ── SCENE 4: Confetti burst (stays on OTP card) ── */
+      setScene("confetti");
+      setShowConfetti(true);
 
-      // Fade cursor out
-      await animateCursor(
-        cursorScope.current,
-        { opacity: 0 },
-        { duration: 0.5, ease: [0.16, 1, 0.3, 1] }
-      );
+      // Fade cursor out during confetti
+      if (cursorScope.current) {
+        animateCursor(
+          cursorScope.current,
+          { opacity: 0 },
+          { duration: 0.4, ease: [0.16, 1, 0.3, 1] }
+        );
+      }
+      await pause(2200);
       if (cancelled) return;
+
+      /* ── SCENE 5: Dashboard (redirect destination) ── */
+      setShowConfetti(false);
+      setScene("dashboard");
       await pause(3000);
 
       // Loop
@@ -505,7 +516,7 @@ export function SignUpDemo() {
           )}
 
           {/* ── OTP verification ── */}
-          {scene === "otp" && (
+          {(scene === "otp" || scene === "confetti") && (
             <motion.div
               key="otp"
               initial={{ opacity: 0 }}
@@ -528,31 +539,35 @@ export function SignUpDemo() {
                   sarah@uni.edu
                 </div>
 
-                {/* OTP boxes */}
+                {/* OTP — connected bar (matches real InputOTPGroup) */}
                 <div
                   ref={otpAreaRef}
-                  className="mt-6 flex items-center justify-center gap-[6px]"
+                  className="mt-6 flex items-center justify-center"
                 >
-                  {otpDigits.map((digit, i) => (
-                    <div
-                      key={i}
-                      className={`flex h-[36px] w-[32px] items-center justify-center rounded-lg border text-[14px] font-medium text-white transition-colors duration-150 ${
-                        digit
-                          ? "border-white/40 bg-white/15"
-                          : "border-white/20 bg-white/10"
-                      }`}
-                    >
-                      {digit && (
-                        <motion.span
-                          initial={{ opacity: 0, scale: 0.5 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ duration: 0.15 }}
-                        >
-                          {digit}
-                        </motion.span>
-                      )}
-                    </div>
-                  ))}
+                  <div className="flex items-center">
+                    {otpDigits.map((digit, i) => (
+                      <div
+                        key={i}
+                        className={`flex h-[32px] w-[30px] items-center justify-center border-y border-r text-[13px] font-medium text-white transition-colors duration-150 ${
+                          i === 0 ? "rounded-l-md border-l" : ""
+                        } ${i === 5 ? "rounded-r-md" : ""} ${
+                          digit
+                            ? "border-white/40 bg-white/15"
+                            : "border-white/20 bg-white/10"
+                        }`}
+                      >
+                        {digit && (
+                          <motion.span
+                            initial={{ opacity: 0, scale: 0.5 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.15 }}
+                          >
+                            {digit}
+                          </motion.span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Verify button */}
@@ -573,107 +588,110 @@ export function SignUpDemo() {
                   <span className="text-white/50 underline">Back</span>
                 </div>
               </div>
+
             </motion.div>
           )}
 
-          {/* ── Success ── */}
-          {scene === "success" && (
+          {/* ── Dashboard (redirect destination) ── */}
+          {scene === "dashboard" && (
             <motion.div
-              key="success"
+              key="dashboard"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.5, ease }}
-              className="absolute inset-0 flex flex-col items-center justify-center"
+              className="absolute inset-0"
             >
-              {/* Checkmark circle */}
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{
-                  duration: 0.45,
-                  ease: [0.34, 1.56, 0.64, 1],
-                }}
-                className="flex h-16 w-16 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm"
-              >
-                <svg
-                  className="h-8 w-8 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                >
-                  <motion.path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M5 13l4 4L19 7"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ duration: 0.5, delay: 0.25 }}
-                  />
-                </svg>
-              </motion.div>
+              {/* Gradient overlay — Grainient visible at top, fading to solid bg
+                  Matches: bg-gradient-to-b from-transparent via-[var(--background)]/60 via-[20%] to-[var(--background)] to-[45%] */}
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent from-0% via-white/60 via-[20%] to-white to-[45%] dark:via-gray-950/60 dark:to-gray-950" />
 
-              {/* Welcome text */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5, duration: 0.5 }}
-                className="mt-5 font-display text-[22px] font-light text-white"
-              >
-                Welcome, Sarah!
-              </motion.div>
-
-              {/* Subtitle */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.7, duration: 0.4 }}
-                className="mt-2 text-[10px] text-white/50"
-              >
-                Redirecting to dashboard...
-              </motion.div>
-
-              {/* Confetti-like dots */}
-              {Array.from({ length: 12 }).map((_, i) => (
+              {/* Dashboard content — layered on top of gradient */}
+              <div className="relative z-10 flex h-full flex-col">
+                {/* DashboardTopBar — avatar + "Hello Sarah" left, 2 icons right */}
                 <motion.div
-                  key={i}
-                  className="absolute h-1.5 w-1.5 rounded-full"
-                  style={{
-                    backgroundColor: [
-                      "#FF9FFC",
-                      "#5227FF",
-                      "#B19EEF",
-                      "#fff",
-                      "#FFD700",
-                      "#FF6B6B",
-                    ][i % 6],
-                  }}
-                  initial={{
-                    opacity: 0,
-                    x: 0,
-                    y: 0,
-                    scale: 0,
-                  }}
-                  animate={{
-                    opacity: [0, 1, 1, 0],
-                    x: Math.cos((i / 12) * Math.PI * 2) * (60 + (i % 3) * 30),
-                    y:
-                      Math.sin((i / 12) * Math.PI * 2) * (60 + (i % 3) * 30) -
-                      20,
-                    scale: [0, 1.2, 1, 0.5],
-                  }}
-                  transition={{
-                    duration: 1.2,
-                    delay: 0.3 + i * 0.04,
-                    ease: [0.16, 1, 0.3, 1],
-                  }}
-                />
-              ))}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.1, duration: 0.5 }}
+                  className="flex items-center justify-between px-4 py-2.5"
+                >
+                  {/* Left — avatar + name */}
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-gray-900/20 bg-gray-900/10 text-[7px] font-medium text-gray-900 dark:border-white/20 dark:bg-white/10 dark:text-white">
+                      S
+                    </div>
+                    <span className="font-display text-[8px] font-light text-gray-900 dark:text-white">
+                      Hello Sarah
+                    </span>
+                  </div>
+                  {/* Right — language picker + theme toggle */}
+                  <div className="flex items-center gap-2">
+                    <div className="h-[14px] w-[14px] rounded-full border border-gray-900/15 dark:border-white/15" />
+                    <div className="h-[14px] w-[14px] rounded-full border border-gray-900/15 dark:border-white/15" />
+                  </div>
+                </motion.div>
+
+                {/* PageHeader — Greeting (centered) */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.2, duration: 0.5 }}
+                  className="mt-1 text-center font-display text-[15px] font-light text-gray-900 dark:text-white"
+                >
+                  Good Morning, Sarah
+                </motion.div>
+
+                {/* DashboardCardGrid — 3 smaller cards */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4, duration: 0.5 }}
+                  className="flex flex-1 items-center justify-center px-6 pb-4"
+                >
+                  <div className="grid w-full max-w-[300px] grid-cols-3 gap-2">
+                    {[
+                      { title: "My Studies", desc: "Track Progress", img: "https://lib.thevibecodedcompany.com/images/my-studies.webp" },
+                      { title: "My Space", desc: "Notes & More", img: "https://lib.thevibecodedcompany.com/images/my-space.webp" },
+                      { title: "Courses", desc: "Browse All", img: "https://lib.thevibecodedcompany.com/images/courses.webp" },
+                    ].map((card, i) => (
+                      <motion.div
+                        key={card.title}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.5 + i * 0.15, duration: 0.5 }}
+                        className="overflow-hidden rounded-lg border border-gray-900/10 bg-white/50 backdrop-blur-xl dark:border-white/15 dark:bg-white/5"
+                      >
+                        {/* Card image — smaller, no clipping */}
+                        <div className="flex items-center justify-center px-2 pt-2">
+                          <img
+                            src={card.img}
+                            alt={card.title}
+                            className="h-[52px] w-[52px] object-contain"
+                          />
+                        </div>
+                        {/* Card text — pinned at bottom */}
+                        <div className="px-1 pb-2 pt-1 text-center">
+                          <div className="font-display text-[7px] font-light text-gray-900 dark:text-white">
+                            {card.title}
+                          </div>
+                          <div className="mt-0.5 text-[5px] text-gray-900/50 dark:text-white/50">
+                            {card.desc}
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+
+      {/* Confetti — same component & props as real auth page */}
+      {showConfetti && (
+        <ConfettiBurst particleCount={90} startVelocity={32} spread={130} />
+      )}
 
       {/* ── Mouse cursor ── */}
       <div

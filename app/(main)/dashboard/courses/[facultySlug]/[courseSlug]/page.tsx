@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { BackButton } from "@/components/BackButton";
 import { PageHeader } from "@/components/PageHeader";
 import { CourseDetail } from "@/components/CourseDetail";
+import { isSubscribed } from "@/lib/subscriptions";
 import type { Metadata } from "next";
 
 type Props = {
@@ -13,7 +14,7 @@ type Props = {
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { courseSlug } = await params;
+  const { facultySlug, courseSlug } = await params;
   const courses = await db
     .select()
     .from(course)
@@ -24,17 +25,33 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return { title: "Course Not Found", robots: { index: false } };
   }
 
+  const description = c.description || `${c.title} — study resources on Libraryyy`;
+  const pageUrl = `/dashboard/courses/${facultySlug}/${courseSlug}`;
+
   return {
     title: c.title,
-    description: c.description || `${c.title} on Libraryyy`,
+    description,
     openGraph: {
       title: `${c.title} | Libraryyy`,
-      description: c.description || `${c.title} on Libraryyy`,
+      description,
+      url: pageUrl,
+      siteName: "Libraryyy",
+      type: "website",
+      images: [
+        {
+          url: "/og-image.jpg",
+          width: 1200,
+          height: 630,
+          alt: `${c.title} — Libraryyy`,
+          type: "image/jpeg",
+        },
+      ],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title: `${c.title} | Libraryyy`,
-      description: c.description || `${c.title} on Libraryyy`,
+      description,
+      images: ["/og-image.jpg"],
     },
   };
 }
@@ -57,17 +74,22 @@ export default async function CoursePage({ params }: Props) {
     .where(eq(faculty.slug, facultySlug))
     .then((rows) => rows[0]);
 
-  // Check if user is a contributor
+  // Check if user is a contributor + subscription status
   let isContributor = false;
+  let subscribed = false;
   try {
     const { data: session } = await auth.getSession();
     if (session?.user?.id) {
-      const profile = await db
-        .select({ contributorVerifiedAt: userProfile.contributorVerifiedAt })
-        .from(userProfile)
-        .where(eq(userProfile.userId, session.user.id))
-        .limit(1);
+      const [profile, subStatus] = await Promise.all([
+        db
+          .select({ contributorVerifiedAt: userProfile.contributorVerifiedAt })
+          .from(userProfile)
+          .where(eq(userProfile.userId, session.user.id))
+          .limit(1),
+        isSubscribed("course", c.id),
+      ]);
       isContributor = !!profile[0]?.contributorVerifiedAt;
+      subscribed = subStatus;
     }
   } catch {
     // Ignore
@@ -89,7 +111,7 @@ export default async function CoursePage({ params }: Props) {
         }}
       >
         <div className="mx-auto max-w-5xl pt-8">
-          <CourseDetail course={c} isContributor={isContributor} facultySlug={facultySlug} />
+          <CourseDetail course={c} isContributor={isContributor} facultySlug={facultySlug} initialSubscribed={subscribed} />
         </div>
       </div>
       <BackButton

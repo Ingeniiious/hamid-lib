@@ -362,7 +362,7 @@ export async function submitTextContribution({
       pipelineJobId = await createJob({
         courseId,
         contributionIds: [row.id],
-        outputTypes: ["study_guide", "flashcards", "quiz"],
+        outputTypes: (await import("@/lib/ai/types")).ALL_CONTENT_TYPES,
         startedBy: "system",
         sourceContent,
         sourceLanguage: lang,

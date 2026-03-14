@@ -106,7 +106,7 @@ export default function NotificationBell() {
         onClick={() => setOpen((o) => !o)}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        className="relative rounded-full p-3 text-gray-900/70 transition-colors duration-300 hover:text-gray-900 dark:text-white/70 dark:hover:text-white"
         aria-label="Notifications"
       >
         {/* Phosphor Duotone Bell */}
@@ -115,7 +115,7 @@ export default function NotificationBell() {
           width="22"
           height="22"
           viewBox="0 0 256 256"
-          className="text-gray-600 dark:text-gray-300"
+          className="text-current"
         >
           <path
             d="M208,192H48a8,8,0,0,1-6.88-12C47.71,168.6,56,139.81,56,104a72,72,0,0,1,144,0c0,35.82,8.3,64.6,14.9,76A8,8,0,0,1,208,192Z"
@@ -152,7 +152,7 @@ export default function NotificationBell() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ ease: EASE, duration: 0.2 }}
-            className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl z-50"
+            className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto rounded-xl border border-gray-900/15 bg-white/70 backdrop-blur-xl dark:border-white/20 dark:bg-white/10 shadow-xl z-50"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
@@ -169,44 +169,108 @@ export default function NotificationBell() {
               )}
             </div>
 
-            {/* Notification list */}
-            {loading ? (
-              <div className="p-8 text-center text-sm text-gray-400">
-                {t("notifications.loading")}
-              </div>
-            ) : notifications.length === 0 ? (
-              <div className="p-8 text-center text-sm text-gray-400">
-                {t("notifications.empty")}
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                {notifications.map((notif) => (
-                  <button
-                    key={notif.id}
-                    onClick={() => handleNotificationClick(notif)}
-                    className={`w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${
-                      !notif.isRead
-                        ? "bg-[#5227FF]/5 dark:bg-[#5227FF]/10"
-                        : ""
-                    }`}
-                  >
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 text-center">
-                      {notif.title}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 text-center">
-                      {notif.body}
-                    </p>
-                    <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 text-center">
-                      {formatTimeAgo(notif.createdAt)}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* Content with cross-fade */}
+            <AnimatePresence mode="wait">
+              {loading ? (
+                <motion.div
+                  key="skeleton"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3, ease: EASE }}
+                  className="divide-y divide-gray-100 dark:divide-gray-800"
+                >
+                  {[0, 1, 2].map((i) => (
+                    <SkeletonNotification key={i} delay={i * 0.15} />
+                  ))}
+                </motion.div>
+              ) : notifications.length === 0 ? (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3, ease: EASE }}
+                  className="p-8 text-center text-sm text-gray-400"
+                >
+                  {t("notifications.empty")}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="list"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3, ease: EASE }}
+                  className="divide-y divide-gray-100 dark:divide-gray-800"
+                >
+                  {notifications.map((notif, i) => (
+                    <motion.button
+                      key={notif.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3, ease: EASE, delay: i * 0.04 }}
+                      onClick={() => handleNotificationClick(notif)}
+                      className={`w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${
+                        !notif.isRead
+                          ? "bg-[#5227FF]/5 dark:bg-[#5227FF]/10"
+                          : ""
+                      }`}
+                    >
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 text-center">
+                        {notif.title}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 text-center">
+                        {notif.body}
+                      </p>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 text-center">
+                        {formatTimeAgo(notif.createdAt)}
+                      </p>
+                    </motion.button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+/* ─── Skeleton shimmer notification row ─── */
+
+function SkeletonNotification({ delay = 0 }: { delay?: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3, ease: EASE, delay }}
+      className="px-4 py-3 flex flex-col items-center gap-2"
+    >
+      {/* Title bone */}
+      <ShimmerBone className="h-3.5 w-36 rounded-full" />
+      {/* Body bone — two lines */}
+      <ShimmerBone className="h-2.5 w-52 rounded-full" />
+      <ShimmerBone className="h-2.5 w-40 rounded-full" />
+      {/* Timestamp bone */}
+      <ShimmerBone className="h-2 w-14 rounded-full mt-0.5" />
+    </motion.div>
+  );
+}
+
+function ShimmerBone({ className }: { className?: string }) {
+  return (
+    <motion.div
+      animate={{ backgroundPosition: ["200% 0", "-200% 0"] }}
+      transition={{ duration: 1.8, ease: "easeInOut", repeat: Infinity }}
+      className={className}
+      style={{
+        background:
+          "linear-gradient(90deg, rgba(128,128,128,0.08) 25%, rgba(128,128,128,0.18) 50%, rgba(128,128,128,0.08) 75%)",
+        backgroundSize: "200% 100%",
+      }}
+    />
   );
 }
 

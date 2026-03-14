@@ -35,6 +35,22 @@ export type ContentType =
   | "report"
   | "interactive_section";
 
+/** All 12 content types the pipeline should generate for every contribution. */
+export const ALL_CONTENT_TYPES: ContentType[] = [
+  "study_guide",
+  "flashcards",
+  "quiz",
+  "mock_exam",
+  "podcast_script",
+  "video_script",
+  "mind_map",
+  "infographic_data",
+  "slide_deck",
+  "data_table",
+  "report",
+  "interactive_section",
+];
+
 // ---------------------------------------------------------------------------
 // Chat completion primitives
 // ---------------------------------------------------------------------------

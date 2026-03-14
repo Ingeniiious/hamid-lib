@@ -4,7 +4,6 @@ import { db } from "@/lib/db";
 import {
   inAppNotification,
   notificationPreference,
-  userProfile,
   pushSubscription,
 } from "@/database/schema";
 import { eq } from "drizzle-orm";
@@ -80,49 +79,12 @@ export async function dispatchNotification(
       }
     }
 
-    // 4. Email notification (if enabled)
-    const emailEnabled = isEmailEnabled(prefs, payload.category);
-    if (emailEnabled) {
-      try {
-        // Get user's email from auth
-        const [profile] = await db
-          .select({ language: userProfile.language })
-          .from(userProfile)
-          .where(eq(userProfile.userId, userId))
-          .limit(1);
-
-        // Fetch user email from neon_auth
-        const emailResult = await db.execute(
-          `SELECT email FROM neon_auth."user" WHERE id = '${userId}' LIMIT 1`
-        );
-        const userEmail = (emailResult as any)?.[0]?.email;
-
-        if (userEmail) {
-          const { buildNotificationEmail } = await import(
-            "@/lib/notification-email-templates"
-          );
-          const { sendEmail } = await import("@/lib/email");
-
-          const email = buildNotificationEmail({
-            title: payload.title,
-            body: payload.body,
-            ctaText: "View Details",
-            ctaUrl: payload.url,
-          });
-
-          await sendEmail({
-            to: userEmail,
-            subject: email.subject,
-            html: email.html,
-            text: email.text,
-          });
-        }
-      } catch (emailErr) {
-        console.log(
-          `[notification] Email failed for ${userId}: ${(emailErr as Error).message}`
-        );
-      }
-    }
+    // 4. Email notification — DISABLED
+    // Email sending is turned off for now. We want to build sender reputation
+    // with high click-rate transactional emails only (auth, password reset).
+    // Automated notification emails will be enabled later when we're ready
+    // for commercial/marketing sends. Templates are kept in lib/notification-email-templates.ts.
+    // Users should use the PWA for push notifications instead.
   } catch (e) {
     console.log(
       `[notification] Dispatch failed for ${userId}: ${(e as Error).message}`
@@ -173,24 +135,5 @@ function isPushEnabled(
   }
 }
 
-function isEmailEnabled(
-  prefs: typeof notificationPreference.$inferSelect | undefined,
-  category: NotificationCategory
-): boolean {
-  if (!prefs) {
-    // Defaults: only contribution email enabled
-    return category === "contribution";
-  }
-  switch (category) {
-    case "contribution":
-      return prefs.contributionEmail;
-    case "course_update":
-      return prefs.courseUpdateEmail;
-    case "faculty_update":
-      return prefs.facultyUpdateEmail;
-    case "system":
-      return prefs.systemEmail;
-    default:
-      return false;
-  }
-}
+// isEmailEnabled — kept for future use when email notifications are enabled.
+// See lib/notification-email-templates.ts for the email template.

@@ -5,8 +5,12 @@ import { motion, AnimatePresence, useInView } from "framer-motion";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { PageHeader } from "@/components/PageHeader";
-import { BackButton } from "@/components/BackButton";
 import { SignUpDemo } from "@/components/help/SignUpDemo";
+import { BrowseDemo } from "@/components/help/BrowseDemo";
+import { ContributeDemo } from "@/components/help/ContributeDemo";
+import { AICouncilDemo } from "@/components/help/AICouncilDemo";
+import { ExamDemo } from "@/components/help/ExamDemo";
+import { RateProfessorDemo } from "@/components/help/RateProfessorDemo";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -584,13 +588,8 @@ export function HelpContent() {
       <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-transparent from-0% via-[var(--background)]/60 via-[20%] to-[var(--background)] to-[45%]" />
 
       <div className="relative z-10 flex h-full flex-col">
-        {/* Back button */}
-        <div className="absolute left-4 top-4 z-20 sm:left-6 sm:top-6">
-          <BackButton href="/" />
-        </div>
-
         {/* Header */}
-        <div className="mx-auto w-full max-w-5xl shrink-0 px-6 pt-16 sm:pt-20">
+        <div className="mx-auto w-full max-w-5xl shrink-0 px-6 pt-10 sm:pt-14">
           <PageHeader
             title={t("help.title")}
             subtitle={t("help.subtitle")}
@@ -626,13 +625,7 @@ export function HelpContent() {
               descKey="help.browseDesc"
               reverse
             >
-              <MockupFrame
-                screens={[
-                  <BrowseScreen0 key="b0" />,
-                  <BrowseScreen1 key="b1" />,
-                  <BrowseScreen2 key="b2" />,
-                ]}
-              />
+              <BrowseDemo />
             </FeatureSection>
 
             <div className="mx-auto h-px w-24 bg-black/[0.06] dark:bg-white/[0.06]" />
@@ -643,49 +636,42 @@ export function HelpContent() {
               titleKey="help.contributeTitle"
               descKey="help.contributeDesc"
             >
-              <MockupFrame
-                screens={[
-                  <ContributeScreen0 key="c0" />,
-                  <ContributeScreen1 key="c1" />,
-                  <ContributeScreen2 key="c2" />,
-                ]}
-              />
+              <ContributeDemo />
             </FeatureSection>
 
             <div className="mx-auto h-px w-24 bg-black/[0.06] dark:bg-white/[0.06]" />
 
-            {/* Section 4: Practice & Exam */}
+            {/* Section 4: AI Teachers' Council */}
             <FeatureSection
               number="04"
-              titleKey="help.practiceTitle"
-              descKey="help.practiceDesc"
+              titleKey="help.aiCouncilTitle"
+              descKey="help.aiCouncilDesc"
               reverse
             >
-              <MockupFrame
-                screens={[
-                  <PracticeScreen0 key="p0" />,
-                  <PracticeScreen1 key="p1" />,
-                  <PracticeScreen2 key="p2" />,
-                ]}
-                interval={3000}
-              />
+              <AICouncilDemo />
             </FeatureSection>
 
             <div className="mx-auto h-px w-24 bg-black/[0.06] dark:bg-white/[0.06]" />
 
-            {/* Section 5: Rate Professors */}
+            {/* Section 5: Practice & Exam */}
             <FeatureSection
               number="05"
+              titleKey="help.practiceTitle"
+              descKey="help.practiceDesc"
+            >
+              <ExamDemo />
+            </FeatureSection>
+
+            <div className="mx-auto h-px w-24 bg-black/[0.06] dark:bg-white/[0.06]" />
+
+            {/* Section 6: Rate Professors */}
+            <FeatureSection
+              number="06"
               titleKey="help.rateTitle"
               descKey="help.rateDesc"
+              reverse
             >
-              <MockupFrame
-                screens={[
-                  <RateScreen0 key="r0" />,
-                  <RateScreen1 key="r1" />,
-                  <RateScreen2 key="r2" />,
-                ]}
-              />
+              <RateProfessorDemo />
             </FeatureSection>
 
             {/* CTA */}
@@ -711,6 +697,29 @@ export function HelpContent() {
             </motion.div>
           </div>
         </div>
+
+        {/* Floating back button — bottom, same position as dashboard */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, ease }}
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-start pb-6 pl-6 sm:justify-center sm:pl-0"
+        >
+          <Link
+            href="/"
+            className="pointer-events-auto inline-flex items-center gap-2 transition-opacity hover:opacity-80 sm:-translate-x-[37vw]"
+          >
+            <img
+              src="https://lib.thevibecodedcompany.com/images/back.webp"
+              alt="Back"
+              width={200}
+              height={107}
+              loading="eager"
+              decoding="async"
+              className="h-12 w-auto object-contain sm:h-14"
+            />
+          </Link>
+        </motion.div>
       </div>
     </div>
   );

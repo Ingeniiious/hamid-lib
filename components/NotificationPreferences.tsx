@@ -19,7 +19,6 @@ type BooleanKeys = {
 interface PrefRow {
   label: string;
   pushKey: BooleanKeys;
-  emailKey: BooleanKeys;
 }
 
 export default function NotificationPreferences() {
@@ -43,22 +42,18 @@ export default function NotificationPreferences() {
     {
       label: t("notifications.prefContribution"),
       pushKey: "contributionPush",
-      emailKey: "contributionEmail",
     },
     {
       label: t("notifications.prefCourseUpdate"),
       pushKey: "courseUpdatePush",
-      emailKey: "courseUpdateEmail",
     },
     {
       label: t("notifications.prefFacultyUpdate"),
       pushKey: "facultyUpdatePush",
-      emailKey: "facultyUpdateEmail",
     },
     {
       label: t("notifications.prefSystem"),
       pushKey: "systemPush",
-      emailKey: "systemEmail",
     },
   ];
 
@@ -96,54 +91,23 @@ export default function NotificationPreferences() {
         <ToggleSwitch checked={muted} onChange={handleMuteToggle} />
       </div>
 
-      {/* Per-category toggles */}
+      {/* Per-category push toggles */}
       <div className="space-y-4">
-        {/* Header row */}
-        <div className="grid grid-cols-3 text-xs font-medium text-gray-500 dark:text-gray-400 text-center">
-          <span />
-          <span>{t("notifications.push")}</span>
-          <span>{t("notifications.email")}</span>
-        </div>
-
         {rows.map((row) => (
           <div
             key={row.pushKey}
-            className="grid grid-cols-3 items-center text-center"
+            className="flex items-center justify-center gap-4"
           >
-            <span className="text-sm text-gray-700 dark:text-gray-300">
+            <span className="text-sm text-gray-700 dark:text-gray-300 min-w-[120px] text-center">
               {row.label}
             </span>
-            <div className="flex justify-center">
-              <ToggleSwitch
-                checked={!!prefs[row.pushKey]}
-                onChange={(v) => handleToggle(row.pushKey, v)}
-                disabled={muted}
-              />
-            </div>
-            <div className="flex justify-center">
-              <ToggleSwitch
-                checked={!!prefs[row.emailKey]}
-                onChange={(v) => handleToggle(row.emailKey, v)}
-                disabled={muted}
-              />
-            </div>
-          </div>
-        ))}
-
-        {/* Weekly digest */}
-        <div className="grid grid-cols-3 items-center text-center">
-          <span className="text-sm text-gray-700 dark:text-gray-300">
-            {t("notifications.prefWeeklyDigest")}
-          </span>
-          <span />
-          <div className="flex justify-center">
             <ToggleSwitch
-              checked={prefs.weeklyDigestEmail}
-              onChange={(v) => handleToggle("weeklyDigestEmail", v)}
+              checked={!!prefs[row.pushKey]}
+              onChange={(v) => handleToggle(row.pushKey, v)}
               disabled={muted}
             />
           </div>
-        </div>
+        ))}
       </div>
     </motion.div>
   );

@@ -604,7 +604,7 @@ export async function overrideAppeal(
         const jobId = await createJob({
           courseId: contrib.courseId,
           contributionIds: [appeal.contributionId],
-          outputTypes: ["study_guide", "flashcards", "quiz"],
+          outputTypes: (await import("@/lib/ai/types")).ALL_CONTENT_TYPES,
           startedBy: session.user.id,
           sourceContent,
           sourceLanguage: lang,

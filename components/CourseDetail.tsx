@@ -6,6 +6,8 @@ import { Separator } from "@/components/ui/separator";
 import { GrainientButton } from "@/components/GrainientButton";
 import { FadeImage, preloadImages } from "@/components/FadeImage";
 import { useTranslation } from "@/lib/i18n";
+import SubscribeButton from "@/components/SubscribeButton";
+import ShareButton from "@/components/ShareButton";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 const CDN = "https://lib.thevibecodedcompany.com";
@@ -21,9 +23,10 @@ interface CourseDetailProps {
   };
   isContributor?: boolean;
   facultySlug?: string;
+  initialSubscribed?: boolean;
 }
 
-export function CourseDetail({ course, isContributor, facultySlug }: CourseDetailProps) {
+export function CourseDetail({ course, isContributor, facultySlug, initialSubscribed = false }: CourseDetailProps) {
   const { t } = useTranslation();
   // Preload on mount so the image is ready before user scrolls down
   useEffect(() => {
@@ -44,10 +47,23 @@ export function CourseDetail({ course, isContributor, facultySlug }: CourseDetai
         {course.semester && <span>{course.semester}</span>}
       </div>
 
+      {/* Subscribe + Share buttons */}
+      <div className="mt-6 flex items-center justify-center gap-3">
+        <SubscribeButton
+          entityType="course"
+          entityId={course.id}
+          initialSubscribed={initialSubscribed}
+        />
+        <ShareButton
+          title={course.title}
+          text={course.description || course.title}
+        />
+      </div>
+
       <Separator className="mx-auto mt-8 max-w-md bg-gray-900/10 dark:bg-white/10" />
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {["Teaching", "Presentation", "Exam / Practice"].map((tab, i) => (
+        {["Teaching", "Studying", "Exam"].map((tab, i) => (
           <motion.div
             key={tab}
             initial={{ opacity: 0 }}
