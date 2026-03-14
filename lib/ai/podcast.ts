@@ -11,55 +11,9 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { generatedContent } from "@/database/schema";
+import { uploadToR2 } from "@/lib/r2";
 import { generatePodcastAudioGrok } from "./providers/grok-tts";
 import type { PodcastScriptContent } from "./types";
-
-// ── R2 upload config ────────────────────────────────────────────────────────
-
-const R2_CDN_URL = "https://lib.thevibecodedcompany.com";
-const R2_BUCKET = "hamid-lib-assets";
-
-function getCloudflareConfig() {
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-  const apiToken = process.env.CLOUDFLARE_API_TOKEN;
-  if (!accountId || !apiToken) {
-    throw new Error(
-      "Missing CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN env vars"
-    );
-  }
-  return { accountId, apiToken };
-}
-
-/**
- * Upload a binary buffer to Cloudflare R2 via the Cloudflare API.
- *
- * PUT https://api.cloudflare.com/client/v4/accounts/{account_id}/r2/buckets/{bucket}/objects/{key}
- */
-async function uploadToR2(
-  key: string,
-  buffer: Buffer,
-  contentType: string
-): Promise<void> {
-  const { accountId, apiToken } = getCloudflareConfig();
-
-  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${R2_BUCKET}/objects/${encodeURIComponent(key)}`;
-
-  const response = await fetch(url, {
-    method: "PUT",
-    headers: {
-      Authorization: `Bearer ${apiToken}`,
-      "Content-Type": contentType,
-    },
-    body: new Uint8Array(buffer),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `R2 upload failed (${response.status}): ${errorText}`
-    );
-  }
-}
 
 // ── Main pipeline function ──────────────────────────────────────────────────
 
@@ -111,11 +65,19 @@ export async function generatePodcastAudioForContent(contentId: string): Promise
     `[podcast] Audio generated — ${result.totalCharacters} chars, ${result.segments} segments`
   );
 
-  // 4. Upload to R2
+  // 4. Upload to R2 (reuse existing S3-compatible R2 client)
   const mediaKey = `audio/podcasts/${contentId}.mp3`;
-  await uploadToR2(mediaKey, result.audio, "audio/mpeg");
+  const uploadResult = await uploadToR2(
+    new Uint8Array(result.audio),
+    mediaKey,
+    "audio/mpeg"
+  );
 
-  const mediaUrl = `${R2_CDN_URL}/${mediaKey}`;
+  if (!uploadResult.success) {
+    throw new Error(`[podcast] R2 upload failed: ${uploadResult.error}`);
+  }
+
+  const mediaUrl = uploadResult.url;
   const mediaSize = result.audio.byteLength;
 
   console.log(
