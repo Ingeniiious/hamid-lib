@@ -4,6 +4,7 @@ import {
   contributionAppeal,
   appealVouch,
   contribution,
+  userProfile,
 } from "@/database/schema";
 import { eq, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
@@ -39,6 +40,20 @@ export async function POST(
     return NextResponse.json(
       { error: "This appeal is not accepting vouches" },
       { status: 400 }
+    );
+  }
+
+  // Must be a verified contributor to vouch
+  const [profile] = await db
+    .select({ contributorVerifiedAt: userProfile.contributorVerifiedAt })
+    .from(userProfile)
+    .where(eq(userProfile.userId, session.user.id))
+    .limit(1);
+
+  if (!profile?.contributorVerifiedAt) {
+    return NextResponse.json(
+      { error: "You must verify your university email before vouching" },
+      { status: 403 }
     );
   }
 
