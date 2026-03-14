@@ -210,6 +210,24 @@ const CONTENT_SCHEMAS: Record<ContentType, z.ZodTypeAny> = {
 // ---------------------------------------------------------------------------
 
 /**
+ * Recursively convert null values to undefined.
+ * AI models (especially Grok) return null for optional fields instead of
+ * omitting them. Zod's .optional() accepts undefined but rejects null.
+ */
+function stripNulls(obj: unknown): unknown {
+  if (obj === null) return undefined;
+  if (Array.isArray(obj)) return obj.map(stripNulls);
+  if (typeof obj === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      result[key] = stripNulls(value);
+    }
+    return result;
+  }
+  return obj;
+}
+
+/**
  * Validate generated content against the expected schema for its content type.
  * Uses passthrough() so extra fields from AI models are kept (not stripped).
  *
@@ -225,8 +243,11 @@ export function validateGeneratedContent(
     return { success: false, errors: [`Unknown content type: ${contentType}`] };
   }
 
+  // Strip null → undefined before validation (AI models return null for missing fields)
+  const cleaned = stripNulls(content);
+
   // Use passthrough to keep extra fields the model may have added
-  const result = (schema as z.ZodObject<z.ZodRawShape>).passthrough().safeParse(content);
+  const result = (schema as z.ZodObject<z.ZodRawShape>).passthrough().safeParse(cleaned);
 
   if (result.success) {
     return { success: true, data: result.data as Record<string, unknown> };

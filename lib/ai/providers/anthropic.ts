@@ -74,7 +74,7 @@ export async function complete(
 
   let content = textBlock?.text ?? "";
 
-  // Defensive: strip markdown fences if Claude still wraps JSON despite output_config
+  // Defensive: strip markdown fences if Claude wraps JSON in ```json ... ```
   if (wantsJson && content) {
     content = stripJsonWrapper(content);
   }

@@ -184,15 +184,10 @@ async function submitAnthropic(
           temperature: request.temperature ?? 0.3,
           ...(systemMessage && { system: systemMessage.content }),
           messages: nonSystemMessages,
-          // Structured outputs for JSON responses
-          ...(wantsJson && {
-            output_config: {
-              format: {
-                type: "json_schema" as const,
-                schema: { type: "object" },
-              },
-            },
-          }),
+          // Prompt-based JSON — no output_config needed.
+          // Opus 4.6 requires additionalProperties: false on ALL nested objects
+          // in output_config schemas, which is impractical for our 12 content types.
+          // Claude follows JSON instructions in prompts reliably.
         },
       },
     ],
