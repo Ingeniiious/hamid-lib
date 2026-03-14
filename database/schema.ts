@@ -958,7 +958,7 @@ export const contributionAppeal = pgTable("contribution_appeal", {
   userId: text("user_id").notNull(),
   appealText: text("appeal_text").notNull(),
   status: text("status").notNull().default("pending"), // pending, vouching, re_evaluating, overturned, upheld
-  requiredVouches: integer("required_vouches").notNull().default(3),
+  requiredVouches: integer("required_vouches").notNull().default(10),
   currentVouches: integer("current_vouches").notNull().default(0),
   adminOverrideBy: text("admin_override_by"),
   adminOverrideAt: timestamp("admin_override_at"),

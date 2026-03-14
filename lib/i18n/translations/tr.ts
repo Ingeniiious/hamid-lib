@@ -289,7 +289,7 @@ export const tr: TranslationKeys = {
     appealPlaceholder: "Bu katkının neden kabul edilmesi gerektiğini açıklayın...",
     submitAppeal: "İtirazı Gönder",
     appealSubmitted: "İtiraz Gönderildi",
-    appealVouchInfo: "Destek almak için sınıf arkadaşlarınızla paylaşın. 3 destek yeniden değerlendirmeyi tetikler.",
+    appealVouchInfo: "Destek almak için sınıf arkadaşlarınızla paylaşın. 5 destek yönetici incelemesi için işaretlenir, 10 destek otomatik yeniden değerlendirmeyi tetikler.",
     backToContributions: "Katkılara Dön",
     noContributions: "Henüz Katkı Yok",
     contributionsWillAppear: "Gönderdiğiniz katkılar burada görünecek.",

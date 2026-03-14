@@ -83,7 +83,26 @@ export async function POST(
       requiredVouches: contributionAppeal.requiredVouches,
     });
 
-  // Check if vouch threshold reached → trigger re-evaluation
+  // At 5 vouches → notify admin for manual review
+  if (updated.currentVouches === 5) {
+    try {
+      const { dispatchNotification } = await import(
+        "@/lib/notification-dispatch"
+      );
+      // Notify admin (Hamid) about the appeal gaining traction
+      await dispatchNotification("system", {
+        category: "system",
+        title: "Appeal Needs Manual Review",
+        body: `Appeal for contribution #${contributionId} has reached 5 vouches. Consider reviewing it manually.`,
+        url: `/admin/contributions`,
+        metadata: { contributionId, appealId: appeal.id, vouches: 5 },
+      });
+    } catch (err) {
+      console.error("[appeal-vouch] Failed to notify admin at 5 vouches:", err);
+    }
+  }
+
+  // At 10 vouches → trigger automatic re-evaluation
   if (updated.currentVouches >= updated.requiredVouches) {
     await db
       .update(contributionAppeal)

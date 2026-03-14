@@ -300,7 +300,7 @@ export const en = {
     appealPlaceholder: "Explain why you believe this contribution should be accepted...",
     submitAppeal: "Submit Appeal",
     appealSubmitted: "Appeal Submitted",
-    appealVouchInfo: "Share this with your classmates to get vouches. 3 vouches will trigger a re-evaluation.",
+    appealVouchInfo: "Share this with your classmates to get vouches. 5 vouches flags for admin review, 10 vouches triggers automatic re-evaluation.",
     backToContributions: "Back To Contributions",
     // My Contributions page
     noContributions: "No Contributions Yet",
