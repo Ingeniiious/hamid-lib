@@ -850,6 +850,9 @@ export const fa: TranslationKeys = {
     examples: "مثال‌ها",
     expandAll: "باز کردن همه",
     collapseAll: "بستن همه",
+    // Source filter
+    allSources: "همه منابع",
+    selectSource: "انتخاب منبع...",
     // Variant / AI Teachers
     createdBy: "ساخته شده توسط",
     whatIsThis: "این چیست؟",

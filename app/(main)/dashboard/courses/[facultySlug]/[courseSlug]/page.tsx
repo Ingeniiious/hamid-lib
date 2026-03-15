@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { course, faculty, userProfile, generatedContent, contentTranslation } from "@/database/schema";
+import { course, faculty, userProfile, generatedContent, contentTranslation, pipelineJob, contribution } from "@/database/schema";
 import { notFound } from "next/navigation";
 import { eq, and, inArray } from "drizzle-orm";
 import { BackButton } from "@/components/BackButton";
@@ -89,6 +89,55 @@ export default async function CoursePage({ params }: Props) {
     )
     .orderBy(generatedContent.contentType, generatedContent.displayOrder, generatedContent.createdAt);
 
+  // Build a map: contentId → contributionIds (from pipeline_job)
+  const jobIds = [...new Set(publishedContentRows.map((r) => r.jobId).filter(Boolean))] as string[];
+  const jobContribMap = new Map<string, number[]>();
+  if (jobIds.length > 0) {
+    const jobs = await db
+      .select({ id: pipelineJob.id, contributionIds: pipelineJob.contributionIds })
+      .from(pipelineJob)
+      .where(inArray(pipelineJob.id, jobIds));
+    for (const j of jobs) {
+      jobContribMap.set(j.id, (j.contributionIds as number[]) ?? []);
+    }
+  }
+
+  // Collect all unique contribution IDs across all published content
+  const allContribIds = [...new Set(
+    publishedContentRows.flatMap((r) => r.jobId ? (jobContribMap.get(r.jobId) ?? []) : [])
+  )];
+
+  // Fetch contribution titles
+  const contribTitleMap = new Map<number, string>();
+  if (allContribIds.length > 0) {
+    const contribs = await db
+      .select({ id: contribution.id, title: contribution.title })
+      .from(contribution)
+      .where(inArray(contribution.id, allContribIds));
+    for (const c2 of contribs) {
+      contribTitleMap.set(c2.id, c2.title);
+    }
+  }
+
+  // Build contributionGroups: { id, title, contentIds[] }
+  // Group content by which contribution(s) produced it
+  const contribGroupMap = new Map<string, Set<string>>(); // contribKey → set of content IDs
+  for (const row of publishedContentRows) {
+    const contribIds = row.jobId ? (jobContribMap.get(row.jobId) ?? []) : [];
+    // Use sorted contribution IDs as a group key (handles multi-contrib jobs)
+    const key = contribIds.length > 0 ? contribIds.sort((a, b) => a - b).join(",") : "unknown";
+    if (!contribGroupMap.has(key)) contribGroupMap.set(key, new Set());
+    contribGroupMap.get(key)!.add(row.id);
+  }
+
+  const contributionGroups = [...contribGroupMap.entries()].map(([key, contentIdSet]) => {
+    const ids = key === "unknown" ? [] : key.split(",").map(Number);
+    const title = ids.length > 0
+      ? ids.map((id) => contribTitleMap.get(id) ?? `#${id}`).join(" + ")
+      : "Other";
+    return { key, title, contentIds: [...contentIdSet] };
+  });
+
   // Fetch completed translations for all published content
   const contentIds = publishedContentRows.map((r) => r.id);
   const translationRows = contentIds.length > 0
@@ -157,6 +206,7 @@ export default async function CoursePage({ params }: Props) {
             initialSubscribed={subscribed}
             publishedContent={publishedContentRows}
             availableTranslations={availableTranslations}
+            contributionGroups={contributionGroups}
           />
         </div>
       </div>

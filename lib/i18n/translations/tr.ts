@@ -851,6 +851,9 @@ export const tr: TranslationKeys = {
     examples: "Örnekler",
     expandAll: "Tümünü Aç",
     collapseAll: "Tümünü Kapat",
+    // Source filter
+    allSources: "Tüm Kaynaklar",
+    selectSource: "Kaynak Seçin...",
     // Variant / AI Teachers
     createdBy: "Oluşturan",
     whatIsThis: "Bu Nedir?",

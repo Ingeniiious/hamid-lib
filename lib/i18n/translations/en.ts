@@ -877,6 +877,9 @@ export const en = {
     examples: "Examples",
     expandAll: "Expand All",
     collapseAll: "Collapse All",
+    // Source filter
+    allSources: "All Sources",
+    selectSource: "Select Source...",
     // Variant / AI Teachers
     createdBy: "Created By",
     whatIsThis: "What Is This?",

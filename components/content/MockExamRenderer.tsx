@@ -10,7 +10,7 @@ import { Matching } from "./question-types/Matching";
 import { Essay } from "./question-types/Essay";
 import { Calculation } from "./question-types/Calculation";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FullscreenExam } from "./FullscreenExam";
+import { FullscreenExam, CancelOverlay } from "./FullscreenExam";
 import { submitQuizAttempt } from "@/lib/practice";
 import type { MockExamContent } from "@/lib/ai/types";
 
@@ -435,38 +435,12 @@ export function MockExamRenderer({
               </p>
             </div>
           </div>
-        {/* Cancel confirmation overlay */}
-        {showCancelConfirm && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.2, ease }}
-              className="mx-4 max-w-sm rounded-3xl border border-gray-900/10 bg-white p-8 text-center shadow-2xl dark:border-white/15 dark:bg-gray-900"
-            >
-              <p className="font-display text-lg font-light text-gray-900 dark:text-white">
-                Cancel Exam?
-              </p>
-              <p className="mt-3 text-sm text-gray-900/50 dark:text-white/50" style={{ textWrap: "balance" }}>
-                Your answers will not be saved. All progress will be lost.
-              </p>
-              <div className="mt-6 flex flex-col items-center gap-3">
-                <button
-                  onClick={handleConfirmCancel}
-                  className="w-full rounded-full border border-red-500/20 bg-red-500/10 px-6 py-2.5 text-sm font-medium text-red-600 transition-all hover:bg-red-500/20 dark:text-red-400"
-                >
-                  Yes, Cancel Exam
-                </button>
-                <button
-                  onClick={() => setShowCancelConfirm(false)}
-                  className="rounded-full px-6 py-2 text-sm font-medium text-gray-900/60 transition-all hover:text-gray-900 dark:text-white/60 dark:hover:text-white"
-                >
-                  Continue Exam
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
+        <CancelOverlay
+          show={showCancelConfirm}
+          label="Exam"
+          onConfirm={handleConfirmCancel}
+          onDismiss={() => setShowCancelConfirm(false)}
+        />
         </div>
       </FullscreenExam>
     );
@@ -574,38 +548,12 @@ export function MockExamRenderer({
             </div>
           </div>
 
-          {/* Cancel confirm overlay */}
-          {showCancelConfirm && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.2, ease }}
-                className="mx-4 max-w-sm rounded-3xl border border-gray-900/10 bg-white p-8 text-center shadow-2xl dark:border-white/15 dark:bg-gray-900"
-              >
-                <p className="font-display text-lg font-light text-gray-900 dark:text-white">
-                  Cancel Exam?
-                </p>
-                <p className="mt-3 text-sm text-gray-900/50 dark:text-white/50" style={{ textWrap: "balance" }}>
-                  Your answers will not be saved. All progress will be lost.
-                </p>
-                <div className="mt-6 flex flex-col items-center gap-3">
-                  <button
-                    onClick={handleConfirmCancel}
-                    className="w-full rounded-full border border-red-500/20 bg-red-500/10 px-6 py-2.5 text-sm font-medium text-red-600 transition-all hover:bg-red-500/20 dark:text-red-400"
-                  >
-                    Yes, Cancel Exam
-                  </button>
-                  <button
-                    onClick={() => setShowCancelConfirm(false)}
-                    className="rounded-full px-6 py-2 text-sm font-medium text-gray-900/60 transition-all hover:text-gray-900 dark:text-white/60 dark:hover:text-white"
-                  >
-                    Continue Exam
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
+          <CancelOverlay
+            show={showCancelConfirm}
+            label="Exam"
+            onConfirm={handleConfirmCancel}
+            onDismiss={() => setShowCancelConfirm(false)}
+          />
         </div>
       </FullscreenExam>
     );

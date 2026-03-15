@@ -10,6 +10,8 @@ import {
   CornersOut,
   CornersIn,
   CircleNotch,
+  FastForward,
+  Rewind,
 } from "@phosphor-icons/react";
 import type { VideoScriptContent } from "@/lib/ai/types";
 
@@ -41,9 +43,18 @@ export function VideoScriptRenderer({
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [seekIndicator, setSeekIndicator] = useState<"forward" | "backward" | null>(null);
+  const seekCountRef = useRef(0);
+  const [seekKey, setSeekKey] = useState(0);
+  const seekIndicatorTimer = useRef<ReturnType<typeof setTimeout>>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   const progress = duration > 0 ? currentTime / duration : 0;
+
+  // Re-focus container so keyboard keeps working after button clicks
+  const refocus = useCallback(() => {
+    containerRef.current?.focus();
+  }, []);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
@@ -57,14 +68,16 @@ export function VideoScriptRenderer({
       setIsLoading(true);
       video.play().finally(() => setIsLoading(false));
     }
-  }, [isPlaying]);
+    refocus();
+  }, [isPlaying, refocus]);
 
   const toggleMute = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
     video.muted = !video.muted;
     setIsMuted(video.muted);
-  }, []);
+    refocus();
+  }, [refocus]);
 
   const toggleFullscreen = useCallback(() => {
     const el = containerRef.current;
@@ -74,7 +87,8 @@ export function VideoScriptRenderer({
     } else {
       el.requestFullscreen();
     }
-  }, []);
+    refocus();
+  }, [refocus]);
 
   const seek = useCallback(
     (delta: number) => {
@@ -85,6 +99,14 @@ export function VideoScriptRenderer({
         Math.min(video.duration || 0, video.currentTime + delta)
       );
       setCurrentTime(video.currentTime);
+
+      // Show seek indicator
+      const dir = delta > 0 ? "forward" : "backward";
+      seekCountRef.current += 1;
+      setSeekIndicator(dir);
+      setSeekKey(seekCountRef.current);
+      if (seekIndicatorTimer.current) clearTimeout(seekIndicatorTimer.current);
+      seekIndicatorTimer.current = setTimeout(() => setSeekIndicator(null), 3000);
     },
     []
   );
@@ -171,6 +193,7 @@ export function VideoScriptRenderer({
     );
     video.currentTime = ratio * duration;
     setCurrentTime(ratio * duration);
+    refocus();
   };
 
   // Keyboard controls
@@ -301,6 +324,55 @@ export function VideoScriptRenderer({
                 weight="duotone"
                 className="animate-spin text-white"
               />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Seek indicator — YouTube-style half-screen arc */}
+        <AnimatePresence>
+          {seekIndicator && (
+            <motion.div
+              key={`seek-${seekKey}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease }}
+              className={`pointer-events-none absolute inset-y-0 flex items-center ${
+                seekIndicator === "forward"
+                  ? "right-0 justify-center"
+                  : "left-0 justify-center"
+              }`}
+              style={{ width: "50%" }}
+            >
+              {/* Arc background */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4, ease }}
+                className="absolute inset-0"
+                style={{
+                  background:
+                    seekIndicator === "forward"
+                      ? "radial-gradient(ellipse at 85% 50%, rgba(255,255,255,0.15) 0%, transparent 65%)"
+                      : "radial-gradient(ellipse at 15% 50%, rgba(255,255,255,0.15) 0%, transparent 65%)",
+                }}
+              />
+              {/* Icon + label */}
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.5, opacity: 0 }}
+                transition={{ duration: 0.3, ease }}
+                className="relative flex flex-col items-center gap-2 text-white"
+              >
+                {seekIndicator === "forward" ? (
+                  <FastForward size={56} weight="duotone" />
+                ) : (
+                  <Rewind size={56} weight="duotone" />
+                )}
+                <span className="text-sm font-medium">5s</span>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>

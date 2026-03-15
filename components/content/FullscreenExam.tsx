@@ -92,3 +92,57 @@ function formatTime(seconds: number): string {
   const s = seconds % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
+
+// ─── Cancel Confirmation Overlay ───────────────────────────
+
+interface CancelOverlayProps {
+  show: boolean;
+  label: string;
+  onConfirm: () => void;
+  onDismiss: () => void;
+}
+
+export function CancelOverlay({ show, label, onConfirm, onDismiss }: CancelOverlayProps) {
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3, ease }}
+          className="absolute inset-0 z-50 flex items-center justify-center bg-black/40"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3, ease }}
+            className="mx-4 max-w-sm rounded-3xl border border-gray-900/10 bg-white p-8 text-center shadow-2xl dark:border-white/15 dark:bg-gray-900"
+          >
+            <p className="font-display text-lg font-light text-gray-900 dark:text-white">
+              Cancel {label}?
+            </p>
+            <p className="mt-3 text-sm text-gray-900/50 dark:text-white/50" style={{ textWrap: "balance" }}>
+              Your answers will not be saved. All progress will be lost.
+            </p>
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <button
+                onClick={onConfirm}
+                className="w-full rounded-full border border-red-500/20 bg-red-500/10 px-6 py-2.5 text-sm font-medium text-red-600 transition-all hover:bg-red-500/20 dark:text-red-400"
+              >
+                Yes, Cancel {label}
+              </button>
+              <button
+                onClick={onDismiss}
+                className="rounded-full px-6 py-2 text-sm font-medium text-gray-900/60 transition-all hover:text-gray-900 dark:text-white/60 dark:hover:text-white"
+              >
+                Continue {label}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}

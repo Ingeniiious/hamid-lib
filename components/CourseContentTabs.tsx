@@ -6,6 +6,7 @@ import { ContentRenderer } from "@/components/content/ContentRenderer";
 import { LanguageSelector } from "@/components/content/LanguageSelector";
 import { OptionPicker } from "@/components/OptionPicker";
 import { useTranslation } from "@/lib/i18n";
+import type { ContributionGroup } from "@/components/CourseDetail";
 import {
   Dialog,
   DialogContent,
@@ -204,10 +205,24 @@ interface CourseContentTabsProps {
   publishedContent: PublishedContentItem[];
   availableTranslations: Record<string, AvailableTranslation[]>;
   courseTitle?: string;
+  contributionGroups?: ContributionGroup[];
 }
 
-export function CourseContentTabs({ publishedContent, availableTranslations, courseTitle }: CourseContentTabsProps) {
+export function CourseContentTabs({ publishedContent, availableTranslations, courseTitle, contributionGroups = [] }: CourseContentTabsProps) {
   const { t } = useTranslation();
+
+  // Contribution filter — "all" shows everything, otherwise filter by group key
+  const showContributionFilter = contributionGroups.length > 1;
+  const [selectedContribution, setSelectedContribution] = useState<string>("all");
+
+  // Filter published content by selected contribution group
+  const filteredContent = useMemo(() => {
+    if (selectedContribution === "all" || !showContributionFilter) return publishedContent;
+    const group = contributionGroups.find((g) => g.key === selectedContribution);
+    if (!group) return publishedContent;
+    const allowedIds = new Set(group.contentIds);
+    return publishedContent.filter((item) => allowedIds.has(item.id));
+  }, [publishedContent, selectedContribution, contributionGroups, showContributionFilter]);
 
   // Group content by tab
   const tabData = useMemo(() => {
@@ -217,7 +232,7 @@ export function CourseContentTabs({ publishedContent, availableTranslations, cou
       exam: [],
       media: [],
     };
-    for (const item of publishedContent) {
+    for (const item of filteredContent) {
       for (const [tab, types] of Object.entries(TAB_CONTENT_TYPES)) {
         if (types.includes(item.contentType)) {
           grouped[tab].push(item);
@@ -226,7 +241,7 @@ export function CourseContentTabs({ publishedContent, availableTranslations, cou
       }
     }
     return grouped;
-  }, [publishedContent]);
+  }, [filteredContent]);
 
   // Only show tabs that have content
   const activeTabs = useMemo(() => {
@@ -306,8 +321,41 @@ export function CourseContentTabs({ publishedContent, availableTranslations, cou
     media: "media",
   };
 
+  const handleContributionChange = (key: string) => {
+    setSelectedContribution(key);
+    setActiveType("");
+    setActiveVariantIndex(0);
+    setViewingTranslation(null);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Contribution source filter — only shown when 2+ contribution groups */}
+      {showContributionFilter && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, ease }}
+          className="flex justify-center"
+        >
+          <div className="w-full max-w-xs">
+            <OptionPicker
+              options={[
+                { value: "all", label: t("courseContent.allSources") || "All Sources" },
+                ...contributionGroups.map((g) => ({
+                  value: g.key,
+                  label: g.title,
+                })),
+              ]}
+              value={selectedContribution}
+              onChange={handleContributionChange}
+              placeholder={t("courseContent.selectSource") || "Select Source..."}
+              size="sm"
+            />
+          </div>
+        </motion.div>
+      )}
+
       {/* Tab cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {activeTabs.map((tab) => (

@@ -14,6 +14,12 @@ import type { PublishedContentItem, AvailableTranslation } from "@/components/Co
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 const CDN = "https://lib.thevibecodedcompany.com";
 
+export interface ContributionGroup {
+  key: string;
+  title: string;
+  contentIds: string[];
+}
+
 interface CourseDetailProps {
   course: {
     id: string;
@@ -28,9 +34,10 @@ interface CourseDetailProps {
   initialSubscribed?: boolean;
   publishedContent?: PublishedContentItem[];
   availableTranslations?: Record<string, AvailableTranslation[]>;
+  contributionGroups?: ContributionGroup[];
 }
 
-export function CourseDetail({ course, isContributor, facultySlug, initialSubscribed = false, publishedContent = [], availableTranslations = {} }: CourseDetailProps) {
+export function CourseDetail({ course, isContributor, facultySlug, initialSubscribed = false, publishedContent = [], availableTranslations = {}, contributionGroups = [] }: CourseDetailProps) {
   const { t } = useTranslation();
   // Preload on mount so the image is ready before user scrolls down
   useEffect(() => {
@@ -86,6 +93,7 @@ export function CourseDetail({ course, isContributor, facultySlug, initialSubscr
               publishedContent={publishedContent}
               availableTranslations={availableTranslations}
               courseTitle={course.title}
+              contributionGroups={contributionGroups}
             />
           </motion.div>
 
