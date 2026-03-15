@@ -19,13 +19,27 @@ import { stitchScenes } from "./ffmpeg-stitch";
 import type { VideoScriptContent } from "./types";
 import type { StitchInput } from "./ffmpeg-stitch";
 
-// ── Scene image R2 key pattern ──────────────────────────────────────────────
+// ── R2 key patterns ─────────────────────────────────────────────────────────
 
 function sceneImageKey(contentId: string, sceneIndex: number): string {
   return `video/scenes/${contentId}/scene_${sceneIndex}.png`;
 }
 
-// ── Original video generation (English) ─────────────────────────────────────
+function sceneAudioKey(contentId: string, sceneIndex: number): string {
+  return `video/scenes/${contentId}/scene_${sceneIndex}.mp3`;
+}
+
+// ── Original video generation (resumable) ───────────────────────────────────
+//
+// Each scene's image + audio is uploaded to R2 immediately after generation.
+// On retry (e.g. after timeout), already-cached assets are downloaded from R2
+// instead of being regenerated. This means progress is never lost.
+//
+// Flow per scene:
+//   1. Check R2 for cached image + audio
+//   2. If both exist → skip (use cached)
+//   3. If missing → generate + upload to R2 immediately
+//   4. Once ALL scenes have assets → stitch + upload final MP4
 
 export async function generateVideoForContent(contentId: string): Promise<{
   mediaUrl: string;
@@ -65,78 +79,111 @@ export async function generateVideoForContent(contentId: string): Promise<{
     );
   }
 
-  console.log(
-    `[video] Processing ${script.scenes.length} scenes, lang=${row.language}`
-  );
+  const total = script.scenes.length;
 
-  // 3. Generate all scene assets in parallel (image + audio per scene)
-  const results = await Promise.allSettled(
-    script.scenes.map((scene, i) =>
+  // 3. Check R2 for already-cached scene assets (from previous partial runs)
+  console.log(`[video] Checking R2 for cached assets (${total} scenes)...`);
+  const cachedChecks = await Promise.all(
+    script.scenes.map((_, i) =>
       Promise.all([
-        generateSceneImage(scene.imagePrompt ?? scene.visualDescription),
-        synthesizeGrok({
-          text: scene.narration,
-          voiceId: "ara",
-          language: row.language,
-        }),
-      ]).then(([imageResult, audioResult]) => {
-        console.log(
-          `[video] Scene ${i + 1}/${script.scenes.length} assets ready`
-        );
-        return { imageResult, audioResult };
-      })
+        downloadFromR2(sceneImageKey(contentId, i)),
+        downloadFromR2(sceneAudioKey(contentId, i)),
+      ])
     )
   );
 
-  // 4. Check results — if any failed, throw with details
-  const failed = results.filter(
-    (r): r is PromiseRejectedResult => r.status === "rejected"
+  const cachedCount = cachedChecks.filter(
+    ([img, aud]) => img.success && aud.success
+  ).length;
+
+  console.log(
+    `[video] ${cachedCount}/${total} scenes already cached in R2, ` +
+      `${total - cachedCount} to generate, lang=${row.language}`
   );
 
-  if (failed.length > 0) {
-    const firstError = failed[0].reason;
+  // 4. Generate missing assets in parallel, upload each to R2 immediately
+  const results = await Promise.allSettled(
+    script.scenes.map(async (scene, i) => {
+      const [cachedImage, cachedAudio] = cachedChecks[i];
+
+      // Use cached if both exist
+      if (cachedImage.success && cachedAudio.success) {
+        console.log(`[video] Scene ${i + 1}/${total} — cached, skipping`);
+        return {
+          image: cachedImage.data,
+          audio: cachedAudio.data,
+        };
+      }
+
+      // Generate image (or use cached)
+      let imageBuffer: Buffer;
+      if (cachedImage.success) {
+        imageBuffer = cachedImage.data;
+      } else {
+        const imageResult = await generateSceneImage(
+          scene.imagePrompt ?? scene.visualDescription
+        );
+        imageBuffer = imageResult.image;
+        // Upload to R2 immediately
+        await uploadToR2(
+          new Uint8Array(imageBuffer),
+          sceneImageKey(contentId, i),
+          "image/png"
+        );
+        console.log(`[video] Scene ${i + 1}/${total} image → R2`);
+      }
+
+      // Generate audio (or use cached)
+      let audioBuffer: Buffer;
+      if (cachedAudio.success) {
+        audioBuffer = cachedAudio.data;
+      } else {
+        const audioResult = await synthesizeGrok({
+          text: scene.narration,
+          voiceId: "ara",
+          language: row.language,
+        });
+        audioBuffer = audioResult.audio;
+        // Upload to R2 immediately
+        await uploadToR2(
+          new Uint8Array(audioBuffer),
+          sceneAudioKey(contentId, i),
+          "audio/mpeg"
+        );
+        console.log(`[video] Scene ${i + 1}/${total} audio → R2`);
+      }
+
+      console.log(`[video] Scene ${i + 1}/${total} assets ready`);
+      return { image: imageBuffer, audio: audioBuffer };
+    })
+  );
+
+  // 5. Check results — if any failed, throw (but cached ones are safe in R2)
+  const succeeded: StitchInput[] = [];
+  const failedIndices: number[] = [];
+
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    if (r.status === "fulfilled") {
+      succeeded.push(r.value);
+    } else {
+      failedIndices.push(i);
+    }
+  }
+
+  if (failedIndices.length > 0) {
+    const firstError = (results[failedIndices[0]] as PromiseRejectedResult).reason;
     throw new Error(
-      `[video] ${failed.length}/${script.scenes.length} scenes failed. ` +
+      `[video] ${failedIndices.length}/${total} scenes failed (${succeeded.length} cached in R2). ` +
+        `Failed: [${failedIndices.join(",")}]. ` +
         `First error: ${firstError instanceof Error ? firstError.message : String(firstError)}`
     );
   }
 
-  // All succeeded — extract scene assets
-  const sceneImages: Buffer[] = [];
-  const sceneAssets: StitchInput[] = results.map((r) => {
-    const { imageResult, audioResult } = (
-      r as PromiseFulfilledResult<{
-        imageResult: { image: Buffer; mimeType: string };
-        audioResult: { audio: Buffer; characterCount: number };
-      }>
-    ).value;
-
-    sceneImages.push(imageResult.image);
-
-    return {
-      image: imageResult.image,
-      audio: audioResult.audio,
-    };
-  });
-
-  console.log(
-    `[video] All ${sceneAssets.length} scene assets generated, starting stitch...`
-  );
-
-  // 5. Cache scene images to R2 (for translated video reuse)
-  console.log(`[video] Caching ${sceneImages.length} scene images to R2...`);
-  await Promise.all(
-    sceneImages.map((img, i) =>
-      uploadToR2(
-        new Uint8Array(img),
-        sceneImageKey(contentId, i),
-        "image/png"
-      )
-    )
-  );
+  console.log(`[video] All ${total} scene assets ready, stitching...`);
 
   // 6. Stitch all scenes into a single MP4
-  const mp4Buffer = await stitchScenes(sceneAssets);
+  const mp4Buffer = await stitchScenes(succeeded);
 
   // 7. Upload final video to R2
   const mediaKey = `video/courses/${contentId}.mp4`;
@@ -173,7 +220,7 @@ export async function generateVideoForContent(contentId: string): Promise<{
     mediaUrl,
     mediaKey,
     mediaSize,
-    totalScenes: script.scenes.length,
+    totalScenes: total,
   };
 }
 
