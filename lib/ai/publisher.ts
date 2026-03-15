@@ -19,8 +19,9 @@ import {
   generatedContent,
   aiModelConfig,
   course,
+  contribution,
 } from "@/database/schema";
-import { eq, and, asc, sql } from "drizzle-orm";
+import { eq, and, asc, sql, inArray } from "drizzle-orm";
 import { complete } from "@/lib/ai/client";
 import { calculateStepCost } from "@/lib/ai/cost";
 import { getGeneratorPrompt } from "@/lib/ai/prompts";
@@ -282,7 +283,7 @@ export async function processGenerationStep(
     response.inputTokens * config.costPerInputToken +
     response.outputTokens * config.costPerOutputToken;
 
-  // Determine title —use course name + content type label
+  // Determine title —use contribution name + course name + content type label
   const MULTI_VARIANT_TYPES = new Set(["mock_exam", "quiz", "flashcards", "interactive_section"]);
   const TEACHER_NAMES: Record<string, string> = {
     kimi: "Luna",
@@ -301,12 +302,38 @@ export async function processGenerationStep(
     .limit(1);
   const courseName = courseRow?.title;
 
-  const baseTitle = courseName
-    ? `${courseName} · ${generateTitle(contentType)}`
-    : generateTitle(contentType);
-  const title = MULTI_VARIANT_TYPES.has(contentType)
-    ? `${baseTitle} · ${teacherName}`
-    : baseTitle;
+  // Fetch contribution title(s) —videos are per-contribution, title reflects the source
+  const contribIds = (job.contributionIds as number[]) ?? [];
+  let contribTitle: string | null = null;
+  if (contribIds.length > 0) {
+    const contribs = await db
+      .select({ title: contribution.title })
+      .from(contribution)
+      .where(inArray(contribution.id, contribIds));
+    if (contribs.length === 1) {
+      contribTitle = contribs[0].title;
+    } else if (contribs.length > 1) {
+      contribTitle = contribs.map((c) => c.title).join(" + ");
+    }
+  }
+
+  // Build title: "Week 2 Information · Introduction To Finance · Video"
+  // For content with contribution context, include the source name
+  const typeLabel = generateTitle(contentType);
+  let title: string;
+  if (contribTitle && courseName) {
+    const baseTitle = `${contribTitle} · ${courseName} · ${typeLabel}`;
+    title = MULTI_VARIANT_TYPES.has(contentType)
+      ? `${baseTitle} · ${teacherName}`
+      : baseTitle;
+  } else {
+    const baseTitle = courseName
+      ? `${courseName} · ${typeLabel}`
+      : typeLabel;
+    title = MULTI_VARIANT_TYPES.has(contentType)
+      ? `${baseTitle} · ${teacherName}`
+      : baseTitle;
+  }
 
   // Save to generated_content —use the detected source language, not hardcoded "en"
   await db.insert(generatedContent).values({
