@@ -281,10 +281,18 @@ export async function processGenerationStep(
     response.inputTokens * config.costPerInputToken +
     response.outputTokens * config.costPerOutputToken;
 
-  // Determine title — for multi-variant types, include the model name
+  // Determine title — for multi-variant types, include the teacher name (never expose model names)
   const MULTI_VARIANT_TYPES = new Set(["mock_exam", "quiz", "flashcards", "interactive_section"]);
+  const TEACHER_NAMES: Record<string, string> = {
+    kimi: "Luna",
+    chatgpt: "Atlas",
+    claude: "Nova",
+    gemini: "Sage",
+    grok: "Echo",
+  };
+  const teacherName = TEACHER_NAMES[config.slug] ?? config.slug;
   const title = MULTI_VARIANT_TYPES.has(contentType)
-    ? `${generateTitle(contentType, job)} — Variant ${config.slug}`
+    ? `${generateTitle(contentType, job)} — Variant ${teacherName}`
     : generateTitle(contentType, job);
 
   // Save to generated_content — use the detected source language, not hardcoded "en"

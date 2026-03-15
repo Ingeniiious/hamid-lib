@@ -4,15 +4,162 @@ import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ContentRenderer } from "@/components/content/ContentRenderer";
 import { LanguageSelector } from "@/components/content/LanguageSelector";
+import { OptionPicker } from "@/components/OptionPicker";
 import { useTranslation } from "@/lib/i18n";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as const;
 
+const TEACHER_NAMES: Record<string, string> = {
+  kimi: "Luna",
+  chatgpt: "Atlas",
+  claude: "Nova",
+  gemini: "Sage",
+  grok: "Echo",
+};
+
+// ---------------------------------------------------------------------------
+// VariantPicker — dropdown with title label + help modal explaining AI teachers
+// ---------------------------------------------------------------------------
+
+const R2_TEACHERS = "https://lib.thevibecodedcompany.com/images/teachers";
+
+const TEACHER_INFO: { slug: string; name: string; descKey: string }[] = [
+  { slug: "kimi", name: "Luna", descKey: "teacherLuna" },
+  { slug: "chatgpt", name: "Atlas", descKey: "teacherAtlas" },
+  { slug: "claude", name: "Nova", descKey: "teacherNova" },
+  { slug: "gemini", name: "Sage", descKey: "teacherSage" },
+  { slug: "grok", name: "Echo", descKey: "teacherEcho" },
+];
+
+function VariantPicker({
+  items,
+  activeIndex,
+  onSelect,
+}: {
+  items: PublishedContentItem[];
+  activeIndex: number;
+  onSelect: (idx: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3, ease }}
+      className="space-y-2"
+    >
+      {/* Label + help button */}
+      <div className="flex items-center justify-center gap-2">
+        <span className="text-xs font-medium text-gray-900/40 dark:text-white/40">
+          {t("courseContent.createdBy")}
+        </span>
+        <button
+          onClick={() => setHelpOpen(true)}
+          className="rounded-full border border-gray-900/10 px-2 py-0.5 text-[10px] font-medium text-gray-900/40 transition-colors hover:bg-gray-900/5 hover:text-gray-900/60 dark:border-white/10 dark:text-white/40 dark:hover:bg-white/5 dark:hover:text-white/60"
+        >
+          {t("courseContent.whatIsThis")}
+        </button>
+      </div>
+
+      {/* Teacher avatar grid */}
+      <div className="flex items-center justify-center gap-3">
+        {items.map((item, idx) => {
+          const isActive = activeIndex === idx;
+          const slug = item.modelSource ?? "";
+          const teacherName = TEACHER_NAMES[slug] ?? `${t("courseContent.variant")} ${idx + 1}`;
+
+          return (
+            <motion.button
+              key={item.id}
+              onClick={() => onSelect(idx)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ duration: 0.2, ease }}
+              className="flex flex-col items-center gap-1.5"
+            >
+              <div className={`relative h-10 w-10 overflow-hidden rounded-full border-2 transition-all duration-200 ${
+                isActive
+                  ? "border-[#5227FF] shadow-md shadow-[#5227FF]/20 dark:border-[#8B6FFF]"
+                  : "border-gray-900/10 opacity-50 hover:opacity-80 dark:border-white/15"
+              }`}>
+                <img
+                  src={`${R2_TEACHERS}/${slug}.webp`}
+                  alt={teacherName}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+              <span className={`text-[10px] font-medium transition-colors ${
+                isActive
+                  ? "text-[#5227FF] dark:text-[#8B6FFF]"
+                  : "text-gray-900/40 dark:text-white/40"
+              }`}>
+                {teacherName}
+              </span>
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* Help modal */}
+      <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+        <DialogContent className="max-w-md rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-center font-display text-lg font-light">
+              {t("courseContent.aiTeachersTitle")}
+            </DialogTitle>
+            <DialogDescription className="text-center text-sm text-gray-900/50 dark:text-white/50">
+              {t("courseContent.aiTeachersDesc")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 max-h-[60vh] space-y-2 overflow-y-auto">
+            {TEACHER_INFO.map((teacher, i) => (
+              <motion.div
+                key={teacher.slug}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4, ease, delay: i * 0.08 }}
+                className="flex items-center gap-3 rounded-2xl border border-gray-900/10 bg-gray-900/[0.02] p-3 dark:border-white/10 dark:bg-white/[0.02]"
+              >
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
+                  <img
+                    src={`${R2_TEACHERS}/${teacher.slug}.webp`}
+                    alt={teacher.name}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div className="min-w-0 flex-1 text-center">
+                  <p className="text-xs font-medium text-[#5227FF] dark:text-[#8B6FFF]">
+                    {teacher.name}
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-gray-900/60 dark:text-white/60">
+                    {t(`courseContent.${teacher.descKey}`)}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </motion.div>
+  );
+}
+
 // Tab → content type mapping
 const TAB_CONTENT_TYPES: Record<string, string[]> = {
-  learning: ["study_guide", "slide_deck", "report", "interactive_section"],
-  studying: ["flashcards", "mind_map", "data_table", "infographic_data", "podcast_script", "video_script"],
-  exam: ["quiz", "mock_exam"],
+  learn: ["study_guide", "interactive_section", "slide_deck", "report"],
+  practice: ["flashcards", "quiz", "mind_map", "data_table", "infographic_data"],
+  exam: ["mock_exam"],
+  media: ["podcast_script", "video_script"],
 };
 
 // Content type display label keys (i18n)
@@ -64,9 +211,10 @@ export function CourseContentTabs({ publishedContent, availableTranslations }: C
   // Group content by tab
   const tabData = useMemo(() => {
     const grouped: Record<string, PublishedContentItem[]> = {
-      learning: [],
-      studying: [],
+      learn: [],
+      practice: [],
       exam: [],
+      media: [],
     };
     for (const item of publishedContent) {
       for (const [tab, types] of Object.entries(TAB_CONTENT_TYPES)) {
@@ -81,23 +229,23 @@ export function CourseContentTabs({ publishedContent, availableTranslations }: C
 
   // Only show tabs that have content
   const activeTabs = useMemo(() => {
-    return (["learning", "studying", "exam"] as const).filter(
+    return (["learn", "practice", "exam", "media"] as const).filter(
       (tab) => tabData[tab].length > 0,
     );
   }, [tabData]);
 
-  const [activeTab, setActiveTab] = useState<string>(activeTabs[0] ?? "learning");
+  const [activeTab, setActiveTab] = useState<string>(activeTabs[0] ?? "learn");
 
-  // Content types available in current tab
+  // Content types available in current tab — ordered to match TAB_CONTENT_TYPES definition
   const currentTabTypes = useMemo(() => {
     const items = tabData[activeTab] ?? [];
-    const types: string[] = [];
+    const available = new Set<string>();
     for (const item of items) {
-      if (!types.includes(item.contentType)) {
-        types.push(item.contentType);
-      }
+      available.add(item.contentType);
     }
-    return types;
+    // Preserve the order defined in TAB_CONTENT_TYPES
+    const definedOrder = TAB_CONTENT_TYPES[activeTab] ?? [];
+    return definedOrder.filter((type) => available.has(type));
   }, [tabData, activeTab]);
 
   const [activeType, setActiveType] = useState<string>("");
@@ -151,82 +299,163 @@ export function CourseContentTabs({ publishedContent, availableTranslations }: C
   if (activeTabs.length === 0) return null;
 
   const tabLabelKey: Record<string, string> = {
-    learning: "learning",
-    studying: "studying",
+    learn: "learn",
+    practice: "practice",
     exam: "exam",
+    media: "media",
   };
 
   return (
     <div className="space-y-6">
-      {/* Tab bar */}
-      <div className="flex items-center justify-center gap-2">
+      {/* Tab cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {activeTabs.map((tab) => (
-          <button
+          <motion.button
             key={tab}
             onClick={() => handleTabChange(tab)}
-            className={`rounded-full px-5 py-2 text-sm font-medium transition-all ${
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ duration: 0.3, ease }}
+            className={`group relative flex items-center justify-center overflow-hidden rounded-2xl px-4 py-5 transition-all duration-300 ${
               activeTab === tab
-                ? "bg-[#5227FF] text-white"
-                : "bg-gray-900/5 text-gray-900/60 hover:bg-gray-900/10 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10"
+                ? "border border-[#5227FF]/20 bg-[#5227FF]/5 shadow-md dark:border-[#8B6FFF]/20 dark:bg-[#5227FF]/10"
+                : "border border-gray-900/10 bg-white/50 backdrop-blur-xl hover:shadow-lg dark:border-white/15 dark:bg-white/5"
             }`}
           >
-            {t(`courseContent.${tabLabelKey[tab]}`) || tab}
-          </button>
+            {/* Grainient hover overlay */}
+            <span
+              className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 ease-out group-hover:opacity-100"
+              style={{
+                background:
+                  "radial-gradient(ellipse at 30% 20%, rgba(255,159,252,0.18), transparent 60%), radial-gradient(ellipse at 70% 80%, rgba(82,39,255,0.15), transparent 60%), radial-gradient(ellipse at 50% 50%, rgba(177,158,239,0.12), transparent 70%)",
+              }}
+            />
+            {/* Grain noise */}
+            <span
+              className="pointer-events-none absolute inset-0 opacity-0 mix-blend-overlay transition-opacity duration-500 ease-out group-hover:opacity-40"
+              style={{
+                backgroundImage:
+                  "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+                backgroundSize: "128px 128px",
+              }}
+            />
+            <span className={`relative z-10 font-display text-sm font-light sm:text-base ${
+              activeTab === tab
+                ? "text-[#5227FF] dark:text-[#8B6FFF]"
+                : "text-gray-900 dark:text-white"
+            }`}>
+              {t(`courseContent.${tabLabelKey[tab]}`) || tab}
+            </span>
+          </motion.button>
         ))}
       </div>
 
-      {/* Content type selector (if multiple types in tab) */}
-      {currentTabTypes.length > 1 && (
+      {/* Content type selector + variant picker */}
+      {currentTabTypes.length > 0 && (
         <motion.div
+          key={activeTab}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3, ease }}
-          className="flex flex-wrap items-center justify-center gap-1.5"
+          className="space-y-3"
         >
-          {currentTabTypes.map((type) => (
-            <button
-              key={type}
-              onClick={() => handleTypeChange(type)}
-              className={`rounded-full px-3.5 py-1 text-xs font-medium transition-all ${
-                effectiveType === type
-                  ? "bg-[#5227FF]/10 text-[#5227FF] dark:bg-[#5227FF]/20 dark:text-[#8B6FFF]"
-                  : "bg-gray-900/5 text-gray-900/50 hover:bg-gray-900/10 dark:bg-white/5 dark:text-white/50 dark:hover:bg-white/10"
-              }`}
-            >
-              {t(`courseContent.${CONTENT_TYPE_LABELS[type]}`) || type.replace(/_/g, " ")}
-            </button>
-          ))}
+          {/* Desktop: glass cards centered + translate button floating right */}
+          <div className="relative hidden sm:block">
+            <div className="flex items-center justify-center gap-2">
+              {currentTabTypes.map((type) => {
+                const isActive = effectiveType === type;
+
+                return (
+                  <motion.button
+                    key={type}
+                    onClick={() => handleTypeChange(type)}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    transition={{ duration: 0.2, ease }}
+                    className={`group relative flex items-center justify-center overflow-hidden rounded-2xl px-5 py-3 transition-all duration-300 ${
+                      isActive
+                        ? "border border-[#5227FF]/20 bg-[#5227FF]/5 shadow-sm dark:border-[#8B6FFF]/20 dark:bg-[#5227FF]/10"
+                        : "border border-gray-900/10 bg-white/50 backdrop-blur-xl hover:shadow-md dark:border-white/15 dark:bg-white/5"
+                    }`}
+                  >
+                    <span
+                      className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 ease-out group-hover:opacity-100"
+                      style={{
+                        background:
+                          "radial-gradient(ellipse at 30% 20%, rgba(255,159,252,0.18), transparent 60%), radial-gradient(ellipse at 70% 80%, rgba(82,39,255,0.15), transparent 60%), radial-gradient(ellipse at 50% 50%, rgba(177,158,239,0.12), transparent 70%)",
+                      }}
+                    />
+                    <span
+                      className="pointer-events-none absolute inset-0 opacity-0 mix-blend-overlay transition-opacity duration-500 ease-out group-hover:opacity-40"
+                      style={{
+                        backgroundImage:
+                          "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+                        backgroundSize: "128px 128px",
+                      }}
+                    />
+                    <span className={`relative z-10 text-xs font-medium ${
+                      isActive
+                        ? "text-[#5227FF] dark:text-[#8B6FFF]"
+                        : "text-gray-900/60 dark:text-white/60"
+                    }`}>
+                      {t(`courseContent.${CONTENT_TYPE_LABELS[type]}`) || type.replace(/_/g, " ")}
+                    </span>
+                  </motion.button>
+                );
+              })}
+            </div>
+            {/* Translate button — floats right, doesn't affect centering */}
+            {currentItem && (
+              <div className="absolute right-0 top-1/2 -translate-y-1/2">
+                <LanguageSelector
+                  contentId={currentItem.id}
+                  contentLanguage={currentItem.language}
+                  availableTranslations={availableTranslations[currentItem.id] ?? []}
+                  viewingTranslation={viewingTranslation}
+                  onSelectTranslation={setViewingTranslation}
+                  compact
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Mobile: OptionPicker centered + translate button */}
+          <div className="relative sm:hidden">
+            <OptionPicker
+              options={currentTabTypes.map((type) => ({
+                value: type,
+                label: t(`courseContent.${CONTENT_TYPE_LABELS[type]}`) || type.replace(/_/g, " "),
+              }))}
+              value={effectiveType}
+              onChange={(type) => {
+                handleTypeChange(type);
+                setViewingTranslation(null);
+              }}
+              size="sm"
+            />
+            {currentItem && (
+              <div className="mt-2 flex items-center justify-center">
+                <LanguageSelector
+                  contentId={currentItem.id}
+                  contentLanguage={currentItem.language}
+                  availableTranslations={availableTranslations[currentItem.id] ?? []}
+                  viewingTranslation={viewingTranslation}
+                  onSelectTranslation={setViewingTranslation}
+                  compact
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Variant picker (if multiple variants of selected type) */}
+          {hasMultipleVariants && (
+            <VariantPicker
+              items={currentItems}
+              activeIndex={activeVariantIndex}
+              onSelect={(idx) => { setActiveVariantIndex(idx); setViewingTranslation(null); }}
+            />
+          )}
         </motion.div>
-      )}
-
-      {/* Variant selector (if multiple items of same type) */}
-      {hasMultipleVariants && (
-        <div className="flex items-center justify-center gap-2">
-          {currentItems.map((item, idx) => (
-            <button
-              key={item.id}
-              onClick={() => { setActiveVariantIndex(idx); setViewingTranslation(null); }}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
-                activeVariantIndex === idx
-                  ? "bg-[#5227FF]/10 text-[#5227FF] dark:bg-[#5227FF]/20 dark:text-[#8B6FFF]"
-                  : "bg-gray-900/5 text-gray-900/50 hover:bg-gray-900/10 dark:bg-white/5 dark:text-white/50 dark:hover:bg-white/10"
-              }`}
-            >
-              {t("courseContent.variant")} {idx + 1}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Language selector + Original/Translated toggle */}
-      {currentItem && (
-        <LanguageSelector
-          contentId={currentItem.id}
-          contentLanguage={currentItem.language}
-          availableTranslations={availableTranslations[currentItem.id] ?? []}
-          viewingTranslation={viewingTranslation}
-          onSelectTranslation={setViewingTranslation}
-        />
       )}
 
       {/* Content renderer */}

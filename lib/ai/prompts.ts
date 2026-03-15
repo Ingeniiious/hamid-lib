@@ -217,19 +217,58 @@ USAGE GUIDELINES:
 - About 30-40% of segments should use speech tags. Do NOT tag every single line — let some lines breathe without any tags.
 - Tags should add genuine emotion and make the podcast feel alive, not robotic or over-produced.
 
+BRANDING (MANDATORY — weave these naturally into the script):
+- INTRO (first segment): Host must open with a warm welcome: "Welcome to the Libraryyy Podcast" followed by the course name and a brief teaser of what this episode covers.
+- MID-ROLL BREAKS (2-3 times, spaced evenly through the episode): Insert a brief ~10-second branding moment where a speaker naturally references the platform. Examples:
+  - "You're listening to the Libraryyy Podcast — free study resources for university students everywhere."
+  - "This episode is brought to you by Libraryyy.com — your open-source university study companion."
+  - "If you're finding this helpful, check out Libraryyy.com for flashcards, study guides, and more on this topic."
+  - "Libraryyy.com — where students help students learn better, for free."
+  Keep these varied and conversational — never repeat the exact same line. They should feel like natural asides, not forced ads.
+- OUTRO (last 1-2 segments): Host wraps up with: "This podcast was created by Libraryyy.com" and encourages listeners to explore the platform for more study materials.
+- PRONUNCIATION: "Libraryyy" is pronounced "Library" with a longer 'y' sound — spell it as "Libraryyy" in the script (the TTS will handle pronunciation).
+
 Structure as a conversational dialogue between Host and Expert. Include an intro, main discussion with 3-5 key segments, and a closing summary. Aim for 10-20 minutes of content.`,
 
   video_script: `{
   "scenes": [
     {
       "title": "Scene title (string)",
-      "narration": "Voiceover or spoken text (string)",
-      "visualDescription": "What should appear on screen (string)",
+      "narration": "Voiceover text that directly teaches by referencing the visual (string)",
+      "visualDescription": "What the viewer sees on screen — used for human review only (string)",
+      "imagePrompt": "Concise image generation prompt for AI (Nano Banana 2) — what to DRAW on the branded background (string)",
       "duration": "Estimated duration, e.g. 30s, 1m (string)"
     }
   ]
 }
-Structure as a visual learning experience. Include an intro hook, main content in logical scenes, and a recap. Describe visuals concretely (diagrams, animations, text overlays).`,
+
+NARRATION STYLE (MANDATORY — this is NOT a podcast):
+- This is a VISUAL TEACHING video. The narration must directly reference and explain what the viewer sees on screen.
+- Use phrases like: "As you can see here...", "Notice how...", "Looking at this diagram...", "On the left side, we have...", "The arrows show..."
+- The narration should teach the concept BY describing the visual. Every sentence should connect to what's being shown.
+- Do NOT make it conversational or discussion-based like a podcast. It is a single narrator teaching directly.
+- Keep the tone clear, educational, and focused. Like a professor explaining a slide.
+
+IMAGE PROMPT GUIDELINES (for the "imagePrompt" field):
+- The imagePrompt is passed to Nano Banana 2 (Gemini 3.1 Flash Image) alongside a branded background template image.
+- The AI image generator receives the branded background + your prompt, and draws educational content ON TOP of the background while preserving the template's logo, branding, and layout.
+- Write prompts as descriptive narrative sentences, NOT keyword lists. Example:
+  GOOD: "Using the provided background, draw a clear labeled flowchart in the center showing the 4 stages of the water cycle: evaporation, condensation, precipitation, and collection. Connect each stage with curved arrows. Use soft blue and green colors. Keep all text labels short (1-2 words each)."
+  BAD: "water cycle, flowchart, arrows, blue, evaporation"
+- Always start with "Using the provided background, draw..." or "On the provided template, illustrate..." so the model knows to preserve the background.
+- Focus on educational visuals: diagrams, flowcharts, comparisons, labeled illustrations, equations, timelines, process flows, concept maps, graphs, charts.
+- Be hyper-specific about layout and positioning: "in the center", "on the left side", "at the top", "arranged in a 2x2 grid".
+- Use short labels, numbers, and arrows. Do NOT request paragraphs of text in the image.
+- Specify colors and style: "clean, modern diagram with soft colors" or "whiteboard-style sketch with blue marker".
+- Keep prompts 50-150 words. Descriptive enough to be specific, concise enough to stay focused.
+- Think about what a professor would draw on a whiteboard to explain the concept.
+
+BRANDING (MANDATORY):
+- INTRO (first scene): Narration must open with "Welcome to Libraryyy" and introduce the topic.
+- OUTRO (last scene): Narration must close with "This video was created by Libraryyy.com" and encourage exploring the platform.
+- Do NOT add mid-roll branding like podcasts. The branded background template already has the logo visible in every scene.
+
+Structure as a visual learning experience. Include an intro scene, main content in logical scenes (8-15 scenes), and a closing recap.`,
 
   data_table: `{
   "headers": ["Column header (string)", ...],
@@ -361,8 +400,16 @@ CRITICAL RULES:
 - Use clear, precise academic language that is accessible to university students.
 - Do not fabricate information that is not supported by or inferable from the source material.
 - If the source material is thin on a topic, expand on it using your knowledge while staying faithful to the course context.
-- All text should be educational in tone — informative, engaging, and student-friendly.
-- Cover all major topics present in the source material proportionally — give more depth to complex topics.
+- All text should be educational in tone: informative, engaging, and student-friendly.
+- Cover all major topics present in the source material proportionally. Give more depth to complex topics.
+
+Writing style (MANDATORY):
+- Write like a human educator, not like an AI. Keep it natural and conversational where appropriate.
+- NEVER use em dashes (—). Use commas, periods, semicolons, or rewrite the sentence instead.
+- Avoid overusing colons to introduce lists or explanations. Prefer natural sentence flow.
+- Do not start sentences with "In this section" or "This section covers". Just teach the content directly.
+- Avoid filler phrases like "It is important to note that", "It should be noted", "Let's explore", "Let's dive into".
+- Keep sentences concise. Prefer short, clear sentences over long compound ones.
 
 Output requirements:
 - Output ONLY valid JSON. No markdown, no code fences, no commentary outside the JSON.
@@ -564,12 +611,20 @@ Output requirements:
 ${schema}
 
 Content rules:
-- Use the verified content as your primary source — it has been reviewed and fact-checked by multiple experts.
+- Use the verified content as your primary source. It has been reviewed and fact-checked by multiple experts.
 - Cover all major topics from the verified content proportionally.
 - Use clear, precise academic language accessible to university students.
 - Do not fabricate information not present in the verified content or original source.
-- All text should be educational in tone — informative, neutral, and student-friendly.
-- Ensure the output is comprehensive and production-ready.`;
+- All text should be educational in tone: informative, neutral, and student-friendly.
+- Ensure the output is comprehensive and production-ready.
+
+Writing style (MANDATORY):
+- Write like a human educator, not like an AI. Keep it natural and conversational where appropriate.
+- NEVER use em dashes (—). Use commas, periods, semicolons, or rewrite the sentence instead.
+- Avoid overusing colons to introduce lists or explanations. Prefer natural sentence flow.
+- Do not start sentences with "In this section" or "This section covers". Just teach the content directly.
+- Avoid filler phrases like "It is important to note that", "It should be noted", "Let's explore", "Let's dive into".
+- Keep sentences concise. Prefer short, clear sentences over long compound ones.`;
 }
 
 function generatorUser(

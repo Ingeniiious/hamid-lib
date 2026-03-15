@@ -51,13 +51,20 @@ export function CourseDetail({ course, isContributor, facultySlug, initialSubscr
         {course.semester && <span>{course.semester}</span>}
       </div>
 
-      {/* Subscribe + Share buttons */}
-      <div className="mt-6 flex items-center justify-center gap-3">
+      {/* Subscribe + Share + Contribute buttons */}
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         <SubscribeButton
           entityType="course"
           entityId={course.id}
           initialSubscribed={initialSubscribed}
         />
+        <GrainientButton
+          href={`/dashboard/contribute?courseId=${course.id}${facultySlug ? `&facultySlug=${facultySlug}` : ""}`}
+        >
+          {isContributor
+            ? t("contribute.contributeToCourse")
+            : t("contribute.becomeContributor")}
+        </GrainientButton>
         <ShareButton
           title={course.title}
           text={course.description || course.title}
@@ -81,27 +88,12 @@ export function CourseDetail({ course, isContributor, facultySlug, initialSubscr
             />
           </motion.div>
 
-          {/* Smaller contribute CTA below content */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, ease, delay: 0.6 }}
-            className="mt-12 text-center"
-          >
-            <GrainientButton
-              href={`/dashboard/contribute?courseId=${course.id}${facultySlug ? `&facultySlug=${facultySlug}` : ""}`}
-            >
-              {isContributor
-                ? t("contribute.contributeToCourse")
-                : t("contribute.becomeContributor")}
-            </GrainientButton>
-          </motion.div>
         </>
       ) : (
         <>
           {/* Empty state tabs */}
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {["Learning", "Studying", "Exam"].map((tab, i) => (
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {["learn", "practice", "exam", "media"].map((tab, i) => (
               <motion.div
                 key={tab}
                 initial={{ opacity: 0 }}
@@ -110,7 +102,7 @@ export function CourseDetail({ course, isContributor, facultySlug, initialSubscr
               >
                 <div className="rounded-2xl border border-gray-900/10 bg-white/50 p-6 text-center backdrop-blur-xl dark:border-white/15 dark:bg-white/5">
                   <h3 className="font-display text-sm font-light text-gray-900 dark:text-white">
-                    {tab}
+                    {t(`courseContent.${tab}`) || tab}
                   </h3>
                   <p className="mt-1 text-xs text-gray-900/40 dark:text-white/40">
                     {t("courseContent.noContentYet")}

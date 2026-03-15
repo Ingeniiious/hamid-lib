@@ -24,6 +24,7 @@ interface LanguageSelectorProps {
   availableTranslations: AvailableTranslation[];
   viewingTranslation: string | null;
   onSelectTranslation: (language: string | null) => void;
+  compact?: boolean;
 }
 
 export function LanguageSelector({
@@ -32,6 +33,7 @@ export function LanguageSelector({
   availableTranslations,
   viewingTranslation,
   onSelectTranslation,
+  compact = false,
 }: LanguageSelectorProps) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
@@ -113,12 +115,88 @@ export function LanguageSelector({
     }
   };
 
-  // If there are no other languages to show (content is in a language and there's nothing else), hide
+  // If there are no other languages to show, hide
   if (otherLanguages.length === 0) return null;
 
+  // Shared dropdown content
+  const dropdownContent = (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease }}
+          className="absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 rounded-2xl border border-gray-900/10 bg-white/95 p-2 shadow-lg backdrop-blur-xl dark:border-white/15 dark:bg-gray-900/95"
+        >
+          <div className="flex min-w-[180px] flex-col gap-1">
+            {/* Back to original option (if viewing translation) */}
+            {viewingTranslation && (
+              <button
+                onClick={() => { onSelectTranslation(null); setIsOpen(false); }}
+                className="flex items-center justify-center rounded-xl px-3 py-2 text-sm font-medium text-[#5227FF] transition-all hover:bg-gray-900/5 dark:text-[#8B6FFF] dark:hover:bg-white/5"
+              >
+                {t("translate.original")}
+              </button>
+            )}
+            {otherLanguages.map((lang) => {
+              const isAvailable = availableLangs.has(lang.code);
+              const isPending = pendingLanguages.has(lang.code);
+              const isViewing = viewingTranslation === lang.code;
+
+              return (
+                <button
+                  key={lang.code}
+                  onClick={() => !isPending && handleSelectLanguage(lang.code)}
+                  disabled={isPending}
+                  className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm transition-all hover:bg-gray-900/5 disabled:opacity-50 dark:hover:bg-white/5 ${
+                    isViewing ? "bg-[#5227FF]/5 dark:bg-[#5227FF]/10" : ""
+                  }`}
+                >
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {lang.nativeLabel}
+                  </span>
+                  {isPending && (
+                    <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                      {t("translate.pending")}
+                    </span>
+                  )}
+                  {isAvailable && !isViewing && (
+                    <span className="rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
+                      {t("translate.available")}
+                    </span>
+                  )}
+                  {!isAvailable && !isPending && (
+                    <span className="text-[10px] text-gray-900/30 dark:text-white/30">
+                      {t("translate.requestTranslation")}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  // Compact mode: animated cycling button with dropdown
+  if (compact) {
+    return (
+      <CompactTranslateButton
+        dropdownRef={dropdownRef}
+        isOpen={isOpen}
+        setIsOpen={setIsOpen}
+        viewingTranslation={viewingTranslation}
+        dropdownContent={dropdownContent}
+        t={t}
+      />
+    );
+  }
+
+  // Full mode (legacy)
   return (
     <div className="flex flex-col items-center gap-2">
-      {/* Original / Translated toggle */}
       {viewingTranslation && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -138,7 +216,6 @@ export function LanguageSelector({
         </motion.div>
       )}
 
-      {/* Language selector dropdown */}
       <div ref={dropdownRef} className="relative">
         <button
           onClick={() => setIsOpen(!isOpen)}
@@ -146,56 +223,9 @@ export function LanguageSelector({
         >
           {t("translate.contentInOtherLanguages")}
         </button>
-
-        <AnimatePresence>
-          {isOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2, ease }}
-              className="absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 rounded-2xl border border-gray-900/10 bg-white/95 p-2 shadow-lg backdrop-blur-xl dark:border-white/15 dark:bg-gray-900/95"
-            >
-              <div className="flex min-w-[180px] flex-col gap-1">
-                {otherLanguages.map((lang) => {
-                  const isAvailable = availableLangs.has(lang.code);
-                  const isPending = pendingLanguages.has(lang.code);
-
-                  return (
-                    <button
-                      key={lang.code}
-                      onClick={() => !isPending && handleSelectLanguage(lang.code)}
-                      disabled={isPending}
-                      className="flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition-all hover:bg-gray-900/5 disabled:opacity-50 dark:hover:bg-white/5"
-                    >
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {lang.nativeLabel}
-                      </span>
-                      {isAvailable && (
-                        <span className="rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
-                          {t("translate.available")}
-                        </span>
-                      )}
-                      {isPending && (
-                        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-                          {t("translate.pending")}
-                        </span>
-                      )}
-                      {!isAvailable && !isPending && (
-                        <span className="text-[10px] text-gray-900/30 dark:text-white/30">
-                          {t("translate.requestTranslation")}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {dropdownContent}
       </div>
 
-      {/* Pending translation notification */}
       {pendingLanguages.size > 0 && (
         <motion.p
           initial={{ opacity: 0 }}
@@ -203,9 +233,102 @@ export function LanguageSelector({
           transition={{ duration: 0.3, ease }}
           className="text-center text-xs text-gray-900/40 dark:text-white/40"
         >
-          {t("translate.translationRequested")} — {t("translate.checkBackSoon")}
+          {t("translate.translationRequested")} · {t("translate.checkBackSoon")}
         </motion.p>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CompactTranslateButton — uses same SmoothLabel pattern as SubscribeButton
+// ---------------------------------------------------------------------------
+
+const SPRING = { type: "spring" as const, stiffness: 600, damping: 30 };
+
+function CompactTranslateButton({
+  dropdownRef,
+  isOpen,
+  setIsOpen,
+  viewingTranslation,
+  dropdownContent,
+  t,
+}: {
+  dropdownRef: React.RefObject<HTMLDivElement | null>;
+  isOpen: boolean;
+  setIsOpen: (v: boolean) => void;
+  viewingTranslation: string | null;
+  dropdownContent: React.ReactNode;
+  t: (key: string) => string;
+}) {
+  const [textIndex, setTextIndex] = useState(0);
+  const [width, setWidth] = useState<number | "auto">("auto");
+  const measureRef = useRef<HTMLSpanElement>(null);
+
+  const cycleTexts = [
+    t("translate.requestTranslation"),
+    t("translate.contentInOtherLanguages"),
+  ];
+
+  // Cycle text every 4 seconds when not viewing a translation
+  useEffect(() => {
+    if (viewingTranslation) return;
+    const interval = setInterval(() => {
+      setTextIndex((prev) => (prev + 1) % cycleTexts.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [viewingTranslation, cycleTexts.length]);
+
+  const displayText = viewingTranslation
+    ? LANGUAGES.find((l) => l.code === viewingTranslation)?.nativeLabel ?? viewingTranslation
+    : cycleTexts[textIndex];
+
+  // Measure width on text change
+  useEffect(() => {
+    if (measureRef.current) {
+      setWidth(measureRef.current.getBoundingClientRect().width);
+    }
+  }, [displayText]);
+
+  return (
+    <div ref={dropdownRef} className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`relative overflow-hidden rounded-full transition-all ${
+          viewingTranslation
+            ? "bg-[#5227FF]/10 text-[#5227FF] dark:bg-[#5227FF]/20 dark:text-[#8B6FFF]"
+            : "border border-gray-900/10 bg-white/50 text-gray-900/50 backdrop-blur-xl hover:shadow-md dark:border-white/15 dark:bg-white/5 dark:text-white/50"
+        }`}
+      >
+        <span className="relative flex items-center justify-center" style={{ padding: "8px 20px" }}>
+          {/* Invisible measurer */}
+          <span ref={measureRef} className="absolute invisible whitespace-nowrap text-sm font-medium">
+            {displayText}
+          </span>
+
+          {/* Animated width container */}
+          <motion.span
+            animate={{ width: typeof width === "number" ? width : undefined }}
+            transition={SPRING}
+            className="relative flex items-center justify-center overflow-hidden"
+            style={{ height: 20 }}
+          >
+            <AnimatePresence mode="sync" initial={false}>
+              <motion.span
+                key={displayText}
+                className="whitespace-nowrap text-sm font-medium leading-none text-current"
+                initial={{ y: -14, opacity: 0, filter: "blur(6px)", position: "absolute" }}
+                animate={{ y: 0, opacity: 1, filter: "blur(0px)", position: "relative" }}
+                exit={{ y: 14, opacity: 0, filter: "blur(6px)", position: "absolute" }}
+                transition={{ duration: 0.18, ease: "easeInOut" }}
+              >
+                {displayText}
+              </motion.span>
+            </AnimatePresence>
+          </motion.span>
+        </span>
+      </button>
+      {dropdownContent}
     </div>
   );
 }

@@ -543,14 +543,68 @@ app/(main)/admin/ai-council/             — admin UI (pipeline visualization, j
 ### Student Challenge System
 Students can challenge published content by commenting on specific sections. The AI council re-evaluates the challenged content — if the student is right, the content is corrected. If not, the council explains why the content is correct. Admin has final say.
 
+### Content Accumulation & Versioning Architecture (decided 2026-03-15)
+
+**Core rule: Full 5-model pipeline always. No cost cutting.** Content is generated once, served to thousands across semesters. ~$1-2 per run is an investment.
+
+#### Hybrid Accumulation (Approach 1 + 2)
+- **First contribution:** Full pipeline → initial study guide with topic-based sections
+- **Subsequent contributions:** Section-based merge:
+  1. Kimi classifies new content by topic (cheap)
+  2. For each topic: exists → MERGE that section only, new → CREATE section
+  3. Only changed/new sections go through the 5-model council
+  4. Stitch back into full guide
+- Cost scales with what changed, not total weeks. Context stays ~80K tokens.
+
+#### Multi-File Upload
+- **One big file:** Extract → full pipeline → done
+- **Bulk upload (all at once):** Extract all in parallel → combine → full pipeline
+- **Incremental (week by week):** Extract → topic classify → section-based merge
+- Pipeline auto-detects fresh course vs. adding to existing content.
+
+#### Content Strategy Per Type
+ALL content reflects full accumulated course. Consistent quality regardless of upload method.
+- **Study Guide, Report:** Section-based merge (add/expand per topic)
+- **Flashcards:** Append new cards, keep existing
+- **Quizzes, Mock Exams:** Regenerate covering ALL material. Tag each question by topic for flexible filtering ("quiz me on Inflation", "mock exam Weeks 1-6")
+- **Podcast, Video:** Regenerate comprehensive version. Keep ALL previous versions labeled by coverage scope
+- **Mind Map, Infographic, Slide Deck:** Regenerate from accumulated content
+- **Data Table, Interactive:** Append new entries/blocks
+
+#### Nothing Archived, Everything Labeled
+- Every generated piece labeled with coverage scope ("Covers: Week 1-6", "Covers: Full Course")
+- No replacing, no deleting — we paid for it, we keep it
+- Students see all versions, filtered/organized by scope
+
+#### On-Demand Generation
+Students can request custom-scoped content:
+- "Mock exam for midterm (Weeks 1-6)"
+- "Flashcards on Chapter 3 topics"
+- System checks: exists → serve. Doesn't exist → generate, save, label.
+- Next student with same request gets it instantly. Library grows organically.
+
+#### Semester Versioning (Git-like)
+- Each semester = like a Git tag. Previous semester content stays as public archive.
+- New semester contributions: compare with previous semester's source
+- Small diff → section-based update (efficient). Big diff → fresh generation.
+- All historical content remains accessible. Platform = public archive of course evolution.
+
+#### Course Page UI (4 tabs)
+- **Learn:** Study Guide, Report, Slide Deck, Interactive Section
+- **Practice:** Flashcards, Quiz, Mind Map, Data Table, Infographic
+- **Exam:** Mock Exam (separate tab — different UX: timed, scored, formal)
+- **Media:** Podcast, Video Script
+
 ### Implementation Phases
 1. **Foundation** ✅ — DB schema (5 tables) + `lib/ai/types.ts` + unified AI client
 2. **Providers** ✅ — Kimi, OpenAI, Anthropic, Gemini, Grok provider implementations
 3. **Pipeline Engine** ✅ — Orchestrator + prompts + cron handler
-4. **Content Extraction** 🔄 — Extraction pipeline (PDF/DOCX/PPTX/image/video → structured text)
-5. **Admin UI** — AI Council admin pages (jobs list, stats, job detail, publish flow)
+4. **Content Extraction** ✅ — Extraction pipeline (PDF/DOCX/PPTX/image/video → structured text)
+5. **Admin UI** ✅ — AI Council admin pages (jobs list, stats, job detail, publish flow)
 6. **Content Generation** — Output type generators + course page rendering
 7. **Student Challenges** — Challenge submission UI + re-evaluation pipeline
+8. **Accumulator Pipeline** — Section-based merge + multi-file upload + semester versioning
+9. **On-Demand Generation** — Student request system for custom-scoped content
 
 ### Cost Model
 - **Kimi** does 90% of token work at ~1/10th the price — runs real-time (instant for users)

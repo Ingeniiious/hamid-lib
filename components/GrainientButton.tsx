@@ -35,7 +35,7 @@ export function GrainientButton({
     <motion.span
       whileHover={{ scale: 1.03 }}
       transition={{ duration: 0.3, ease }}
-      className={`relative inline-flex items-center justify-center overflow-hidden rounded-full px-8 py-3 text-sm font-medium ${className}`}
+      className={`relative inline-flex items-center justify-center overflow-hidden rounded-full px-5 py-2 text-sm font-medium ${className}`}
     >
       {/* Grainient background */}
       <span
