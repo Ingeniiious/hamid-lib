@@ -345,7 +345,8 @@ export async function processGenerationStep(
     language: job.sourceLanguage ?? "en",
     modelSource: config.slug,
     version: job.version,
-    isPublished: false,
+    isPublished: true,
+    publishedAt: new Date(),
   });
 
   console.log(
