@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/podcast-audio",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/video",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

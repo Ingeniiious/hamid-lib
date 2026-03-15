@@ -18,9 +18,9 @@ export function StudiesCardGrid() {
         index={0}
       />
       <DashboardCard
-        title={t("studies.examResults")}
-        description={t("studies.viewResults")}
-        href="/dashboard/me/exam"
+        title={t("studies.bookmarks")}
+        description={t("studies.bookmarksDescription")}
+        href="/dashboard/me/bookmarks"
         image={`${R2_BASE}/images/exam-results.webp`}
         index={1}
       />

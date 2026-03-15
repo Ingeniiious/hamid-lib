@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import type { FlashcardContent } from "@/lib/ai/types";
 
@@ -58,6 +58,8 @@ export function FlashcardRenderer({ content }: FlashcardRendererProps) {
     );
   }
 
+  const currentTags = cards[currentIndex]?.tags;
+
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       {/* View mode toggle */}
@@ -87,13 +89,39 @@ export function FlashcardRenderer({ content }: FlashcardRendererProps) {
       {viewMode === "single" ? (
         /* Single card mode */
         <div className="space-y-4">
-          <FlipCard
-            front={cards[currentIndex].front}
-            back={cards[currentIndex].back}
-            tags={cards[currentIndex].tags}
-            isFlipped={flippedCards.has(currentIndex)}
-            onFlip={() => toggleFlip(currentIndex)}
-          />
+          <div className="mx-auto w-[260px] sm:w-[280px]">
+            <FlipCard
+              front={cards[currentIndex].front}
+              back={cards[currentIndex].back}
+              isFlipped={flippedCards.has(currentIndex)}
+              onFlip={() => toggleFlip(currentIndex)}
+              contentKey={currentIndex}
+            />
+          </div>
+
+          {/* Tags — below the card, above navigation */}
+          <AnimatePresence mode="wait">
+            {currentTags && currentTags.length > 0 && (
+              <motion.div
+                key={currentIndex}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25, ease }}
+                className="flex flex-wrap items-center justify-center gap-1.5"
+              >
+                {currentTags.map((tag, ti) => (
+                  <Badge
+                    key={ti}
+                    variant="secondary"
+                    className="rounded-full bg-gray-900/5 px-3 py-0.5 text-[10px] font-medium text-gray-900/60 dark:bg-white/5 dark:text-white/60"
+                  >
+                    {tag}
+                  </Badge>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Navigation */}
           <div className="flex items-center justify-center gap-4">
@@ -118,22 +146,36 @@ export function FlashcardRenderer({ content }: FlashcardRendererProps) {
         </div>
       ) : (
         /* Grid mode */
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="flex flex-wrap items-start justify-center gap-4">
           {cards.map((card, idx) => (
             <motion.div
               key={idx}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.4, ease, delay: idx * 0.03 }}
+              className="w-[200px] sm:w-[220px]"
             >
               <FlipCard
                 front={card.front}
                 back={card.back}
-                tags={card.tags}
                 isFlipped={flippedCards.has(idx)}
                 onFlip={() => toggleFlip(idx)}
                 compact
               />
+              {/* Tags below each grid card */}
+              {card.tags && card.tags.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-1">
+                  {card.tags.map((tag, ti) => (
+                    <Badge
+                      key={ti}
+                      variant="secondary"
+                      className="rounded-full bg-gray-900/5 px-2 py-0 text-[8px] font-medium text-gray-900/50 dark:bg-white/5 dark:text-white/50"
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </motion.div>
           ))}
         </div>
@@ -145,17 +187,17 @@ export function FlashcardRenderer({ content }: FlashcardRendererProps) {
 function FlipCard({
   front,
   back,
-  tags,
   isFlipped,
   onFlip,
   compact,
+  contentKey,
 }: {
   front: string;
   back: string;
-  tags?: string[];
   isFlipped: boolean;
   onFlip: () => void;
   compact?: boolean;
+  contentKey?: number;
 }) {
   return (
     <div
@@ -167,56 +209,61 @@ function FlipCard({
         animate={{ rotateY: isFlipped ? 180 : 0 }}
         transition={{ duration: 0.5, ease }}
         style={{ transformStyle: "preserve-3d" }}
-        className={`relative ${compact ? "min-h-[140px]" : "min-h-[200px]"}`}
+        className="relative aspect-[2.5/3.5]"
       >
         {/* Front face */}
         <div
-          className={`absolute inset-0 flex flex-col items-center justify-center rounded-2xl border border-gray-900/10 bg-white/50 p-5 text-center backdrop-blur-xl dark:border-white/15 dark:bg-white/10 ${compact ? "p-4" : "p-6"}`}
+          className="absolute inset-0 flex flex-col rounded-2xl border border-gray-900/10 bg-white/50 px-5 text-center backdrop-blur-xl dark:border-white/15 dark:bg-white/10"
           style={{ backfaceVisibility: "hidden" }}
         >
-          <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-[#5227FF] dark:text-[#8B6FFF]">
+          <p className="mt-5 text-[9px] font-semibold uppercase tracking-wider text-[#5227FF] dark:text-[#8B6FFF]">
             Question
           </p>
-          <p
-            className={`font-medium text-gray-900 dark:text-white ${compact ? "text-sm" : "text-base"}`}
-          >
-            {front}
-          </p>
-          {tags && tags.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-1">
-              {tags.map((tag, ti) => (
-                <Badge
-                  key={ti}
-                  variant="secondary"
-                  className="rounded-full bg-gray-900/5 text-[9px] dark:bg-white/5"
-                >
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          )}
-          <p className="mt-2 text-[10px] text-gray-900/30 dark:text-white/30">
+          <div className="flex flex-1 items-center justify-center px-1">
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={`front-${contentKey ?? front}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3, ease }}
+                className={`font-medium text-gray-900 dark:text-white ${compact ? "text-xs" : "text-sm"}`}
+              >
+                {front}
+              </motion.p>
+            </AnimatePresence>
+          </div>
+          <p className="mb-4 text-[10px] text-gray-900/30 dark:text-white/30">
             Click To Flip
           </p>
         </div>
 
         {/* Back face */}
         <div
-          className={`absolute inset-0 flex flex-col items-center justify-center rounded-2xl border border-[#5227FF]/20 bg-[#5227FF]/5 p-5 text-center backdrop-blur-xl dark:border-[#8B6FFF]/20 dark:bg-[#5227FF]/10 ${compact ? "p-4" : "p-6"}`}
+          className="absolute inset-0 flex flex-col rounded-2xl border border-[#5227FF]/20 bg-[#5227FF]/5 px-5 text-center backdrop-blur-xl dark:border-[#8B6FFF]/20 dark:bg-[#5227FF]/10"
           style={{
             backfaceVisibility: "hidden",
             transform: "rotateY(180deg)",
           }}
         >
-          <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-[#5227FF] dark:text-[#8B6FFF]">
+          <p className="mt-5 text-[9px] font-semibold uppercase tracking-wider text-[#5227FF] dark:text-[#8B6FFF]">
             Answer
           </p>
-          <p
-            className={`text-gray-900 dark:text-white ${compact ? "text-sm" : "text-base"}`}
-          >
-            {back}
-          </p>
-          <p className="mt-2 text-[10px] text-gray-900/30 dark:text-white/30">
+          <div className="flex flex-1 items-center justify-center px-1">
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={`back-${contentKey ?? back}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3, ease }}
+                className={`text-gray-900 dark:text-white ${compact ? "text-xs" : "text-sm"}`}
+              >
+                {back}
+              </motion.p>
+            </AnimatePresence>
+          </div>
+          <p className="mb-4 text-[10px] text-gray-900/30 dark:text-white/30">
             Click To Flip Back
           </p>
         </div>

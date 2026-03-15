@@ -75,6 +75,12 @@ export function DashboardTopBar({
               {t("dashboard.courses")}
             </DropdownMenuItem>
             <DropdownMenuItem
+              onClick={() => router.push("/dashboard/me/bookmarks")}
+              className="cursor-pointer rounded-lg text-gray-900/80 focus:bg-gray-900/5 focus:text-gray-900 dark:text-white/80 dark:focus:bg-white/10 dark:focus:text-white"
+            >
+              {t("studies.bookmarks")}
+            </DropdownMenuItem>
+            <DropdownMenuItem
               onClick={() => router.push("/dashboard/me/calendar")}
               className="cursor-pointer rounded-lg text-gray-900/80 focus:bg-gray-900/5 focus:text-gray-900 dark:text-white/80 dark:focus:bg-white/10 dark:focus:text-white"
             >

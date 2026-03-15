@@ -91,7 +91,7 @@ async function propagateToContributions(
           await dispatchNotification(c.userId, {
             category: "contribution",
             title: "Contribution Approved",
-            body: `Your contribution "${c.title}" has been approved and content is being generated.`,
+            body: `Your contribution "${c.title}" has been approved! New content is on its way.`,
             url: "/dashboard/contribute/my",
             metadata: { contributionId: contribId },
           });
@@ -478,7 +478,7 @@ export async function processNextStep(): Promise<{
     }
   }
 
-  const prompt = getPrompt(role, contentType, sourceContent, previousOutputStrings, courseContext, job.sourceLanguage);
+  const prompt = await getPrompt(role, contentType, sourceContent, previousOutputStrings, courseContext, job.sourceLanguage);
   const messages: AIMessage[] = [
     { role: "system", content: prompt.system },
     { role: "user", content: prompt.user },
@@ -946,6 +946,16 @@ async function handleStepFailure(
 ): Promise<"retrying" | "skipped" | "failed"> {
   const role = step.role as ModelRole;
   const isSkippable = SKIPPABLE_ROLES.includes(role);
+
+  // ── Billing/credit alert — email admin immediately ────────────────────
+  try {
+    const { checkAndAlertBilling } = await import("@/lib/admin-alerts");
+    await checkAndAlertBilling(step.modelSlug ?? "unknown", errorMessage, {
+      jobId: job.id,
+      courseId: job.courseId,
+      step: `${step.stepOrder} (${role})`,
+    });
+  } catch { /* alert is best-effort */ }
 
   // ── Permanent errors: don't waste retries ──────────────────────────────
   // Auth errors, missing API keys, etc. won't resolve on retry.

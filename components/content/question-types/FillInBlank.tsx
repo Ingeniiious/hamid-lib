@@ -23,11 +23,11 @@ export function FillInBlank({
 }: FillInBlankProps) {
   return (
     <div className="space-y-3">
-      <div className="flex items-start justify-center gap-2 text-center">
+      <div className="flex items-center justify-center gap-2 text-center">
         <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#5227FF]/10 text-[11px] font-bold text-[#5227FF] dark:text-[#8B6FFF]">
           {questionNumber}
         </span>
-        <p className="text-sm font-medium text-gray-900 dark:text-white">
+        <p className="text-sm font-medium text-gray-900 dark:text-white" style={{ textWrap: "balance" }}>
           {question}
         </p>
         {points !== undefined && (

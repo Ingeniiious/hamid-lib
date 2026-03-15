@@ -139,8 +139,8 @@ export const en = {
   studies: {
     presentations: "Presentations",
     uploadAndShare: "Upload and share files",
-    examResults: "Exam Results",
-    viewResults: "View your results",
+    bookmarks: "Bookmarks",
+    bookmarksDescription: "Quick access to courses you follow",
     calendar: "Calendar",
     schedulesAndDeadlines: "Schedules and deadlines",
   },
@@ -537,6 +537,14 @@ export const en = {
     subtitle: "Review your past exams, scores, and performance analysis.",
     noResults: "No Exam Results Yet.",
     noResultsDescription: "Your scores and analysis will appear here after you take an exam.",
+    myStudies: "My Studies",
+  },
+  followedCourses: {
+    title: "Bookmarks",
+    subtitle: "Courses you follow for quick access and updates.",
+    empty: "No Bookmarked Courses Yet.",
+    emptyDescription: "Follow a course to see it here for quick access.",
+    unfollow: "Unfollow",
     myStudies: "My Studies",
   },
   professors: {

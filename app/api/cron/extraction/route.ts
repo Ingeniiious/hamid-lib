@@ -50,6 +50,16 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("[extraction-cron] Error:", error);
+
+    // Alert admin if this is a billing/credit error (Kimi multimodal)
+    const errMsg = (error as Error).message ?? String(error);
+    try {
+      const { checkAndAlertBilling } = await import("@/lib/admin-alerts");
+      await checkAndAlertBilling("Extraction Pipeline (Kimi)", errMsg, {
+        cron: "/api/cron/extraction",
+      });
+    } catch { /* best-effort */ }
+
     return NextResponse.json(
       {
         error: "Extraction processing failed",

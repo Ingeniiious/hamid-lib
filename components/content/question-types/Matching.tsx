@@ -1,5 +1,7 @@
 "use client";
 
+import { OptionPicker } from "@/components/OptionPicker";
+
 interface MatchingProps {
   question: string;
   matchPairs: { left: string; right: string }[];
@@ -23,15 +25,18 @@ export function Matching({
   points,
   questionNumber,
 }: MatchingProps) {
-  const rightOptions = matchPairs.map((p) => p.right);
+  const rightOptions = matchPairs.map((p, ri) => ({
+    value: ri,
+    label: p.right,
+  }));
 
   return (
     <div className="space-y-3">
-      <div className="flex items-start justify-center gap-2 text-center">
+      <div className="flex items-center justify-center gap-2 text-center">
         <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#5227FF]/10 text-[11px] font-bold text-[#5227FF] dark:text-[#8B6FFF]">
           {questionNumber}
         </span>
-        <p className="text-sm font-medium text-gray-900 dark:text-white">
+        <p className="text-sm font-medium text-gray-900 dark:text-white" style={{ textWrap: "balance" }}>
           {question}
         </p>
         {points !== undefined && (
@@ -58,29 +63,29 @@ export function Matching({
               key={idx}
               className="flex items-center justify-center gap-3"
             >
-              <span className="flex-1 text-right text-sm text-gray-900 dark:text-white">
+              <span className="flex-1 text-center text-sm text-gray-900 dark:text-white">
                 {pair.left}
               </span>
               <span className="text-gray-900/30 dark:text-white/30">&rarr;</span>
-              <select
-                value={selectedVal}
-                onChange={(e) => onSelect(idx, Number(e.target.value))}
-                disabled={disabled}
-                className={`flex-1 rounded-full border bg-white/50 px-3 py-1.5 text-center text-sm text-gray-900 focus:border-[#5227FF] focus:outline-none focus:ring-2 focus:ring-[#5227FF]/20 disabled:opacity-60 dark:bg-white/5 dark:text-white dark:focus:border-[#8B6FFF] dark:focus:ring-[#8B6FFF]/20 ${
-                  isCorrect
-                    ? "border-green-500/30"
-                    : isIncorrect
-                      ? "border-red-500/30"
-                      : "border-gray-900/10 dark:border-white/15"
-                }`}
-              >
-                <option value={-1}>Select...</option>
-                {rightOptions.map((opt, ri) => (
-                  <option key={ri} value={ri}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
+              <div className={`flex-1 ${
+                isCorrect
+                  ? "[&_button]:border-green-500/30"
+                  : isIncorrect
+                    ? "[&_button]:border-red-500/30"
+                    : ""
+              }`}>
+                <OptionPicker
+                  options={[
+                    { value: -1, label: "Select..." },
+                    ...rightOptions,
+                  ]}
+                  value={selectedVal}
+                  onChange={(val) => {
+                    if (!disabled) onSelect(idx, val);
+                  }}
+                  size="sm"
+                />
+              </div>
             </div>
           );
         })}

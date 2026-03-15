@@ -1,11 +1,11 @@
 // ---------------------------------------------------------------------------
-// AI Council — Publisher
+// AI Council —Publisher
 //
 // After the 5-teacher verification pipeline completes, the publisher:
 // 1. Extracts the best verified content (Grok's enrichedContent or fallback)
 // 2. Creates generation steps for each requested output type
 // 3. For MULTI-VARIANT types (exams, quizzes, flashcards, interactive):
-//    each of the 5 models creates a unique variant — different AIs think
+//    each of the 5 models creates a unique variant —different AIs think
 //    differently, so students get 5 diverse question sets / card decks
 // 4. For SINGLE-OUTPUT types (study guide, podcast, video, slides, etc.):
 //    Kimi generates from verified content (cheapest, one polished result)
@@ -18,6 +18,7 @@ import {
   pipelineStep,
   generatedContent,
   aiModelConfig,
+  course,
 } from "@/database/schema";
 import { eq, and, asc, sql } from "drizzle-orm";
 import { complete } from "@/lib/ai/client";
@@ -38,7 +39,7 @@ import { validateGeneratedContent } from "@/lib/ai/content-schemas";
 export function getBestVerifiedContent(
   steps: (typeof pipelineStep.$inferSelect)[]
 ): { content: string; sourceModelSlug: string } | null {
-  // Sort by stepOrder descending — prefer later teachers (more refined)
+  // Sort by stepOrder descending —prefer later teachers (more refined)
   const completed = steps
     .filter((s) => s.status === "completed" && s.role !== "generator")
     .sort((a, b) => b.stepOrder - a.stepOrder);
@@ -86,7 +87,7 @@ export function getBestVerifiedContent(
 
 /**
  * Creates pipeline_step rows for content generation.
- * Called when all 5 teacher steps finish — transitions job to "generating" phase.
+ * Called when all 5 teacher steps finish —transitions job to "generating" phase.
  *
  * Returns the number of generation steps created.
  */
@@ -102,7 +103,7 @@ export async function createGenerationSteps(jobId: string): Promise<number> {
   const outputTypes = job.outputTypes as string[];
   if (!outputTypes || outputTypes.length === 0) return 0;
 
-  // Idempotency guard — prevent duplicate generation steps on race condition
+  // Idempotency guard —prevent duplicate generation steps on race condition
   const [existing] = await db
     .select({ count: sql<number>`count(*)` })
     .from(pipelineStep)
@@ -149,7 +150,7 @@ export async function createGenerationSteps(jobId: string): Promise<number> {
 
   for (const outputType of outputTypes) {
     if (MULTI_VARIANT_TYPES.has(outputType)) {
-      // Each model creates its own unique variant — 5 different perspectives
+      // Each model creates its own unique variant —5 different perspectives
       for (const model of models) {
         generationSteps.push({
           jobId: job.id,
@@ -166,7 +167,7 @@ export async function createGenerationSteps(jobId: string): Promise<number> {
       }
     } else {
       // Single-output types (study guide, podcast, video, slides, etc.)
-      // Use Kimi (cheapest) — one polished result is enough
+      // Use Kimi (cheapest) —one polished result is enough
       generationSteps.push({
         jobId: job.id,
         modelSlug: "kimi",
@@ -241,8 +242,8 @@ export async function processGenerationStep(
   // Get source content (stored on first step)
   const sourceContent = teacherSteps[0]?.inputSummary ?? "";
 
-  // Build prompt — pass explicit source language to prevent wrong language generation
-  const prompt = getGeneratorPrompt(contentType, verified.content, sourceContent, job.sourceLanguage);
+  // Build prompt —pass explicit source language to prevent wrong language generation
+  const prompt = await getGeneratorPrompt(contentType, verified.content, sourceContent, job.sourceLanguage);
 
   // Call AI
   const response = await complete({
@@ -257,7 +258,7 @@ export async function processGenerationStep(
     responseFormat: "json",
   });
 
-  // Parse generated content — strip markdown fences if model wrapped JSON in ```json ... ```
+  // Parse generated content —strip markdown fences if model wrapped JSON in ```json ... ```
   let parsed: Record<string, unknown>;
   try {
     let raw = response.content.trim();
@@ -268,7 +269,7 @@ export async function processGenerationStep(
     throw new Error(`Generator returned invalid JSON for ${contentType}`);
   }
 
-  // Validate schema — ensure the AI output matches the expected structure
+  // Validate schema —ensure the AI output matches the expected structure
   const validation = validateGeneratedContent(contentType, parsed);
   if (!validation.success) {
     throw new Error(
@@ -281,7 +282,7 @@ export async function processGenerationStep(
     response.inputTokens * config.costPerInputToken +
     response.outputTokens * config.costPerOutputToken;
 
-  // Determine title — for multi-variant types, include the teacher name (never expose model names)
+  // Determine title —use course name + content type label
   const MULTI_VARIANT_TYPES = new Set(["mock_exam", "quiz", "flashcards", "interactive_section"]);
   const TEACHER_NAMES: Record<string, string> = {
     kimi: "Luna",
@@ -291,11 +292,23 @@ export async function processGenerationStep(
     grok: "Echo",
   };
   const teacherName = TEACHER_NAMES[config.slug] ?? config.slug;
-  const title = MULTI_VARIANT_TYPES.has(contentType)
-    ? `${generateTitle(contentType, job)} — Variant ${teacherName}`
-    : generateTitle(contentType, job);
 
-  // Save to generated_content — use the detected source language, not hardcoded "en"
+  // Fetch the course name for a meaningful title
+  const [courseRow] = await db
+    .select({ title: course.title })
+    .from(course)
+    .where(eq(course.id, job.courseId))
+    .limit(1);
+  const courseName = courseRow?.title;
+
+  const baseTitle = courseName
+    ? `${courseName} · ${generateTitle(contentType)}`
+    : generateTitle(contentType);
+  const title = MULTI_VARIANT_TYPES.has(contentType)
+    ? `${baseTitle} · ${teacherName}`
+    : baseTitle;
+
+  // Save to generated_content —use the detected source language, not hardcoded "en"
   await db.insert(generatedContent).values({
     courseId: job.courseId,
     jobId: job.id,
@@ -309,7 +322,7 @@ export async function processGenerationStep(
   });
 
   console.log(
-    `[publisher] Generated ${contentType} for job ${job.id} via ${config.slug} — $${costUsd.toFixed(6)}`
+    `[publisher] Generated ${contentType} for job ${job.id} via ${config.slug} —$${costUsd.toFixed(6)}`
   );
 
   return {
@@ -324,20 +337,20 @@ export async function processGenerationStep(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function generateTitle(contentType: ContentType, job: typeof pipelineJob.$inferSelect): string {
+function generateTitle(contentType: ContentType): string {
   const labels: Record<string, string> = {
     study_guide: "Study Guide",
     flashcards: "Flashcards",
     quiz: "Quiz",
     mock_exam: "Mock Exam",
-    podcast_script: "Podcast Script",
-    video_script: "Video Script",
+    podcast_script: "Podcast",
+    video_script: "Video",
     mind_map: "Mind Map",
     infographic_data: "Infographic",
-    slide_deck: "Slide Deck",
+    slide_deck: "Slides",
     data_table: "Data Table",
     report: "Report",
-    interactive_section: "Interactive Section",
+    interactive_section: "Interactive",
   };
   return labels[contentType] ?? contentType;
 }

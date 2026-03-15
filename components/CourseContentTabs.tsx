@@ -203,9 +203,10 @@ export interface AvailableTranslation {
 interface CourseContentTabsProps {
   publishedContent: PublishedContentItem[];
   availableTranslations: Record<string, AvailableTranslation[]>;
+  courseTitle?: string;
 }
 
-export function CourseContentTabs({ publishedContent, availableTranslations }: CourseContentTabsProps) {
+export function CourseContentTabs({ publishedContent, availableTranslations, courseTitle }: CourseContentTabsProps) {
   const { t } = useTranslation();
 
   // Group content by tab
@@ -468,13 +469,18 @@ export function CourseContentTabs({ publishedContent, availableTranslations }: C
             exit={{ opacity: 0 }}
             transition={{ duration: 0.4, ease }}
           >
-            {/* Content title */}
+            {/* Content title + language badge */}
             <div className="mb-4 text-center">
-              <h3 className="font-display text-lg font-light text-gray-900 dark:text-white">
-                {viewingTranslation
-                  ? (availableTranslations[currentItem.id]?.find((t) => t.language === viewingTranslation)?.title ?? currentItem.title)
-                  : currentItem.title}
-              </h3>
+              <div className="flex items-center justify-center gap-2">
+                <h3 className="font-display text-lg font-light text-balance text-gray-900 dark:text-white">
+                  {viewingTranslation
+                    ? (availableTranslations[currentItem.id]?.find((t) => t.language === viewingTranslation)?.title ?? currentItem.title)
+                    : currentItem.title}
+                </h3>
+                <span className="inline-flex items-center justify-center rounded-full bg-[#5227FF]/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase text-[#5227FF] dark:text-[#8B6FFF]">
+                  {(viewingTranslation ?? currentItem.language).toUpperCase()}
+                </span>
+              </div>
               {currentItem.description && !viewingTranslation && (
                 <p className="mt-1 text-sm text-gray-900/50 dark:text-white/50">
                   {currentItem.description}
@@ -486,6 +492,8 @@ export function CourseContentTabs({ publishedContent, availableTranslations }: C
               contentType={currentItem.contentType}
               content={renderContent}
               contentId={currentItem.id}
+              courseId={currentItem.courseId}
+              courseTitle={courseTitle}
               mediaUrl={currentItem.mediaUrl}
             />
           </motion.div>

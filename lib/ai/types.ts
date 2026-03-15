@@ -2,6 +2,10 @@
 // AI Council -- shared type definitions
 // ---------------------------------------------------------------------------
 
+/** Branded 16:9 2K background template for Nano Banana 2 video scene generation */
+export const VIDEO_BACKGROUND_URL =
+  "https://lib.thevibecodedcompany.com/images/video-bg-821e7fa6be60.png";
+
 export type ModelSlug = "kimi" | "chatgpt" | "claude" | "gemini" | "grok";
 export type ModelRole = "creator" | "reviewer" | "enricher" | "validator" | "fact_checker" | "generator";
 

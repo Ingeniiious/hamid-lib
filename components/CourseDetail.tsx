@@ -85,6 +85,7 @@ export function CourseDetail({ course, isContributor, facultySlug, initialSubscr
             <CourseContentTabs
               publishedContent={publishedContent}
               availableTranslations={availableTranslations}
+              courseTitle={course.title}
             />
           </motion.div>
 

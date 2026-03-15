@@ -808,10 +808,10 @@ function StickyNotesSection() {
 
     // Card animation — mid-section range for swaps
     const anim = clamp((progress - 0.18) / 0.5, 0, 1);
-    // Draw path — complete by ~75% scroll so the circle is fully drawn
-    // when it aligns with the sticky cards at viewport center
-    const drawAnim = clamp(progress / 0.75, 0, 1);
-    drawPath.update(easeInOutCubic(drawAnim));
+    // Draw path — uses the raw progress across the full 250vh section.
+    // Square root easing makes the first half draw slower (most visible),
+    // then speeds up toward the end when the circle forms.
+    drawPath.update(Math.sqrt(progress));
 
     const spread = getSpread(getSpreadX());
 

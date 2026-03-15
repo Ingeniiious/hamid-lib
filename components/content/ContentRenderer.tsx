@@ -31,6 +31,8 @@ export interface ContentRendererProps {
   contentType: string;
   content: Record<string, unknown>;
   contentId?: string;
+  courseId?: string;
+  courseTitle?: string;
   mode?: "preview" | "interactive";
   mediaUrl?: string | null;
 }
@@ -39,6 +41,8 @@ export function ContentRenderer({
   contentType,
   content,
   contentId,
+  courseId,
+  courseTitle,
   mode = "interactive",
   mediaUrl,
 }: ContentRendererProps) {
@@ -57,6 +61,9 @@ export function ContentRenderer({
       return (
         <QuizRenderer
           content={content as unknown as QuizContent}
+          contentId={contentId}
+          courseId={courseId}
+          courseTitle={courseTitle}
           mode={mode}
         />
       );
@@ -66,6 +73,8 @@ export function ContentRenderer({
         <MockExamRenderer
           content={content as unknown as MockExamContent}
           contentId={contentId}
+          courseId={courseId}
+          courseTitle={courseTitle}
           mode={mode}
         />
       );
@@ -99,6 +108,7 @@ export function ContentRenderer({
       return (
         <VideoScriptRenderer
           content={content as unknown as VideoScriptContent}
+          mediaUrl={mediaUrl}
         />
       );
 

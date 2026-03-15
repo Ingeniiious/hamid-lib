@@ -72,6 +72,15 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("[ai-pipeline] Cron error:", error);
+
+    const errMsg = error instanceof Error ? error.message : String(error);
+    try {
+      const { checkAndAlertBilling } = await import("@/lib/admin-alerts");
+      await checkAndAlertBilling("AI Pipeline", errMsg, {
+        cron: "/api/cron/ai-pipeline",
+      });
+    } catch { /* best-effort */ }
+
     return NextResponse.json(
       { status: "error", error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }

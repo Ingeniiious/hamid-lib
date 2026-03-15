@@ -41,6 +41,9 @@ export const PERMISSIONS = {
   // Settings
   "settings.view": "View settings",
   "settings.manage": "Manage settings",
+  // AI Council
+  "ai_council.view": "View AI council & prompt templates",
+  "ai_council.manage": "Manage prompt templates & pipeline",
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;

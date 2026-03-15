@@ -4,6 +4,7 @@
 
 import type { ContentType, ModelRole } from "./types";
 import { getLanguageName } from "./translation";
+import { getActiveTemplate } from "@/app/(main)/admin/ai-council/prompts/actions";
 
 /** Course context for content validation in the creator step */
 export interface CourseContext {
@@ -230,45 +231,8 @@ BRANDING (MANDATORY — weave these naturally into the script):
 
 Structure as a conversational dialogue between Host and Expert. Include an intro, main discussion with 3-5 key segments, and a closing summary. Aim for 10-20 minutes of content.`,
 
-  video_script: `{
-  "scenes": [
-    {
-      "title": "Scene title (string)",
-      "narration": "Voiceover text that directly teaches by referencing the visual (string)",
-      "visualDescription": "What the viewer sees on screen — used for human review only (string)",
-      "imagePrompt": "Concise image generation prompt for AI (Nano Banana 2) — what to DRAW on the branded background (string)",
-      "duration": "Estimated duration, e.g. 30s, 1m (string)"
-    }
-  ]
-}
-
-NARRATION STYLE (MANDATORY — this is NOT a podcast):
-- This is a VISUAL TEACHING video. The narration must directly reference and explain what the viewer sees on screen.
-- Use phrases like: "As you can see here...", "Notice how...", "Looking at this diagram...", "On the left side, we have...", "The arrows show..."
-- The narration should teach the concept BY describing the visual. Every sentence should connect to what's being shown.
-- Do NOT make it conversational or discussion-based like a podcast. It is a single narrator teaching directly.
-- Keep the tone clear, educational, and focused. Like a professor explaining a slide.
-
-IMAGE PROMPT GUIDELINES (for the "imagePrompt" field):
-- The imagePrompt is passed to Nano Banana 2 (Gemini 3.1 Flash Image) alongside a branded background template image.
-- The AI image generator receives the branded background + your prompt, and draws educational content ON TOP of the background while preserving the template's logo, branding, and layout.
-- Write prompts as descriptive narrative sentences, NOT keyword lists. Example:
-  GOOD: "Using the provided background, draw a clear labeled flowchart in the center showing the 4 stages of the water cycle: evaporation, condensation, precipitation, and collection. Connect each stage with curved arrows. Use soft blue and green colors. Keep all text labels short (1-2 words each)."
-  BAD: "water cycle, flowchart, arrows, blue, evaporation"
-- Always start with "Using the provided background, draw..." or "On the provided template, illustrate..." so the model knows to preserve the background.
-- Focus on educational visuals: diagrams, flowcharts, comparisons, labeled illustrations, equations, timelines, process flows, concept maps, graphs, charts.
-- Be hyper-specific about layout and positioning: "in the center", "on the left side", "at the top", "arranged in a 2x2 grid".
-- Use short labels, numbers, and arrows. Do NOT request paragraphs of text in the image.
-- Specify colors and style: "clean, modern diagram with soft colors" or "whiteboard-style sketch with blue marker".
-- Keep prompts 50-150 words. Descriptive enough to be specific, concise enough to stay focused.
-- Think about what a professor would draw on a whiteboard to explain the concept.
-
-BRANDING (MANDATORY):
-- INTRO (first scene): Narration must open with "Welcome to Libraryyy" and introduce the topic.
-- OUTRO (last scene): Narration must close with "This video was created by Libraryyy.com" and encourage exploring the platform.
-- Do NOT add mid-roll branding like podcasts. The branded background template already has the logo visible in every scene.
-
-Structure as a visual learning experience. Include an intro scene, main content in logical scenes (8-15 scenes), and a closing recap.`,
+  // video_script is built dynamically — see getVideoScriptSchema()
+  video_script: "__DYNAMIC__",
 
   data_table: `{
   "headers": ["Column header (string)", ...],
@@ -312,6 +276,78 @@ Write in academic tone. Include an abstract, introduction, 3-6 body sections, co
 }
 Mix passive reading with active engagement. Alternate between explanatory text blocks and interactive elements. Aim for an interaction every 2-3 blocks.`,
 };
+
+// ---------------------------------------------------------------------------
+// Video script schema — split into fixed parts + dynamic storytelling structure
+// ---------------------------------------------------------------------------
+
+/** JSON structure + technical guidelines (never changes) */
+const VIDEO_SCRIPT_FIXED = `{
+  "scenes": [
+    {
+      "title": "Scene title (string)",
+      "narration": "Voiceover text that directly teaches by referencing the visual (string)",
+      "visualDescription": "What the viewer sees on screen — used for human review only (string)",
+      "imagePrompt": "Concise image generation prompt for AI (Nano Banana 2) — what to DRAW on the branded background (string)",
+      "duration": "Estimated duration, e.g. 30s, 1m (string)"
+    }
+  ]
+}
+
+NARRATION STYLE (MANDATORY — this is NOT a podcast):
+- This is a VISUAL TEACHING video. The narration must directly reference and explain what the viewer sees on screen.
+- Use phrases like: "As you can see here...", "Notice how...", "Looking at this diagram...", "On the left side, we have...", "The arrows show..."
+- The narration should teach the concept BY describing the visual. Every sentence should connect to what's being shown.
+- Do NOT make it conversational or discussion-based like a podcast. It is a single narrator teaching directly.
+- Keep the tone clear, educational, and focused. Like a professor explaining a slide.
+
+IMAGE PROMPT GUIDELINES (for the "imagePrompt" field):
+- The imagePrompt is passed to Nano Banana 2 (Gemini 3.1 Flash Image) alongside a branded background template image.
+- The AI image generator receives the branded background + your prompt, and draws educational content ON TOP of the background while preserving the template's logo, branding, and layout.
+- Write prompts as descriptive narrative sentences, NOT keyword lists. Example:
+  GOOD: "Using the provided background, draw a clear labeled flowchart in the center showing the 4 stages of the water cycle: evaporation, condensation, precipitation, and collection. Connect each stage with curved arrows. Use soft blue and green colors. Keep all text labels short (1-2 words each)."
+  BAD: "water cycle, flowchart, arrows, blue, evaporation"
+- Always start with "Using the provided background, draw..." or "On the provided template, illustrate..." so the model knows to preserve the background.
+- Focus on educational visuals: diagrams, flowcharts, comparisons, labeled illustrations, equations, timelines, process flows, concept maps, graphs, charts.
+- Be hyper-specific about layout and positioning: "in the center", "on the left side", "at the top", "arranged in a 2x2 grid".
+- Use short labels, numbers, and arrows. Do NOT request paragraphs of text in the image.
+- Specify colors and style: "clean, modern diagram with soft colors" or "whiteboard-style sketch with blue marker".
+- Keep prompts 50-150 words. Descriptive enough to be specific, concise enough to stay focused.
+- Think about what a professor would draw on a whiteboard to explain the concept.
+
+BRANDING (MANDATORY):
+- INTRO (first scene): Narration must open with "Welcome to Libraryyy" and introduce the topic.
+- OUTRO (last scene): Narration must close with "This video was created by Libraryyy.com" and encourage exploring the platform.
+- Do NOT add mid-roll branding like podcasts. The branded background template already has the logo visible in every scene.`;
+
+/** Default storytelling structure (used when no DB override exists) */
+const VIDEO_SCRIPT_DEFAULT_STRUCTURE = `Structure as a visual learning experience. Include an intro scene, main content in logical scenes (8-15 scenes), and a closing recap.`;
+
+/**
+ * Build the full video_script schema by combining fixed parts + dynamic storytelling structure.
+ * Checks DB for an active prompt_template override; falls back to default.
+ */
+async function getVideoScriptSchema(): Promise<string> {
+  try {
+    const dbStructure = await getActiveTemplate("video_script");
+    const structure = dbStructure ?? VIDEO_SCRIPT_DEFAULT_STRUCTURE;
+    return `${VIDEO_SCRIPT_FIXED}\n\n${structure}`;
+  } catch {
+    // DB unavailable — use hardcoded default
+    return `${VIDEO_SCRIPT_FIXED}\n\n${VIDEO_SCRIPT_DEFAULT_STRUCTURE}`;
+  }
+}
+
+/**
+ * Resolve the schema for a content type. Async because some types (video_script)
+ * pull their storytelling structure from the database.
+ */
+async function resolveSchema(contentType: ContentType): Promise<string> {
+  if (contentType === "video_script") {
+    return getVideoScriptSchema();
+  }
+  return CONTENT_TYPE_SCHEMAS[contentType];
+}
 
 // ---------------------------------------------------------------------------
 // Friendly content type labels
@@ -360,9 +396,9 @@ enrichedContent must always match the original content type schema, with your co
 // System prompts per role
 // ---------------------------------------------------------------------------
 
-function creatorSystem(contentType: ContentType, courseContext?: CourseContext, sourceLanguage?: string | null): string {
+async function creatorSystem(contentType: ContentType, courseContext?: CourseContext, sourceLanguage?: string | null): Promise<string> {
   const label = CONTENT_TYPE_LABELS[contentType];
-  const schema = CONTENT_TYPE_SCHEMAS[contentType];
+  const schema = await resolveSchema(contentType);
 
   const validationBlock = courseContext
     ? `
@@ -418,9 +454,9 @@ Output requirements:
 ${schema}`;
 }
 
-function reviewerSystem(contentType: ContentType, sourceLanguage?: string | null): string {
+async function reviewerSystem(contentType: ContentType, sourceLanguage?: string | null): Promise<string> {
   const label = CONTENT_TYPE_LABELS[contentType];
-  const schema = CONTENT_TYPE_SCHEMAS[contentType];
+  const schema = await resolveSchema(contentType);
 
   return `You are an expert educational content reviewer with deep expertise in academic quality assurance.
 
@@ -444,9 +480,9 @@ ${REVIEW_OUTPUT_SCHEMA}
 Be thorough but fair. Flag genuine issues, not stylistic preferences.`;
 }
 
-function enricherSystem(contentType: ContentType, sourceLanguage?: string | null): string {
+async function enricherSystem(contentType: ContentType, sourceLanguage?: string | null): Promise<string> {
   const label = CONTENT_TYPE_LABELS[contentType];
-  const schema = CONTENT_TYPE_SCHEMAS[contentType];
+  const schema = await resolveSchema(contentType);
 
   return `You are an expert educational content enricher. You take reviewed academic content and make it exceptional.
 
@@ -472,9 +508,9 @@ Expected schema:
 ${schema}`;
 }
 
-function validatorSystem(contentType: ContentType, sourceLanguage?: string | null): string {
+async function validatorSystem(contentType: ContentType, sourceLanguage?: string | null): Promise<string> {
   const label = CONTENT_TYPE_LABELS[contentType];
-  const schema = CONTENT_TYPE_SCHEMAS[contentType];
+  const schema = await resolveSchema(contentType);
 
   return `You are a factual accuracy and consistency validator for educational content.
 
@@ -498,9 +534,9 @@ ${REVIEW_OUTPUT_SCHEMA}
 Be precise. Only flag issues you are confident about. For uncertain claims, note the uncertainty in the issue description rather than marking them as definitively wrong.`;
 }
 
-function factCheckerSystem(contentType: ContentType, sourceLanguage?: string | null): string {
+async function factCheckerSystem(contentType: ContentType, sourceLanguage?: string | null): Promise<string> {
   const label = CONTENT_TYPE_LABELS[contentType];
-  const schema = CONTENT_TYPE_SCHEMAS[contentType];
+  const schema = await resolveSchema(contentType);
 
   return `You are a rigorous fact-checker for educational content. You cross-reference claims against established knowledge.
 
@@ -594,9 +630,9 @@ function factCheckerUser(
 // Generator prompts (used by publisher after teacher verification)
 // ---------------------------------------------------------------------------
 
-function generatorSystem(contentType: ContentType, sourceLanguage?: string | null): string {
+async function generatorSystem(contentType: ContentType, sourceLanguage?: string | null): Promise<string> {
   const label = CONTENT_TYPE_LABELS[contentType];
-  const schema = CONTENT_TYPE_SCHEMAS[contentType];
+  const schema = await resolveSchema(contentType);
 
   return `You are an expert educational content generator. Your task is to produce a high-quality ${label} from verified, fact-checked educational content.
 
@@ -657,22 +693,22 @@ Generate a complete ${label} from the above content. Output ONLY valid JSON matc
  * Returns the human-readable JSON schema description for a content type.
  * Useful for documentation, UI tooltips, or passing to other systems.
  */
-export function getContentTypeSchema(contentType: ContentType): string {
-  return CONTENT_TYPE_SCHEMAS[contentType];
+export async function getContentTypeSchema(contentType: ContentType): Promise<string> {
+  return resolveSchema(contentType);
 }
 
 /**
  * Build system + user prompts for a generator step.
  * Used by the publisher after the 5-teacher verification pipeline completes.
  */
-export function getGeneratorPrompt(
+export async function getGeneratorPrompt(
   contentType: ContentType,
   verifiedContent: string,
   sourceContent: string,
   sourceLanguage?: string | null,
-): { system: string; user: string } {
+): Promise<{ system: string; user: string }> {
   return {
-    system: generatorSystem(contentType, sourceLanguage),
+    system: await generatorSystem(contentType, sourceLanguage),
     user: generatorUser(contentType, verifiedContent, sourceContent),
   };
 }
@@ -686,44 +722,44 @@ export function getGeneratorPrompt(
  * @param previousStepOutputs - Outputs from earlier pipeline steps (role + raw output string)
  * @returns `{ system, user }` ready to send to the AI provider
  */
-export function getPrompt(
+export async function getPrompt(
   role: ModelRole,
   contentType: ContentType,
   sourceContent: string,
   previousStepOutputs?: { role: string; output: string }[],
   courseContext?: CourseContext,
   sourceLanguage?: string | null,
-): { system: string; user: string } {
+): Promise<{ system: string; user: string }> {
   const outputs = previousStepOutputs ?? [];
 
   switch (role) {
     case "creator":
       return {
-        system: creatorSystem(contentType, courseContext, sourceLanguage),
+        system: await creatorSystem(contentType, courseContext, sourceLanguage),
         user: creatorUser(sourceContent),
       };
 
     case "reviewer":
       return {
-        system: reviewerSystem(contentType, sourceLanguage),
+        system: await reviewerSystem(contentType, sourceLanguage),
         user: reviewerUser(sourceContent, outputs),
       };
 
     case "enricher":
       return {
-        system: enricherSystem(contentType, sourceLanguage),
+        system: await enricherSystem(contentType, sourceLanguage),
         user: enricherUser(sourceContent, outputs),
       };
 
     case "validator":
       return {
-        system: validatorSystem(contentType, sourceLanguage),
+        system: await validatorSystem(contentType, sourceLanguage),
         user: validatorUser(sourceContent, outputs),
       };
 
     case "fact_checker":
       return {
-        system: factCheckerSystem(contentType, sourceLanguage),
+        system: await factCheckerSystem(contentType, sourceLanguage),
         user: factCheckerUser(sourceContent, outputs),
       };
 

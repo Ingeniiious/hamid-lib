@@ -788,6 +788,11 @@ export const contentTranslation = pgTable("content_translation", {
   errorMessage: text("error_message"),
   // Batch API tracking (for GPT batch jobs)
   batchJobId: text("batch_job_id"),                      // OpenAI batch job ID
+  // Media content (for translated podcast audio, video)
+  mediaUrl: text("media_url"),                           // R2 CDN URL
+  mediaKey: text("media_key"),                           // R2 object key
+  mediaType: text("media_type"),                         // MIME type (audio/mpeg, video/mp4)
+  mediaSize: integer("media_size"),                      // bytes
   // Timestamps
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -949,6 +954,38 @@ export const examAttempt = pgTable("exam_attempt", {
 ]);
 
 // ==================
+// Practice Progress (aggregated stats per user per course)
+// ==================
+
+export const practiceProgress = pgTable("practice_progress", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  courseId: text("course_id").notNull().references(() => course.id, { onDelete: "cascade" }),
+  totalAttempts: integer("total_attempts").notNull().default(0),
+  totalQuestionsAnswered: integer("total_questions_answered").notNull().default(0),
+  totalCorrect: integer("total_correct").notNull().default(0),
+  bestScorePct: numeric("best_score_pct", { precision: 5, scale: 2 }).default("0"),
+  latestScorePct: numeric("latest_score_pct", { precision: 5, scale: 2 }).default("0"),
+  averageScorePct: numeric("average_score_pct", { precision: 5, scale: 2 }).default("0"),
+  firstScorePct: numeric("first_score_pct", { precision: 5, scale: 2 }),
+  currentStreak: integer("current_streak").notNull().default(0),
+  bestStreak: integer("best_streak").notNull().default(0),
+  totalTimeSpentSeconds: integer("total_time_spent_seconds").notNull().default(0),
+  /** Array of { topic: string, wrongCount: number, totalCount: number } */
+  weakTopics: jsonb("weak_topics").$type<{ topic: string; wrongCount: number; totalCount: number }[]>().notNull().default([]),
+  /** Array of { topic: string, correctCount: number, totalCount: number } */
+  strongTopics: jsonb("strong_topics").$type<{ topic: string; correctCount: number; totalCount: number }[]>().notNull().default([]),
+  lastPracticedAt: timestamp("last_practiced_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  unique("practice_progress_unique").on(table.userId, table.courseId),
+  index("practice_progress_user_id_idx").on(table.userId),
+  index("practice_progress_course_id_idx").on(table.courseId),
+  index("practice_progress_last_practiced_idx").on(table.lastPracticedAt),
+]);
+
+// ==================
 // Contribution Appeals
 // ==================
 
@@ -1049,3 +1086,20 @@ export const notificationPreference = pgTable("notification_preference", {
   mutedUntil: timestamp("muted_until"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// ==================
+// Prompt Templates (admin-managed content generation structures)
+// ==================
+
+export const promptTemplate = pgTable("prompt_template", {
+  id: serial("id").primaryKey(),
+  contentType: text("content_type").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  structurePrompt: text("structure_prompt").notNull(),
+  isActive: boolean("is_active").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("prompt_template_content_type_idx").on(table.contentType),
+]);

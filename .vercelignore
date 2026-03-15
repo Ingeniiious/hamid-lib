@@ -7,6 +7,13 @@ scripts/
 database/*.json
 database/seed*.ts
 
+# Test/generated files
+test-*.png
+test-*.mp4
+test-*.mjs
+test-*.mts
+create-test-job.mts
+
 # Landing page sandbox (WIP)
 app/landing-clone/
 app/landing-v2/
