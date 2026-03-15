@@ -82,6 +82,10 @@ export async function generateSceneImage(imagePrompt: string): Promise<{
   image: Buffer;
   mimeType: string;
 }> {
+  if (!imagePrompt) {
+    throw new Error("[nano-banana] imagePrompt is empty or undefined");
+  }
+
   const ai = getGemini();
   const background = await getBackground();
 

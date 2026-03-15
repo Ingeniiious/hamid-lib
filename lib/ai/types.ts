@@ -195,7 +195,7 @@ export interface VideoScriptContent {
     title: string;
     narration: string;
     visualDescription: string;
-    imagePrompt: string;
+    imagePrompt?: string;
     duration: string;
   }[];
 }

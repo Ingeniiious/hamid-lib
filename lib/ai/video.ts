@@ -73,7 +73,7 @@ export async function generateVideoForContent(contentId: string): Promise<{
   const results = await Promise.allSettled(
     script.scenes.map((scene, i) =>
       Promise.all([
-        generateSceneImage(scene.imagePrompt),
+        generateSceneImage(scene.imagePrompt ?? scene.visualDescription),
         synthesizeGrok({
           text: scene.narration,
           voiceId: "ara",
