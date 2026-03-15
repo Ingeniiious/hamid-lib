@@ -10,6 +10,8 @@ export function TermsContent() {
 
   return (
     <div className="relative h-full w-full">
+      <BackButton href="/" floating useBack />
+
       {/* Gradient overlay — Grainient visible at top, smoothly fading to background */}
       <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-transparent from-0% via-[var(--background)]/60 via-[20%] to-[var(--background)] to-[45%]" />
 
@@ -24,7 +26,7 @@ export function TermsContent() {
 
         {/* Scrollable content */}
         <div
-          className="min-h-0 flex-1 overflow-y-auto px-6 pb-24"
+          className="min-h-0 flex-1 overflow-y-auto px-6 pb-24 scrollbar-hide"
           style={{
             maskImage:
               "linear-gradient(to bottom, transparent 0%, black 64px)",

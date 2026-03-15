@@ -30,7 +30,7 @@ function getElPos(
   return { x, y };
 }
 
-type Scene = "tabs" | "notes" | "mindmap";
+type Scene = "tabs" | "notes" | "tasks";
 
 /* ─── Shared gradient overlay (all dashboard pages have this) ─── */
 
@@ -75,6 +75,21 @@ function MiniBackButton() {
   );
 }
 
+/* ─── Mini folder shape (SVG) ─── */
+
+function MiniFolderIcon({ color }: { color: string }) {
+  return (
+    <svg width="28" height="22" viewBox="0 0 28 22" fill="none">
+      {/* Back flap */}
+      <rect x="0" y="4" width="28" height="18" rx="3" fill={color} opacity="0.85" />
+      {/* Tab */}
+      <path d="M0 5C0 3.34 1.34 2 3 2H10L12 5H0Z" fill={color} opacity="0.65" />
+      {/* Front */}
+      <rect x="0" y="8" width="28" height="14" rx="3" fill={color} />
+    </svg>
+  );
+}
+
 /* ─── Main component ─── */
 
 export function MySpaceDemo() {
@@ -85,14 +100,18 @@ export function MySpaceDemo() {
   /* Element refs for cursor targets */
   const notesCardRef = useRef<HTMLDivElement>(null);
   const noteItemRef = useRef<HTMLDivElement>(null);
-  const mindmapCenterRef = useRef<HTMLDivElement>(null);
+  const activeTabRef = useRef<HTMLButtonElement>(null);
+  const taskCheckRef = useRef<HTMLButtonElement>(null);
 
   /* Scene & animation state */
   const [scene, setScene] = useState<Scene>("tabs");
   const [cycle, setCycle] = useState(0);
   const [highlightCard, setHighlightCard] = useState<string | null>(null);
   const [expandedNote, setExpandedNote] = useState(false);
-  const [visibleNodes, setVisibleNodes] = useState(0);
+
+  /* Tasks scene state */
+  const [taskFilter, setTaskFilter] = useState<"all" | "active">("all");
+  const [taskCompleted, setTaskCompleted] = useState<Set<string>>(new Set(["task-3"]));
 
   /* ─── Animation sequence ─── */
 
@@ -140,7 +159,8 @@ export function MySpaceDemo() {
       setScene("tabs");
       setHighlightCard(null);
       setExpandedNote(false);
-      setVisibleNodes(0);
+      setTaskFilter("all");
+      setTaskCompleted(new Set(["task-3"]));
 
       if (!cursorScope.current) return;
 
@@ -173,7 +193,7 @@ export function MySpaceDemo() {
       if (cancelled) return;
       await pause(400);
 
-      /* ── SCENE 2: Notes list ── */
+      /* ── SCENE 2: Notes explorer ── */
       setHighlightCard(null);
       setScene("notes");
       await pause(900);
@@ -192,24 +212,34 @@ export function MySpaceDemo() {
       await pause(2000);
       if (cancelled) return;
 
-      /* ── SCENE 3: Mind map ── */
+      /* ── SCENE 3: Tasks ── */
       setHighlightCard(null);
       setExpandedNote(false);
-      setScene("mindmap");
+      setScene("tasks");
+      await pause(900);
+      if (cancelled) return;
+
+      // Move cursor to "Active" filter tab
+      await moveTo(activeTabRef, 0.7);
+      if (cancelled) return;
+      await pause(300);
+      await click();
+      if (cancelled) return;
+
+      // Switch to Active filter (hides completed task)
+      setTaskFilter("active");
       await pause(800);
       if (cancelled) return;
 
-      // Move cursor to center of mind map
-      await moveTo(mindmapCenterRef, 0.7);
+      // Move cursor to first task checkbox
+      await moveTo(taskCheckRef, 0.7);
+      if (cancelled) return;
+      await pause(300);
+      await click();
       if (cancelled) return;
 
-      // Animate nodes appearing one by one
-      for (let i = 1; i <= 4; i++) {
-        if (cancelled) return;
-        setVisibleNodes(i);
-        await pause(500);
-      }
-
+      // Mark task-1 as completed
+      setTaskCompleted((prev) => new Set([...prev, "task-1"]));
       await pause(3000);
       if (cancelled) return;
 
@@ -234,13 +264,41 @@ export function MySpaceDemo() {
     };
   }, [isInView, cycle, animateCursor, cursorScope]);
 
-  /* ─── Mind map node positions (relative to center) ─── */
-  const mindmapNodes = [
-    { label: "Arrays", angle: -45, distance: 70 },
-    { label: "Linked Lists", angle: 45, distance: 75 },
-    { label: "Trees", angle: 135, distance: 70 },
-    { label: "Graphs", angle: -135, distance: 75 },
+  /* ─── Task data ─── */
+  const tasks = [
+    {
+      key: "task-1",
+      title: "Study Chapter 5",
+      priority: "high" as const,
+      dueDate: "Mar 15",
+      subtasks: { done: 2, total: 3 },
+    },
+    {
+      key: "task-2",
+      title: "Submit Homework 3",
+      priority: "medium" as const,
+      dueDate: "Mar 16",
+      subtasks: null,
+    },
+    {
+      key: "task-3",
+      title: "Review Notes",
+      priority: "low" as const,
+      dueDate: null,
+      subtasks: null,
+    },
   ];
+
+  const priorityColors = {
+    high: "bg-red-500/15 text-red-700 dark:text-red-400",
+    medium: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+    low: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  };
+
+  const visibleTasks =
+    taskFilter === "active"
+      ? tasks.filter((t) => !taskCompleted.has(t.key))
+      : tasks;
 
   /* ─── Render ─── */
 
@@ -341,7 +399,7 @@ export function MySpaceDemo() {
             </motion.div>
           )}
 
-          {/* ── Scene 2: Notes list ── */}
+          {/* ── Scene 2: Notes Explorer ── */}
           {scene === "notes" && (
             <motion.div
               key="notes"
@@ -362,37 +420,78 @@ export function MySpaceDemo() {
                   </div>
                 </div>
 
-                {/* Notes list */}
-                <div className="flex flex-1 flex-col items-center overflow-hidden px-5 pt-3">
-                  <div className="w-full max-w-[300px] space-y-2">
+                {/* Action buttons */}
+                <div className="mt-2 flex items-center justify-center gap-1.5 px-5">
+                  {["+ Note", "+ Folder", "Select"].map((label) => (
+                    <div
+                      key={label}
+                      className="rounded-full border border-dashed border-gray-900/15 px-2.5 py-1 text-[6px] text-gray-900/40 dark:border-white/15 dark:text-white/40"
+                    >
+                      {label}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Folders section */}
+                <div className="mt-2.5 px-5">
+                  <div className="mb-1.5 text-center text-[6px] text-gray-900/30 dark:text-white/30">
+                    Folders
+                  </div>
+                  <div className="flex items-center justify-center gap-4">
+                    {[
+                      { name: "Physics", color: "#5227FF" },
+                      { name: "Calculus", color: "#2563eb" },
+                    ].map((folder) => (
+                      <div key={folder.name} className="flex flex-col items-center gap-1">
+                        <MiniFolderIcon color={folder.color} />
+                        <span className="text-[5px] font-medium text-gray-900 dark:text-white">
+                          {folder.name}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Notes section */}
+                <div className="mt-2.5 px-5">
+                  <div className="mb-1.5 text-center text-[6px] text-gray-900/30 dark:text-white/30">
+                    Notes
+                  </div>
+                  <div className="flex items-center justify-center gap-2">
                     {[
                       {
-                        title: "Data Structures Summary",
-                        date: "Mar 12, 2026",
+                        title: "Data Structures",
+                        date: "Mar 12",
+                        color: "bg-amber-100 dark:bg-amber-900/30",
                         key: "note-1",
                       },
                       {
-                        title: "Algorithm Complexity",
-                        date: "Mar 10, 2026",
+                        title: "Algorithm Notes",
+                        date: "Mar 10",
+                        color: "bg-blue-100 dark:bg-blue-900/30",
                         key: "note-2",
                       },
                       {
-                        title: "Binary Trees Review",
-                        date: "Mar 8, 2026",
+                        title: "Binary Trees",
+                        date: "Mar 8",
+                        color: "bg-pink-100 dark:bg-pink-900/30",
                         key: "note-3",
                       },
                     ].map((note) => (
                       <div
                         key={note.key}
                         ref={note.key === "note-1" ? noteItemRef : undefined}
-                        className={`overflow-hidden rounded-lg border bg-white/50 backdrop-blur-xl transition-all duration-300 dark:bg-white/5 ${
+                        className={`w-[80px] overflow-hidden rounded-xl border bg-white/50 backdrop-blur-xl transition-all duration-300 dark:bg-white/5 ${
                           highlightCard === note.key
                             ? "border-[#5227FF]/40 shadow-md"
                             : "border-gray-900/10 dark:border-white/15"
                         }`}
                       >
-                        <div className="px-3 py-2 text-center">
-                          <div className="font-display text-[8px] font-light text-gray-900 dark:text-white">
+                        {/* Paper preview strip */}
+                        <div className={`h-[24px] w-full ${note.color}`} />
+                        {/* Title + date */}
+                        <div className="px-1.5 py-1.5 text-center">
+                          <div className="truncate font-display text-[6px] font-light text-gray-900 dark:text-white">
                             {note.title}
                           </div>
                           <div className="mt-0.5 text-[5px] text-gray-900/40 dark:text-white/40">
@@ -409,16 +508,16 @@ export function MySpaceDemo() {
                               transition={{ duration: 0.3, ease }}
                               className="overflow-hidden"
                             >
-                              <div className="border-t border-gray-900/5 px-3 pb-2.5 pt-2 dark:border-white/5">
+                              <div className="border-t border-gray-900/5 px-2 pb-2 pt-1.5 dark:border-white/5">
                                 {/* Skeleton text lines */}
-                                <div className="space-y-1.5">
-                                  <div className="mx-auto h-1 w-[90%] rounded-full bg-gray-900/[0.06] dark:bg-white/[0.06]" />
-                                  <div className="mx-auto h-1 w-[75%] rounded-full bg-gray-900/[0.06] dark:bg-white/[0.06]" />
-                                  <div className="mx-auto h-1 w-[85%] rounded-full bg-gray-900/[0.06] dark:bg-white/[0.06]" />
+                                <div className="space-y-1">
+                                  <div className="mx-auto h-[2px] w-[90%] rounded-full bg-gray-900/[0.06] dark:bg-white/[0.06]" />
+                                  <div className="mx-auto h-[2px] w-[70%] rounded-full bg-gray-900/[0.06] dark:bg-white/[0.06]" />
+                                  <div className="mx-auto h-[2px] w-[80%] rounded-full bg-gray-900/[0.06] dark:bg-white/[0.06]" />
                                 </div>
                                 {/* Image placeholder */}
-                                <div className="mx-auto mt-2 flex h-[28px] w-[60%] items-center justify-center rounded-md bg-gray-900/[0.04] dark:bg-white/[0.04]">
-                                  <div className="text-[6px] text-gray-900/30 dark:text-white/30">
+                                <div className="mx-auto mt-1.5 flex h-[16px] w-[80%] items-center justify-center rounded bg-gray-900/[0.04] dark:bg-white/[0.04]">
+                                  <div className="text-[4px] text-gray-900/30 dark:text-white/30">
                                     Image
                                   </div>
                                 </div>
@@ -435,10 +534,10 @@ export function MySpaceDemo() {
             </motion.div>
           )}
 
-          {/* ── Scene 3: Mind map ── */}
-          {scene === "mindmap" && (
+          {/* ── Scene 3: Tasks ── */}
+          {scene === "tasks" && (
             <motion.div
-              key="mindmap"
+              key="tasks"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -449,93 +548,140 @@ export function MySpaceDemo() {
                 {/* Page header */}
                 <div className="px-4 pt-1 text-center">
                   <div className="font-display text-[14px] font-light text-gray-900 dark:text-white">
-                    Mind Map
+                    Tasks
                   </div>
                   <div className="mt-0.5 text-[8px] text-gray-900/50 dark:text-white/50">
-                    Data Structures
+                    Track Homework
                   </div>
                 </div>
 
-                {/* Mind map visualization */}
-                <div className="flex flex-1 items-center justify-center px-5">
-                  <div className="relative h-[180px] w-[260px]">
-                    {/* SVG lines connecting center to nodes */}
-                    <svg
-                      className="absolute inset-0 h-full w-full"
-                      viewBox="0 0 260 180"
-                    >
-                      {mindmapNodes.map((node, i) => {
-                        const cx = 130;
-                        const cy = 90;
-                        const rad = (node.angle * Math.PI) / 180;
-                        const nx = cx + Math.cos(rad) * node.distance;
-                        const ny = cy + Math.sin(rad) * node.distance;
-                        return (
-                          <motion.line
-                            key={node.label}
-                            x1={cx}
-                            y1={cy}
-                            x2={nx}
-                            y2={ny}
-                            stroke="currentColor"
-                            strokeWidth="0.5"
-                            className="text-gray-900/15 dark:text-white/15"
-                            initial={{ opacity: 0 }}
-                            animate={{
-                              opacity: visibleNodes >= i + 1 ? 1 : 0,
-                            }}
-                            transition={{ duration: 0.4, ease }}
-                          />
-                        );
-                      })}
-                    </svg>
+                {/* Filter tabs + Add button */}
+                <div className="mt-2 flex items-center justify-center gap-2 px-5">
+                  {/* Filter pills */}
+                  <div className="flex items-center gap-0.5 rounded-full bg-gray-900/5 p-0.5 dark:bg-white/5">
+                    {(["All", "Active", "Done"] as const).map((tab) => {
+                      const tabKey = tab.toLowerCase() as "all" | "active" | "done";
+                      const isActive =
+                        (taskFilter === "all" && tabKey === "all") ||
+                        (taskFilter === "active" && tabKey === "active");
+                      return (
+                        <button
+                          key={tab}
+                          ref={tab === "Active" ? activeTabRef : undefined}
+                          className={`rounded-full px-2.5 py-0.5 text-[6px] font-medium transition-all duration-300 ${
+                            isActive
+                              ? "bg-white text-gray-900 shadow-sm dark:bg-white/15 dark:text-white"
+                              : "text-gray-900/50 dark:text-white/50"
+                          }`}
+                        >
+                          {tab}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                    {/* Center node */}
-                    <div
-                      ref={mindmapCenterRef}
-                      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-                    >
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.5, ease }}
-                        className="flex h-[40px] w-[40px] items-center justify-center rounded-full border border-[#5227FF]/30 bg-[#5227FF]/10 backdrop-blur-xl dark:bg-[#5227FF]/20"
-                      >
-                        <div className="text-center font-display text-[5px] font-light leading-tight text-[#5227FF] dark:text-[#a78bfa]">
-                          Data
-                          <br />
-                          Structures
-                        </div>
-                      </motion.div>
-                    </div>
+                  {/* Add Task button */}
+                  <div className="rounded-full bg-[#5227FF] px-2.5 py-1 text-[6px] font-medium text-white">
+                    Add Task
+                  </div>
+                </div>
 
-                    {/* Outer nodes */}
-                    {mindmapNodes.map((node, i) => {
-                      const cx = 130;
-                      const cy = 90;
-                      const rad = (node.angle * Math.PI) / 180;
-                      const nx = cx + Math.cos(rad) * node.distance;
-                      const ny = cy + Math.sin(rad) * node.distance;
+                {/* Task cards */}
+                <div className="mt-2.5 flex flex-col items-center gap-1.5 overflow-hidden px-5">
+                  <AnimatePresence mode="popLayout">
+                    {visibleTasks.map((task) => {
+                      const isCompleted = taskCompleted.has(task.key);
                       return (
                         <motion.div
-                          key={node.label}
-                          className="absolute -translate-x-1/2 -translate-y-1/2"
-                          style={{ left: nx, top: ny }}
+                          key={task.key}
+                          layout
                           initial={{ opacity: 0 }}
-                          animate={{
-                            opacity: visibleNodes >= i + 1 ? 1 : 0,
-                          }}
-                          transition={{ duration: 0.4, ease }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.3, ease }}
+                          className={`w-full max-w-[300px] rounded-xl border p-2 transition-colors duration-300 ${
+                            isCompleted
+                              ? "border-gray-900/5 bg-gray-900/[0.02] dark:border-white/5 dark:bg-white/[0.02]"
+                              : "border-gray-900/10 bg-white/50 dark:border-white/10 dark:bg-white/5"
+                          }`}
                         >
-                          <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full border border-gray-900/10 bg-white/60 backdrop-blur-xl dark:border-white/15 dark:bg-white/5">
-                            <div className="text-center font-display text-[5px] font-light leading-tight text-gray-900 dark:text-white">
-                              {node.label}
+                          <div className="flex items-center gap-2">
+                            {/* Checkbox */}
+                            <button
+                              ref={task.key === "task-1" ? taskCheckRef : undefined}
+                              className={`flex h-[12px] w-[12px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition-all duration-300 ${
+                                isCompleted
+                                  ? "border-[#5227FF] bg-[#5227FF]"
+                                  : "border-gray-900/20 dark:border-white/20"
+                              }`}
+                            >
+                              {isCompleted && (
+                                <svg width="6" height="5" viewBox="0 0 10 8" fill="none">
+                                  <path
+                                    d="M1 4L3.5 6.5L9 1"
+                                    stroke="white"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              )}
+                            </button>
+
+                            {/* Title + priority + date */}
+                            <div className="min-w-0 flex-1 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <span
+                                  className={`text-[7px] font-medium transition-all duration-300 ${
+                                    isCompleted
+                                      ? "text-gray-900/30 line-through dark:text-white/30"
+                                      : "text-gray-900 dark:text-white"
+                                  }`}
+                                >
+                                  {task.title}
+                                </span>
+                                <span
+                                  className={`rounded-full px-1.5 py-[1px] text-[5px] font-medium ${
+                                    priorityColors[task.priority]
+                                  }`}
+                                >
+                                  {task.priority}
+                                </span>
+                              </div>
+
+                              {/* Due date */}
+                              {task.dueDate && (
+                                <div className="mt-0.5 text-[5px] text-gray-900/40 dark:text-white/40">
+                                  {task.dueDate}
+                                </div>
+                              )}
+
+                              {/* Subtask progress bar */}
+                              {task.subtasks && (
+                                <div className="mt-1 flex items-center justify-center gap-1.5">
+                                  <div className="h-[3px] w-[40px] overflow-hidden rounded-full bg-gray-900/10 dark:bg-white/10">
+                                    <motion.div
+                                      className="h-full rounded-full bg-[#5227FF]"
+                                      initial={{ width: `${(task.subtasks.done / task.subtasks.total) * 100}%` }}
+                                      animate={{
+                                        width: isCompleted
+                                          ? "100%"
+                                          : `${(task.subtasks.done / task.subtasks.total) * 100}%`,
+                                      }}
+                                      transition={{ duration: 0.5, ease }}
+                                    />
+                                  </div>
+                                  <span className="text-[5px] text-gray-900/40 dark:text-white/40">
+                                    {isCompleted ? task.subtasks.total : task.subtasks.done}/{task.subtasks.total}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </motion.div>
                       );
                     })}
-                  </div>
+                  </AnimatePresence>
                 </div>
                 <MiniBackButton />
               </div>

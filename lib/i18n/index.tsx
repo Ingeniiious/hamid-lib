@@ -97,12 +97,30 @@ export function changeLocaleAnimated(newLocale: Locale): Promise<void> {
   return Promise.resolve();
 }
 
+/** Map IP country code to locale (Turkey → Turkish, everything else → English) */
+function geoLocale(): Locale | null {
+  try {
+    const country = document.documentElement.dataset.geoCountry;
+    if (country === "TR") return "tr";
+  } catch {
+    // dataset unavailable
+  }
+  return null;
+}
+
 // Initialise from localStorage on client (runs once when module loads)
 if (typeof window !== "undefined") {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && VALID_LOCALES.has(saved)) {
       currentLocale = saved as Locale;
+    } else {
+      // First visit — use IP-based geo detection
+      const geo = geoLocale();
+      if (geo) {
+        currentLocale = geo;
+        localStorage.setItem(STORAGE_KEY, geo);
+      }
     }
   } catch {
     // localStorage unavailable

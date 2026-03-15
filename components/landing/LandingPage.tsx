@@ -349,7 +349,7 @@ const LANG_OPTIONS: { code: Locale; label: string }[] = [
   { code: "fa", label: "FA" },
 ];
 
-function LangSwitcher() {
+function LangSwitcher({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
   const { locale, setLocale } = useTranslation();
   const [open, setOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -357,22 +357,31 @@ function LangSwitcher() {
   const current = LANG_OPTIONS.find((l) => l.code === locale) || LANG_OPTIONS[0];
   const others = LANG_OPTIONS.filter((l) => l.code !== locale);
 
-  const handleEnter = () => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    setOpen(true);
+  const updateOpen = (next: boolean) => {
+    setOpen(next);
+    onOpenChange?.(next);
   };
-  const handleLeave = () => {
-    timeoutRef.current = setTimeout(() => setOpen(false), 200);
+
+  // Use pointerType to distinguish mouse from touch — prevents
+  // onMouseEnter (fires on tap) from conflicting with onClick toggle
+  const handleEnter = (e: React.PointerEvent) => {
+    if (e.pointerType !== "mouse") return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    updateOpen(true);
+  };
+  const handleLeave = (e: React.PointerEvent) => {
+    if (e.pointerType !== "mouse") return;
+    timeoutRef.current = setTimeout(() => updateOpen(false), 200);
   };
 
   return (
     <div
       className="relative inline-flex"
-      onMouseEnter={handleEnter}
-      onMouseLeave={handleLeave}
+      onPointerEnter={handleEnter}
+      onPointerLeave={handleLeave}
     >
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => updateOpen(!open)}
         className="relative inline-flex items-center px-2 py-1 pb-2 font-gochi text-[22px] text-white sm:px-3"
       >
         {current.label}
@@ -382,18 +391,18 @@ function LangSwitcher() {
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: 4 }}
+            initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
+            exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-1/2 bottom-full z-50 mb-1 flex -translate-x-1/2 flex-col items-center gap-1 px-3 py-2"
+            className="absolute left-1/2 top-full z-50 mt-1 flex -translate-x-1/2 flex-col items-center gap-1 px-3 py-2"
           >
             {others.map((lang) => (
               <button
                 key={lang.code}
                 onClick={() => {
                   setLocale(lang.code);
-                  setOpen(false);
+                  updateOpen(false);
                 }}
                 className="w-full px-3 py-1 font-gochi text-[18px] text-white/60 transition-colors hover:text-white"
               >
@@ -403,6 +412,258 @@ function LangSwitcher() {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/* ── Lang switcher + doodle — wired together so dropdown open hides doodle ── */
+function LangDoodle() {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  return (
+    <DoodleAnnotation config={LANG_DOODLE} childOpen={dropdownOpen}>
+      <LangSwitcher onOpenChange={setDropdownOpen} />
+    </DoodleAnnotation>
+  );
+}
+
+/* ── Doodle annotation — reusable hand-drawn circle + arrow + text ── */
+// 6 hand-drawn frames snap at ~4fps for stop-motion doodle wobble.
+// Circles don't close perfectly (start ≠ end) for authentic hand-drawn feel.
+// Arrow start matches arrowhead tip on every frame — always connected.
+
+interface DoodleConfig {
+  shapes: string[];
+  arrows: string[];
+  heads: string[];
+  filledHead?: boolean;
+  labels: string[];
+  prefix: string;
+  svgPos: React.CSSProperties;
+  scaleOrigin: string;
+  textPos: React.CSSProperties;
+  delay: number;
+  mobileScale?: string; // Tailwind scale class, default "scale-[0.65]"
+}
+
+const FILTER_SEEDS = [42, 17, 89, 63, 31, 55];
+
+// Language picker — smaller circle + SE arrow, circle at (60,24)
+const LANG_DOODLE: DoodleConfig = {
+  shapes: [
+    "M 24,24 C 22,12 36,2 60,2 C 84,2 98,12 100,24 C 102,36 88,44 62,44 C 36,44 26,36 24,28",
+    "M 28,22 C 22,8 40,0 62,2 C 84,4 100,12 98,26 C 96,38 82,46 58,44 C 34,42 30,34 28,26",
+    "M 22,26 C 26,12 38,4 60,2 C 82,0 100,10 102,24 C 104,36 90,46 64,46 C 38,46 20,38 22,30",
+    "M 26,24 C 20,10 40,0 58,2 C 80,4 102,12 100,26 C 98,38 84,48 60,46 C 34,44 28,34 26,28",
+    "M 22,28 C 24,14 36,2 56,2 C 80,2 98,10 102,24 C 106,36 90,44 64,42 C 38,42 20,36 22,32",
+    "M 28,24 C 22,8 42,2 62,4 C 84,6 100,14 96,28 C 92,40 78,44 56,42 C 34,40 30,32 28,28",
+  ],
+  arrows: [
+    "M 84,42 C 96,54 110,68 122,80 C 132,92 140,102 148,110",
+    "M 82,40 C 94,52 108,70 124,84 C 134,92 142,104 150,112",
+    "M 86,42 C 98,56 112,68 122,82 C 130,94 138,106 146,114",
+    "M 83,41 C 95,53 106,64 120,78 C 130,88 142,100 152,108",
+    "M 85,43 C 99,57 114,70 126,84 C 136,96 144,108 148,116",
+    "M 84,40 C 96,52 104,72 118,86 C 128,96 136,106 144,112",
+  ],
+  heads: [
+    "M 87,56 L 84,42 L 98,45",
+    "M 85,54 L 82,40 L 96,43",
+    "M 89,56 L 86,42 L 100,45",
+    "M 86,55 L 83,41 L 97,44",
+    "M 88,57 L 85,43 L 99,46",
+    "M 87,54 L 84,40 L 98,43",
+  ],
+  mobileScale: "scale-[0.75]",
+  labels: ["Choose Your Language", "Dilini Buradan Seç", "زبانت رو انتخاب کن"],
+  prefix: "dl",
+  svgPos: { left: "50%", top: "50%", transform: "translate(-60px, -24px)" },
+  scaleOrigin: "60px 24px",
+  textPos: { top: "118px", left: "148px", transform: "translateX(-50%)" },
+  delay: 3.5,
+};
+
+// "Let's Start" button — hand-drawn rectangle + bent arrow with filled head
+// Rectangle centered at (180,24), arrow bends down then left (elbow shape)
+const START_DOODLE: DoodleConfig = {
+  shapes: [
+    "M 124,2 C 152,-1 206,-2 232,2 C 236,14 237,32 234,46 C 208,49 152,50 122,47 C 119,34 118,14 124,2",
+    "M 126,0 C 154,-3 204,0 230,4 C 234,16 236,34 232,48 C 204,51 150,52 120,48 C 117,36 116,16 126,4",
+    "M 122,4 C 150,1 208,-4 234,0 C 238,12 239,30 236,44 C 210,47 154,48 124,46 C 121,32 120,12 122,4",
+    "M 128,2 C 156,-2 202,-1 228,3 C 232,14 234,34 230,48 C 202,50 148,52 118,48 C 116,36 114,14 128,6",
+    "M 120,4 C 148,0 210,-2 236,2 C 240,16 238,32 234,46 C 206,50 154,50 126,46 C 122,34 122,14 120,4",
+    "M 126,0 C 152,-2 208,0 232,4 C 236,12 238,30 234,44 C 208,48 150,50 122,48 C 118,34 120,12 126,4",
+  ],
+  arrows: [
+    // Elbow-bent: straight-ish down, then bends left
+    "M 156,60 C 158,70 160,78 160,86 C 158,94 146,100 130,106 C 114,112 98,116 84,118",
+    "M 158,62 C 160,72 162,80 162,88 C 160,96 148,102 132,108 C 118,114 100,118 86,120",
+    "M 154,60 C 156,68 158,76 158,84 C 156,92 142,98 126,104 C 110,110 96,114 82,116",
+    "M 157,61 C 160,72 163,80 161,88 C 158,94 150,100 134,106 C 120,112 102,116 88,118",
+    "M 155,60 C 156,70 158,78 156,86 C 154,92 140,100 122,106 C 106,112 92,116 78,118",
+    "M 158,62 C 162,74 164,80 162,90 C 160,96 148,102 130,108 C 112,114 98,118 84,120",
+  ],
+  heads: [
+    // Filled triangles (closed with Z) — tip at arrow/rect junction, opening downward
+    "M 148,62 L 156,48 L 164,60 Z",
+    "M 150,64 L 158,50 L 166,62 Z",
+    "M 146,62 L 154,48 L 162,60 Z",
+    "M 149,63 L 157,49 L 165,61 Z",
+    "M 147,62 L 155,48 L 163,60 Z",
+    "M 150,64 L 158,50 L 166,62 Z",
+  ],
+  filledHead: true,
+  mobileScale: "scale-[0.85]",
+  labels: ["Start Here", "Buradan Başla", "از اینجا شروع کن"],
+  prefix: "ds",
+  svgPos: { left: "50%", top: "50%", transform: "translate(-180px, -24px)" },
+  scaleOrigin: "180px 24px",
+  textPos: { top: "122px", left: "84px", transform: "translateX(-50%)" },
+  delay: 2,
+};
+
+function DoodleAnnotation({
+  children,
+  config,
+  childOpen,
+}: {
+  children: React.ReactNode;
+  config: DoodleConfig;
+  childOpen?: boolean;
+}) {
+  const [frame, setFrame] = useState(0);
+  const [textIdx, setTextIdx] = useState(0);
+  const [visible, setVisible] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(true), config.delay * 1000);
+    return () => clearTimeout(timer);
+  }, [config.delay]);
+
+  useEffect(() => {
+    const id = setInterval(() => setFrame((f) => (f + 1) % 6), 250);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(
+      () => setTextIdx((i) => (i + 1) % config.labels.length),
+      5000,
+    );
+    return () => clearInterval(id);
+  }, [config.labels.length]);
+
+  // Desktop: hover to hide doodle
+  const handleEnter = () => {
+    if (leaveTimer.current) clearTimeout(leaveTimer.current);
+    setHovered(true);
+  };
+  const handleLeave = () => {
+    leaveTimer.current = setTimeout(() => setHovered(false), 300);
+  };
+
+  // Hide on hover (desktop) OR when child dropdown is open (mobile)
+  const active = hovered || !!childOpen;
+  const show = visible && !active;
+  const { prefix } = config;
+
+  return (
+    <div
+      className="relative -m-4 inline-flex p-4"
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+    >
+      <motion.div
+        animate={{ opacity: show ? 1 : 0 }}
+        transition={{ duration: show ? 0.5 : 0.25, ease }}
+        className="pointer-events-none absolute"
+        style={config.svgPos}
+      >
+        <div
+          className={`${config.mobileScale ?? "scale-[0.65]"} sm:scale-100`}
+          style={{ transformOrigin: config.scaleOrigin }}
+        >
+          <svg
+            width={240}
+            height={130}
+            viewBox="0 0 240 130"
+            fill="none"
+            className="overflow-visible"
+          >
+            <defs>
+              {FILTER_SEEDS.map((seed, i) => (
+                <filter
+                  key={i}
+                  id={`${prefix}-f${i}`}
+                  x="-10%"
+                  y="-10%"
+                  width="120%"
+                  height="120%"
+                >
+                  <feTurbulence
+                    type="fractalNoise"
+                    baseFrequency="0.6"
+                    numOctaves={3}
+                    seed={seed}
+                    result="n"
+                  />
+                  <feDisplacementMap
+                    in="SourceGraphic"
+                    in2="n"
+                    scale={1.5}
+                    xChannelSelector="R"
+                    yChannelSelector="G"
+                  />
+                </filter>
+              ))}
+            </defs>
+            <g filter={`url(#${prefix}-f${frame})`} opacity="0.85">
+              <path
+                d={config.shapes[frame]}
+                stroke="white"
+                strokeWidth="2.5"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d={config.arrows[frame]}
+                stroke="white"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d={config.heads[frame]}
+                stroke="white"
+                strokeWidth={config.filledHead ? "1.5" : "2"}
+                fill={config.filledHead ? "white" : "none"}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </g>
+          </svg>
+
+          <div className="absolute" style={config.textPos}>
+            <AnimatePresence mode="wait">
+              <motion.span
+                key={textIdx}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.5, ease }}
+                className="block whitespace-nowrap text-center font-gochi text-lg text-white"
+              >
+                {config.labels[textIdx]}
+              </motion.span>
+            </AnimatePresence>
+          </div>
+        </div>
+      </motion.div>
+
+      {children}
     </div>
   );
 }
@@ -728,6 +989,119 @@ const STEPS = [
   },
 ];
 
+/* ── Doodle marker highlight — zigzag draw-in then stop-motion wobble ── */
+// 6 messy zigzag marker strokes that fill behind the text like a highlighter.
+// Phase 1: pathLength draws the zigzag in. Phase 2: wobbles between frames.
+const HIGHLIGHT_FRAMES = [
+  // Vertical zigzag — messy scribble overshooting edges, uneven spacing
+  "M -6,8 L -2,30 L 8,0 L 14,36 L 22,6 L 30,34 L 38,-2 L 44,38 L 54,8 L 58,32 L 68,2 L 76,36 L 82,6 L 90,34 L 96,-2 L 102,38 L 108,10",
+  "M -4,4 L 0,34 L 10,8 L 16,38 L 28,2 L 32,30 L 42,6 L 46,36 L 56,0 L 62,34 L 70,8 L 78,38 L 86,2 L 92,32 L 100,6 L 106,36 L 108,8",
+  "M -8,10 L -2,36 L 6,2 L 12,32 L 24,8 L 28,38 L 36,0 L 44,34 L 52,6 L 60,38 L 66,2 L 74,30 L 84,8 L 88,36 L 98,0 L 104,34 L 110,6",
+  "M -4,6 L 2,32 L 10,-2 L 18,36 L 26,4 L 34,38 L 40,2 L 48,32 L 58,8 L 64,36 L 72,0 L 78,34 L 88,6 L 94,38 L 100,2 L 108,34 L 106,8",
+  "M -6,2 L 0,36 L 8,6 L 16,34 L 22,0 L 30,38 L 38,4 L 46,30 L 54,2 L 60,36 L 68,6 L 76,32 L 86,0 L 90,38 L 98,4 L 106,32 L 108,4",
+  "M -4,8 L -2,34 L 6,0 L 14,38 L 24,4 L 32,32 L 40,8 L 46,38 L 56,2 L 62,30 L 72,6 L 78,36 L 84,0 L 92,34 L 100,8 L 104,36 L 110,10",
+];
+
+function DoodleHighlight({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const [drawn, setDrawn] = useState(false);
+  const [frame, setFrame] = useState(0);
+  const [inView, setInView] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  // Trigger when scrolled into view
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.5 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  // After draw-in completes, start the wobble loop
+  useEffect(() => {
+    if (!drawn) return;
+    const id = setInterval(() => setFrame((f) => (f + 1) % 6), 600);
+    return () => clearInterval(id);
+  }, [drawn]);
+
+  return (
+    <span ref={ref} className={`relative inline-block ${className ?? ""}`}>
+      {/* Highlight SVG behind the text */}
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+        viewBox="0 0 100 36"
+        preserveAspectRatio="none"
+        fill="none"
+      >
+        <defs>
+          <filter id="hl-pencil" x="-5%" y="-5%" width="110%" height="110%">
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.5"
+              numOctaves={3}
+              seed="77"
+              result="n"
+            />
+            <feDisplacementMap
+              in="SourceGraphic"
+              in2="n"
+              scale={2}
+              xChannelSelector="R"
+              yChannelSelector="G"
+            />
+          </filter>
+        </defs>
+        {drawn ? (
+          // Phase 2: wobble between frames
+          <path
+            d={HIGHLIGHT_FRAMES[frame]}
+            stroke="#5227FF"
+            strokeWidth="10"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.2"
+            filter="url(#hl-pencil)"
+          />
+        ) : (
+          // Phase 1: draw-in zigzag
+          <motion.path
+            d={HIGHLIGHT_FRAMES[0]}
+            stroke="#5227FF"
+            strokeWidth="10"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.2"
+            filter="url(#hl-pencil)"
+            initial={{ pathLength: 0 }}
+            animate={inView ? { pathLength: 1 } : { pathLength: 0 }}
+            transition={{ duration: 1.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+            onAnimationComplete={() => {
+              if (inView) setDrawn(true);
+            }}
+          />
+        )}
+      </svg>
+
+      {/* Text on top */}
+      <span className="relative z-10">{children}</span>
+    </span>
+  );
+}
+
 function HowItWorksSection() {
   const { t } = useTranslation();
   return (
@@ -742,7 +1116,7 @@ function HowItWorksSection() {
           transition={{ duration: 0.7, ease }}
           className="mb-16 text-center font-display text-3xl font-light text-foreground sm:mb-20 sm:text-4xl md:text-5xl"
         >
-          {t("landing.howItWorksTitle")}
+          <DoodleHighlight>{t("landing.howItWorksTitle")}</DoodleHighlight>
         </motion.h2>
 
         <div className="flex flex-col items-center gap-12 sm:gap-16 md:gap-20">
@@ -911,6 +1285,198 @@ function PricingSection() {
   );
 }
 
+/* ── Doodle underline — hand-drawn lines that draw beneath a title ── */
+const UNDERLINE_FRAMES = [
+  // Two wobbly lines stacked — messy emphasis strokes
+  "M -4,6 C 15,4 35,8 50,5 C 65,2 85,7 104,5",
+  "M -2,8 C 18,5 32,9 50,6 C 68,3 82,8 102,6",
+  "M -6,6 C 12,3 38,8 52,5 C 66,2 88,7 106,4",
+  "M -4,7 C 16,4 30,8 48,5 C 64,2 84,8 104,6",
+  "M -2,5 C 14,3 36,8 50,6 C 66,3 86,7 102,4",
+  "M -6,8 C 18,5 34,9 52,6 C 70,3 82,8 106,6",
+];
+const UNDERLINE_FRAMES_2 = [
+  "M -2,12 C 20,10 40,14 55,11 C 70,8 85,13 102,11",
+  "M -4,14 C 16,11 38,15 52,12 C 68,9 88,14 104,12",
+  "M 0,12 C 22,10 36,14 50,11 C 66,8 82,14 100,11",
+  "M -2,13 C 18,10 42,14 56,11 C 72,8 84,13 104,11",
+  "M -4,12 C 14,10 34,15 50,12 C 68,9 86,13 102,12",
+  "M 0,14 C 20,11 40,15 54,12 C 70,9 80,14 100,12",
+];
+
+function DoodleUnderlineTitle({
+  children,
+  exclamation,
+}: {
+  children: React.ReactNode;
+  exclamation?: boolean;
+}) {
+  const { locale } = useTranslation();
+  const [drawn, setDrawn] = useState(false);
+  const [frame, setFrame] = useState(0);
+  const [inView, setInView] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.5 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!drawn) return;
+    const id = setInterval(() => setFrame((f) => (f + 1) % 6), 600);
+    return () => clearInterval(id);
+  }, [drawn]);
+
+  // Persian/Arabic → exclamation on the left, everything else → right
+  const isRTL = locale === "fa";
+
+  return (
+    <span ref={ref} className="relative inline-block">
+      {/* Doodle exclamation mark — locale-aware, animated wobble */}
+      {exclamation && (
+        <span
+          className={`pointer-events-none absolute top-[0.05em] bottom-0 ${isRTL ? "-left-[0.5em]" : "-right-[0.5em]"}`}
+        >
+          <svg
+            className="h-[1em] w-auto overflow-visible"
+            viewBox="0 0 14 36"
+            fill="none"
+          >
+            <defs>
+              <filter id="ex-pencil" x="-20%" y="-10%" width="140%" height="120%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves={3} seed={FILTER_SEEDS[frame]} result="n" />
+                <feDisplacementMap in="SourceGraphic" in2="n" scale={1.5} xChannelSelector="R" yChannelSelector="G" />
+              </filter>
+            </defs>
+            <g filter="url(#ex-pencil)">
+              {/* Teardrop — wide at top, tapers to a point at bottom */}
+              {[
+                "M 3,2 C 2,4 1,8 2,14 C 3,20 5,24 7,28 C 9,24 11,20 12,14 C 13,8 12,4 11,2 C 9,0 5,0 3,2 Z",
+                "M 4,2 C 2,5 0,9 1,14 C 2,20 5,25 7,28 C 10,24 12,19 13,14 C 14,9 12,5 10,2 C 8,0 6,0 4,2 Z",
+                "M 2,2 C 1,4 0,8 1,14 C 3,21 6,25 7,28 C 8,24 11,20 12,14 C 13,8 13,4 12,2 C 10,0 4,0 2,2 Z",
+                "M 4,2 C 3,5 1,9 2,14 C 3,20 6,24 7,28 C 9,25 11,20 12,14 C 14,9 13,5 11,2 C 9,0 5,0 4,2 Z",
+                "M 3,2 C 1,4 0,8 1,14 C 2,20 5,24 7,28 C 10,25 12,20 13,14 C 14,8 12,4 10,2 C 8,0 5,0 3,2 Z",
+                "M 2,2 C 2,5 1,9 2,14 C 4,21 6,25 7,28 C 8,24 10,19 12,14 C 13,9 13,5 12,2 C 10,0 4,0 2,2 Z",
+              ].map((d, i) => i === frame && (
+                <path key={i} d={d} fill="currentColor" className="text-[#5227FF] dark:text-white" opacity="0.5" />
+              ))}
+              {/* Round dot */}
+              {[
+                "M 5,32 C 4,31 4,34 5,35 C 7,36 9,36 9,34 C 10,32 8,31 7,31 C 6,31 5,31 5,32 Z",
+                "M 5,33 C 4,32 3,34 5,35 C 7,36 10,36 10,34 C 10,32 8,31 7,31 C 6,31 5,32 5,33 Z",
+                "M 4,32 C 4,31 3,34 5,35 C 7,37 9,36 10,34 C 10,32 9,31 7,31 C 5,31 4,31 4,32 Z",
+                "M 5,32 C 4,31 4,34 6,35 C 8,36 10,35 10,34 C 10,32 8,31 7,31 C 6,31 5,32 5,32 Z",
+                "M 4,33 C 4,32 3,34 5,36 C 7,36 9,36 10,34 C 10,32 9,31 7,31 C 5,31 4,32 4,33 Z",
+                "M 5,32 C 4,31 3,34 5,35 C 7,37 10,36 10,34 C 10,32 8,31 7,31 C 6,31 5,31 5,32 Z",
+              ].map((d, i) => i === frame && (
+                <path key={i} d={d} fill="currentColor" className="text-[#5227FF] dark:text-white" opacity="0.5" />
+              ))}
+            </g>
+          </svg>
+        </span>
+      )}
+
+      {children}
+
+      {/* Underline SVG below the text */}
+      <svg
+        className="pointer-events-none absolute -bottom-4 left-0 w-full overflow-visible sm:-bottom-5"
+        style={{ height: 18 }}
+        viewBox="0 0 100 18"
+        preserveAspectRatio="none"
+        fill="none"
+      >
+        <defs>
+          <filter id="ul-pencil" x="-5%" y="-5%" width="110%" height="110%">
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.5"
+              numOctaves={3}
+              seed="33"
+              result="n"
+            />
+            <feDisplacementMap
+              in="SourceGraphic"
+              in2="n"
+              scale={1.5}
+              xChannelSelector="R"
+              yChannelSelector="G"
+            />
+          </filter>
+        </defs>
+        {drawn ? (
+          <>
+            <path
+              d={UNDERLINE_FRAMES[frame]}
+              stroke="currentColor"
+              className="text-[#5227FF] dark:text-white"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              opacity="0.5"
+              filter="url(#ul-pencil)"
+            />
+            <path
+              d={UNDERLINE_FRAMES_2[frame]}
+              stroke="currentColor"
+              className="text-[#5227FF] dark:text-white"
+              strokeWidth="2"
+              strokeLinecap="round"
+              opacity="0.3"
+              filter="url(#ul-pencil)"
+            />
+          </>
+        ) : (
+          <>
+            <motion.path
+              d={UNDERLINE_FRAMES[0]}
+              stroke="currentColor"
+              className="text-[#5227FF] dark:text-white"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              opacity="0.5"
+              filter="url(#ul-pencil)"
+              initial={{ pathLength: 0 }}
+              animate={inView ? { pathLength: 1 } : { pathLength: 0 }}
+              transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+            />
+            <motion.path
+              d={UNDERLINE_FRAMES_2[0]}
+              stroke="currentColor"
+              className="text-[#5227FF] dark:text-white"
+              strokeWidth="2"
+              strokeLinecap="round"
+              opacity="0.3"
+              filter="url(#ul-pencil)"
+              initial={{ pathLength: 0 }}
+              animate={inView ? { pathLength: 1 } : { pathLength: 0 }}
+              transition={{
+                duration: 0.6,
+                delay: 0.5,
+                ease: [0.25, 0.46, 0.45, 0.94],
+              }}
+              onAnimationComplete={() => {
+                if (inView) setDrawn(true);
+              }}
+            />
+          </>
+        )}
+      </svg>
+    </span>
+  );
+}
+
 function FeaturesSection() {
   const { t } = useTranslation();
   return (
@@ -925,7 +1491,9 @@ function FeaturesSection() {
           transition={{ duration: 0.7, ease }}
           className="mb-16 text-center font-display text-3xl font-light text-foreground sm:mb-20 sm:text-4xl md:text-5xl"
         >
-          {t("landing.featuresTitle")}
+          <DoodleUnderlineTitle exclamation>
+            {t("landing.featuresTitle")}
+          </DoodleUnderlineTitle>
         </motion.h2>
 
         <div className="grid auto-rows-[1fr] grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3">
@@ -945,6 +1513,83 @@ function FeaturesSection() {
 }
 
 /* ── Community / About section ── */
+/* ── Doodle heart — single hand-drawn heart at the end of title ── */
+// Classic heart shape using proper SVG heart bezier curves.
+// 6 wobble frames with pencil texture filter.
+// Hand-drawn heart: asymmetric lobes, imperfect closure, sketchy feel.
+// 10 frames for more variety at fast wobble speed.
+const DOODLE_HEART_FRAMES = [
+  "M 10,19 C 8,16 1,12 1,7 C 1,3 3,1 6,1 C 8,1 10,3 10,5 C 10,3 12,1 14,1 C 17,1 19,3 19,7 C 19,12 12,16 10,19",
+  "M 10,18 C 7,15 2,12 2,7 C 2,3 4,0 7,0 C 9,0 10,2 10,4 C 10,2 12,0 14,0 C 17,0 18,3 18,7 C 18,12 13,15 11,18",
+  "M 10,19 C 8,17 0,12 0,7 C 0,2 3,0 6,0 C 8,0 10,2 10,4 C 10,2 11,0 14,0 C 17,0 20,2 20,7 C 20,12 12,17 10,19",
+  "M 10,18 C 7,16 1,11 1,7 C 1,3 4,1 7,1 C 9,1 10,3 10,5 C 10,3 12,1 14,1 C 16,1 19,3 19,7 C 19,11 13,16 11,18",
+  "M 10,19 C 8,16 2,13 2,7 C 2,2 4,0 6,0 C 8,0 10,2 10,4 C 10,2 11,0 14,0 C 17,0 18,2 18,7 C 18,13 12,16 10,19",
+  "M 10,18 C 7,15 0,12 0,7 C 0,3 3,1 7,1 C 9,1 10,3 10,5 C 10,3 12,1 14,1 C 17,1 20,3 20,7 C 20,12 13,15 11,18",
+  "M 10,19 C 9,17 1,13 1,8 C 1,3 4,0 6,0 C 8,0 10,2 10,4 C 10,2 12,0 14,0 C 16,0 19,3 19,8 C 19,13 11,17 10,19",
+  "M 10,18 C 7,16 2,11 2,7 C 2,2 5,1 7,1 C 9,1 10,3 10,5 C 10,3 11,1 13,1 C 16,1 18,2 18,7 C 18,11 13,16 11,18",
+  "M 10,19 C 8,16 0,13 0,7 C 0,3 3,0 7,0 C 9,0 10,2 10,4 C 10,2 12,0 14,0 C 17,0 20,3 20,7 C 20,13 12,16 10,19",
+  "M 10,18 C 7,15 1,12 1,8 C 1,4 4,1 6,1 C 8,1 10,3 10,5 C 10,3 12,1 14,1 C 17,1 19,4 19,8 C 19,12 13,15 11,18",
+];
+
+function DoodleHeart() {
+  const [frame, setFrame] = useState(0);
+  const [inView, setInView] = useState(false);
+  const ref = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.5 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!inView) return;
+    const id = setInterval(() => setFrame((f) => (f + 1) % 10), 250);
+    return () => clearInterval(id);
+  }, [inView]);
+
+  return (
+    <motion.svg
+      ref={ref}
+      className="ml-2 inline-block overflow-visible align-middle sm:ml-3"
+      style={{ width: "0.8em", height: "0.8em", marginBottom: "0.05em" }}
+      viewBox="0 0 20 20"
+      fill="none"
+      initial={{ opacity: 0, scale: 0 }}
+      animate={inView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0 }}
+      transition={{ duration: 0.5, delay: 0.3, ease }}
+    >
+      <defs>
+        <filter id="heart-pencil" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves={3} seed={FILTER_SEEDS[frame % FILTER_SEEDS.length]} result="n" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale={1.5} xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </defs>
+      <path
+        d={DOODLE_HEART_FRAMES[frame]}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        filter="url(#heart-pencil)"
+        className="text-[#5227FF] dark:text-[#8B6FFF]"
+        opacity="0.85"
+      />
+    </motion.svg>
+  );
+}
+
 function CommunitySection() {
   const { t } = useTranslation();
   return (
@@ -959,7 +1604,7 @@ function CommunitySection() {
           transition={{ duration: 0.7, ease }}
           className="font-display text-3xl font-light text-foreground sm:text-4xl md:text-5xl"
         >
-          {t("landing.communityTitle")}
+          {t("landing.communityTitle")}<DoodleHeart />
         </motion.h2>
 
         <motion.p
@@ -1030,6 +1675,9 @@ function Footer() {
           <Link href="/professors" className="text-sm text-white/80 transition-colors hover:text-white">
             {t("landing.rateYourProfessor")}
           </Link>
+          <Link href="/help" className="text-sm text-white/80 transition-colors hover:text-white">
+            {t("landing.helpCenter")}
+          </Link>
           <Link href="/privacy" className="text-sm text-white/80 transition-colors hover:text-white">
             {t("landing.privacyPolicy")}
           </Link>
@@ -1088,23 +1736,25 @@ export default function LandingPage() {
             >
               {t("landing.subtitle")}
             </motion.p>
-          </div>
 
-          {/* ── Nav ── */}
-          <motion.nav
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, ease, delay: 0.3 }}
-            className="flex w-full items-center justify-center gap-2 px-6 pb-10 sm:gap-4 sm:px-10 sm:pb-14"
-          >
-            <NavLink href="/auth" font="delicious">
-              {t("landing.letsStart")}
-            </NavLink>
-            <NavLink href="/portal" font="gochi">
-              {t("landing.portal")}
-            </NavLink>
-            <LangSwitcher />
-          </motion.nav>
+            {/* ── Nav ── */}
+            <motion.nav
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, ease, delay: 0.3 }}
+              className="flex items-center gap-2 sm:gap-4"
+            >
+              <DoodleAnnotation config={START_DOODLE}>
+                <NavLink href="/auth" font="delicious">
+                  {t("landing.letsStart")}
+                </NavLink>
+              </DoodleAnnotation>
+              <NavLink href="/portal" font="gochi">
+                {t("landing.portal")}
+              </NavLink>
+              <LangDoodle />
+            </motion.nav>
+          </div>
         </div>
 
         {/* Extra scroll space — the "leap" before the fade begins */}

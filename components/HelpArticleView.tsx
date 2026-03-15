@@ -27,6 +27,7 @@ const AICouncilDemo = dynamic(() => import("@/components/help/AICouncilDemo").th
 const ChallengeContentDemo = dynamic(() => import("@/components/help/ChallengeContentDemo").then((m) => ({ default: m.ChallengeContentDemo })), { ssr: false });
 const RateProfessorDemo = dynamic(() => import("@/components/help/RateProfessorDemo").then((m) => ({ default: m.RateProfessorDemo })), { ssr: false });
 const PortalDemo = dynamic(() => import("@/components/help/PortalDemo").then((m) => ({ default: m.PortalDemo })), { ssr: false });
+const MyStudiesDemo = dynamic(() => import("@/components/help/MyStudiesDemo").then((m) => ({ default: m.MyStudiesDemo })), { ssr: false });
 
 const SLUG_DEMO: Record<string, React.ComponentType> = {
   "create-account": SignUpDemo,
@@ -36,6 +37,7 @@ const SLUG_DEMO: Record<string, React.ComponentType> = {
   "my-space": MySpaceDemo,
   "presentations": PresentationsDemo,
   "portal": PortalDemo,
+  "my-studies": MyStudiesDemo,
   "support": SupportDemo,
   "browse-courses": BrowseDemo,
   "course-content": BrowseDemo,

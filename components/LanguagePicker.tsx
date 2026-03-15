@@ -36,6 +36,7 @@ export function LanguagePicker() {
         <button
           className="rounded-full p-3 text-sm font-medium text-gray-900/70 transition-colors duration-300 hover:text-gray-900 focus-visible:outline-none dark:text-white/70 dark:hover:text-white"
           aria-label="Change language"
+          suppressHydrationWarning
         >
           {current.short}
         </button>

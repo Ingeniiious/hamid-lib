@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+import { headers } from "next/headers";
 import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { I18nProvider } from "@/lib/i18n";
@@ -62,13 +63,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const headersList = await headers();
+  const geoCountry = headersList.get("x-vercel-ip-country") || "";
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-geo-country={geoCountry} suppressHydrationWarning>
       <body className={`${geist.variable} font-sans antialiased`}>
         <ThemeProvider>
           <I18nProvider>

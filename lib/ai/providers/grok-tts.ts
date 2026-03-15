@@ -22,8 +22,8 @@ const BASE_URL = "https://api.x.ai/v1";
 // ── Default voice map ───────────────────────────────────────────────────────
 
 const DEFAULT_VOICE_MAP: Record<string, string> = {
-  Host: "rex", // Confident, clear, professional
-  Expert: "sal", // Smooth, balanced, versatile
+  Host: "ara", // Female, warm, inviting — the main host voice
+  Expert: "sal", // Neutral, smooth, friendly — the subject matter expert
 };
 
 // ── Character limit ─────────────────────────────────────────────────────────
@@ -195,15 +195,12 @@ export async function synthesizeGrok(
     text: request.text,
     voice_id: request.voiceId,
     language,
+    output_format: {
+      codec: request.outputFormat?.codec ?? "mp3",
+      sample_rate: request.outputFormat?.sampleRate ?? 44100,
+      bit_rate: request.outputFormat?.bitRate ?? 192000,
+    },
   };
-
-  if (request.outputFormat) {
-    const fmt: Record<string, unknown> = {};
-    if (request.outputFormat.codec) fmt.codec = request.outputFormat.codec;
-    if (request.outputFormat.sampleRate) fmt.sample_rate = request.outputFormat.sampleRate;
-    if (request.outputFormat.bitRate) fmt.bit_rate = request.outputFormat.bitRate;
-    if (Object.keys(fmt).length > 0) body.output_format = fmt;
-  }
 
   const response = await fetchWithRetry(
     `${BASE_URL}/tts`,

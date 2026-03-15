@@ -26,6 +26,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
     titleKey: "helpArticles.yourDashboard",
     articles: [
       { slug: "navigate-dashboard", titleKey: "helpArticles.navigateDashboard", descKey: "helpArticles.navigateDashboardDesc", bodyKey: "helpArticles.navigateDashboardBody", category: "helpArticles.yourDashboard" },
+      { slug: "my-studies", titleKey: "helpArticles.myStudiesArticle", descKey: "helpArticles.myStudiesArticleDesc", bodyKey: "helpArticles.myStudiesArticleBody", category: "helpArticles.yourDashboard" },
       { slug: "my-space", titleKey: "helpArticles.mySpace", descKey: "helpArticles.mySpaceDesc", bodyKey: "helpArticles.mySpaceBody", category: "helpArticles.yourDashboard" },
       { slug: "support", titleKey: "helpArticles.support", descKey: "helpArticles.supportDesc", bodyKey: "helpArticles.supportBody", category: "helpArticles.yourDashboard" },
     ],

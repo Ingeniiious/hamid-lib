@@ -47,7 +47,7 @@ export function DashboardTopBar({
       <div className="pointer-events-auto flex items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="focus-visible:outline-none">
+            <button className="focus-visible:outline-none" suppressHydrationWarning>
               <Avatar className="h-9 w-9 cursor-pointer border border-gray-900/20 bg-gray-900/10 transition-colors hover:bg-gray-900/20 dark:border-white/20 dark:bg-white/10 dark:hover:bg-white/20">
                 {avatarUrl && (
                   <AvatarImage src={avatarUrl} alt={userName} />
